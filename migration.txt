@@ -1,0 +1,7 @@
+source,dest
+A,B
+B,A
+A,C
+C,A
+B,C
+C,B
