@@ -7,3 +7,4 @@ max migration events = 2
 secondary contact = True
 divergence with gene flow = True
 output directory = test
+seed = 1234

@@ -62,13 +62,19 @@ def parse_config(configfile):
             # migration rate
             if line.startswith("migration rate ="):
                 migration_rate = line.split("=")[1].split("#")[0].strip()
+                migration_rate = [float(migration_rate.split("U(")[1].split(",")[0]), float(migration_rate.split(",")[1].split(")")[0].strip())]
 
             # output directory
             if line.startswith("output directory ="):
                 output_directory = line.split("=")[1].split("#")[0].strip()
 
+            # random seed
+            if line.startswith("seed ="):
+                seed = int(line.split("=")[1].split("#")[0].strip())
 
-    return(species_tree, replicates, migration_df, symmetric, maxmig, secondary, dwg, migration_rate, output_directory)
+
+
+    return(species_tree, replicates, migration_df, symmetric, maxmig, secondary, dwg, migration_rate, output_directory, seed)
 
 def get_priors(species_tree):
     """A function to get priors for population sizes and divergence times from the species tree."""
@@ -292,182 +298,135 @@ def add_dwg_demographies(baseline_demographies, migration_df, symmetric, maxmig)
         
     return(migration_demographies)
 
-def model_to_yaml_divergence(model, outputfile):
-
-    yaml_dict = {}
-
+def draw_population_sizes(model, population_sizes, replicates, rng):
+    # draw population sizes and map populations to keys
+    population_size_draws = {}
+    population_size_keys = {}
+    count=0
     for population in model.populations:
-        yaml_dict[population.name] = {'size':population.initial_size}
+        population_size_draws[population.name] = rng.uniform(low=population_sizes[population.name][0], high=population_sizes[population.name][1], size=replicates)
+        population_size_keys[population.name] = count
+        count+=1
+    return(population_size_draws, population_size_keys)
 
+def draw_divergence_times(population_size_draws, model, divergence_times, replicates, rng):
+
+    # create a list of populations that are never ancestors
+    all_populations = population_size_draws.keys()
+    ancestral = [x for x in model.events if hasattr(x, 'ancestral')]
+    ancestral = [x.ancestral for x in ancestral]
+    non_ancestral = list(set(all_populations)- set(ancestral))
+    # draw divergence times
+    divergence_time_draws = {}
+    # add zero for non-ancestral populations
+    for x in non_ancestral:
+        divergence_time_draws[x] = np.repeat(0, replicates)
     for event in model.events:
-        yaml_dict[event.ancestral]['end_time']= event.time
-        yaml_dict[event.derived[0]]['ancestor'] = event.ancestral
-        yaml_dict[event.derived[1]]['ancestor'] = event.ancestral
-    
-
-    with open(outputfile, 'w') as f:
-        f.write('time_units: generations\n')
-        f.write('demes:\n')
-        for item in yaml_dict:
-            f.write('  -name: %s\n' % item)
-            try:
-                f.write('    ancestors:[%s]\n' % yaml_dict[item]["ancestor"])
-            except:
-                pass
-            f.write('    epochs:\n')
-            try:
-                f.write('      -{end_time: %s, start_size: %s}\n' % (yaml_dict[item]["end_time"], yaml_dict[item]["size"]))
-            except:
-                f.write('      -{end_time: 0, start_size: %s}\n' % (yaml_dict[item]["size"]))
-
-def model_to_yaml_sc(model, outputfile, migration_matrix, migration_prior):
-
-    yaml_dict = {}
-
-    for population in model.populations:
-        yaml_dict[population.name] = {'size':population.initial_size}
-
-    for event in model.events:
-        if event.time != 0 and hasattr(event, 'ancestral'):
-            yaml_dict[event.ancestral]['end_time']= event.time
-            yaml_dict[event.derived[0]]['ancestor'] = event.ancestral
-            yaml_dict[event.derived[1]]['ancestor'] = event.ancestral
-    
-
-    with open(outputfile, 'w') as f:
-        f.write('time_units: generations\n')
-        f.write('demes:\n')
-        for item in yaml_dict:
-            f.write('  -name: %s\n' % item)
-            try:
-                f.write('    ancestors:[%s]\n' % yaml_dict[item]["ancestor"])
-            except:
-                pass
-            f.write('    epochs:\n')
-            try:
-                f.write('      -{end_time: %s, start_size: %s}\n' % (yaml_dict[item]["end_time"], yaml_dict[item]["size"]))
-            except:
-                f.write('      -{end_time: 0, start_size: %s}\n' % (yaml_dict[item]["size"]))
-
-        f.write('migrations:\n')
-        row_count=0
-        for row in migration_matrix:
-            col_count=0
-            for col in row:
-                if col != 0:
-                    f.write('{demes: [%s, %s], rate: %s, start_time: 0, end_time: mindiv/2}\n' % (row_count, col_count, migration_prior))
-                col_count+=1
-            row_count+=1
-
-def model_to_yaml_dwg(model, outputfile, migration_matrix, migration_prior):
-
-    yaml_dict = {}
-
-    for population in model.populations:
-        yaml_dict[population.name] = {'size':population.initial_size}
-
-    for event in model.events:
-        if event.time != 0 and hasattr(event, 'ancestral'):
-            yaml_dict[event.ancestral]['end_time']= event.time
-            yaml_dict[event.derived[0]]['ancestor'] = event.ancestral
-            yaml_dict[event.derived[1]]['ancestor'] = event.ancestral
-
-    with open(outputfile, 'w') as f:
-        f.write('time_units: generations\n')
-        f.write('demes:\n')
-        for item in yaml_dict:
-            f.write('  -name: %s\n' % item)
-            try:
-                f.write('    ancestors:[%s]\n' % yaml_dict[item]["ancestor"])
-            except:
-                pass
-            f.write('    epochs:\n')
-            try:
-                f.write('      -{end_time: %s, start_size: %s}\n' % (yaml_dict[item]["end_time"], yaml_dict[item]["size"]))
-            except:
-                f.write('      -{end_time: 0, start_size: %s}\n' % (yaml_dict[item]["size"]))
-
-    for event in model.events:
-        if event.time != 0 and hasattr(event, 'rate'):
-            deme_1 = event.populations[0]
-            deme_2 = event.populations[1]
-            # find the ancestor of the two focal populations to figure out when to start and end migration
-            deme_1_ancestor = yaml_dict[deme_1]['ancestor']
-            deme_2_ancestor = yaml_dict[deme_2]['ancestor']
-            if not deme_1_ancestor == deme_2_ancestor:
-                sys.exit("ERROR IN DWG MODEL.")
-
-
-#        row_count=0
-#        for row in migration_matrix:
-#            col_count=0
-#            for col in row:
-#                if col != 0:
-#                    print(row,col)
-#                    f.write('{demes: [%s, %s], rate: %s, start_time: 0, end_time: mindiv/2}\n' % (row_count, col_count, migration_prior))
-#                col_count+=1
-#            row_count+=1
-
-
-def create_yaml_files(output_directory, baseline_demographies, sc_demographies, dwg_demographies, population_sizes, divergence_times, migration_rates):
-
-    print("Creating yaml model files.")
-    modno = 1
-
-    # for divergence only models
-    for model in baseline_demographies:
-        
-        # put priors in for population sizes
-        for population in model.populations:
-            prior = 'U(%s, %s)' % (population_sizes[population.name][0], population_sizes[population.name][1])
-            population.initial_size=prior
-        
-        # put priors in for divergence times
-        for event in model.events:
+        if hasattr(event, 'ancestral'):
             if event.time != 0:
-                prior = 'U(%s, %s)' % (divergence_times[event.ancestral][0],divergence_times[event.ancestral][1])
-                event.time = prior
+                # get the divergence times of the derived populations, and use that to set the minimum value for drawing divergence times
+                min_values = [max(x) for x in zip(divergence_time_draws[event.derived[0]], divergence_time_draws[event.derived[1]], np.repeat(divergence_times[event.ancestral][0], replicates))]
+                divergence_time_draws[event.ancestral] = [rng.uniform(low=x, high=divergence_times[event.ancestral][1]) for x in min_values]
+            elif event.time == 0:
+                divergence_time_draws[event.ancestral] = np.repeat(0, replicates)
+    return(divergence_time_draws)
 
-        # write to yaml
-        model_to_yaml_divergence(model, '%s/model_%s.yaml' % (output_directory, str(modno)))
+def draw_migration_rates(population_size_keys, model, migration_rate, replicates, rng):
 
-        modno += 1
+    # draw migration rates
+    migration_rate_draws = {}
+    for event in model.events:
+        if hasattr(event, 'rate'):
+            migration_rate_draws["%s_%s" % (population_size_keys[event.populations[0]], population_size_keys[event.populations[1]])] =  rng.uniform(low=migration_rate[0], high=migration_rate[1], size=replicates)
+    return(migration_rate_draws)
 
+def get_migration_stops(replicates, divergence_time_draws):
+    minimum_divergence = []
+    for rep in range(replicates):
+        min = np.inf
+        for key in divergence_time_draws:
+            if divergence_time_draws[key][rep] > 0 and divergence_time_draws[key][rep] < min:
+                min = divergence_time_draws[key][rep]
+        minimum_divergence.append(min)
+    migration_stop = [np.ceil(x/2) for x in minimum_divergence]
+    return(migration_stop)
+
+def draw_parameters_baseline(baseline_demographies, divergence_times, population_sizes, replicates, output_directory, seed):
+    models_with_parameters = []
+    rng_base = np.random.default_rng(seed)
+    rng_seeds = rng_base.integers(2**32, size=len(baseline_demographies))
+
+    """Draw parameters for models."""
+    modcount=0
+    for model in baseline_demographies:
+
+        rng = np.random.default_rng(rng_seeds[modcount])
+        modcount+=1
+
+        this_model_with_parameters = []
+
+        population_size_draws, population_size_keys = draw_population_sizes(model, population_sizes, replicates, rng)
+        
+        divergence_time_draws = draw_divergence_times(population_size_draws, model,divergence_times, replicates, rng)
+
+        for rep in range(replicates):
+            for population in model.populations:
+                population.initial_size = population_size_draws[population.name][rep]
+            for event in model.events:
+                if hasattr(event, 'ancestral'):
+                    event.time = divergence_time_draws[event.ancestral][rep]
+
+            this_model_with_parameters.append(model)
+        models_with_parameters.append(this_model_with_parameters)
+
+    return(models_with_parameters)
+
+def draw_parameters_sc(sc_demographies, divergence_times, population_sizes, replicates, output_directory, seed, migration_rate):
+    models_with_parameters = []
+    rng_base = np.random.default_rng(seed)
+    rng_seeds = rng_base.integers(2**32, size=len(sc_demographies))
+
+    """Draw parameters for models."""
+    modcount=0
     for model in sc_demographies:
 
-        # put priors in for population sizes
-        for population in model.populations:
-            prior = 'U(%s, %s)' % (population_sizes[population.name][0], population_sizes[population.name][1])
-            population.initial_size=prior
-        
-        # put priors in for divergence times
-        for event in model.events:
-            if event.time != 0 and hasattr(event, 'ancestral'):
-                prior = 'U(%s, %s)' % (divergence_times[event.ancestral][0],divergence_times[event.ancestral][1])
-                event.time = prior
+        rng = np.random.default_rng(rng_seeds[modcount])
+        modcount+=1
 
-        # write to yaml
-        model_to_yaml_sc(model, '%s/model_%s.yaml' % (output_directory, str(modno)), migration_matrix=model.migration_matrix, migration_prior=migration_rates)
+        this_model_with_parameters = []
 
-        modno += 1
+        population_size_draws, population_size_keys = draw_population_sizes(model, population_sizes, replicates, rng)
 
-    for model in dwg_demographies:
+        divergence_time_draws = draw_divergence_times(population_size_draws, model,divergence_times, replicates, rng)
 
-        # put priors in for population sizes
-        for population in model.populations:
-            prior = 'U(%s, %s)' % (population_sizes[population.name][0], population_sizes[population.name][1])
-            population.initial_size=prior
-        
-        # put priors in for divergence times
-        for event in model.events:
-            if event.time != 0 and hasattr(event, 'ancestral'):
-                prior = 'U(%s, %s)' % (divergence_times[event.ancestral][0],divergence_times[event.ancestral][1])
-                event.time = prior
+        migration_rate_draws = draw_migration_rates(population_size_keys, model, migration_rate, replicates, rng)
 
-        # write to yaml
-        model_to_yaml_dwg(model, '%s/model_%s.yaml' % (output_directory, str(modno)), migration_matrix=model.migration_matrix, migration_prior=migration_rates)
+        migration_stop = get_migration_stops(replicates, divergence_time_draws)
+        minimum_divergence = []
+        for rep in range(replicates):
+            min = np.inf
+            for key in divergence_time_draws:
+                if divergence_time_draws[key][rep] > 0 and divergence_time_draws[key][rep] < min:
+                    min = divergence_time_draws[key][rep]
+            minimum_divergence.append(min)
+        migration_stop = [np.ceil(x/2) for x in minimum_divergence]
 
-        modno += 1
+        for rep in range(replicates):
+            for population in model.populations:
+                population.initial_size = population_size_draws[population.name][rep]
+            for event in model.events:
+                if hasattr(event, 'ancestral'):
+                    event.time = divergence_time_draws[event.ancestral][rep]
+                elif hasattr(event, 'rate'):
+                    event.time = migration_stop[rep]
+            for key in migration_rate_draws.keys():
+                model.migration_matrix[int(str(key.split('_')[0])),int(str(key.split('_')[1]))] = migration_rate_draws[key][rep]
+                model.migration_matrix[int(str(key.split('_')[1])),int(str(key.split('_')[0]))] = migration_rate_draws[key][rep]
+            this_model_with_parameters.append(model)
+
+        models_with_parameters.append(this_model_with_parameters)
+
+    return(models_with_parameters)
 
 
 def main():
@@ -476,7 +435,7 @@ def main():
     options, args = parse_arguments()
 
     # get information from the configuration file
-    species_tree, replicates, migration_df, symmetric, maxmig, secondary, dwg, migration_rate, output_directory = parse_config(configfile=options.configfile)
+    species_tree, replicates, migration_df, symmetric, maxmig, secondary, dwg, migration_rate, output_directory, seed = parse_config(configfile=options.configfile)
 
     # create output directory
     os.system('mkdir -p %s' % output_directory)
@@ -501,16 +460,21 @@ def main():
 
     print('Creating %s different models based on user input.' % len(baseline_demographies+sc_demographies+dwg_demographies))
 
-    # create modified yaml files
-    create_yaml_files(output_directory, baseline_demographies, sc_demographies, dwg_demographies, population_sizes, divergence_times, migration_rate)
+
+    # draw parameters from priors for each set of demographies
+    rng = np.random.default_rng(seed)
+    random_seeds = rng.integers(2**32, size=3)
+
+    parameterized_baseline_demographies = draw_parameters_baseline(baseline_demographies, divergence_times, population_sizes, replicates=replicates, output_directory=output_directory, seed=random_seeds[0])
+    parameterized_sc_demographies = draw_parameters_sc(sc_demographies, divergence_times, population_sizes, replicates=replicates, output_directory=output_directory, seed=random_seeds[1], migration_rate=migration_rate)
+
 
 
     # to do:
     # 1. add random seeds
-    # 2. take yaml formatted files as input
-    # 3. write yaml formatted files as output (I would do this prior to simulations, and draw parameters from these files.)
-    # 4. COMPLETE add secondary contact histories
-    # 5. COMPLETE add divergence with gene flow histories
+    # 1. check how the rng thing works with numpy
+    # 2. take msprime models from users
+    # 3. draw parameters from priors
     # 6. perform simulations
     # 7. option to save simulated data in useful format
     # 8. create input for CNN
@@ -530,12 +494,7 @@ def main():
     #21. write preprint
     #22. create documentation
     #23. turn into python package
-    #24. add migration rate priors
-    #25. parameter estimation?
-    #26. make sure parameter draws play by the rules of the tree
-    #27. does symmetric mean that we use the same rate, or just that migration happens in both directions?
-    #28. secondary contact only occurs between current populations (including ancestral populations in the tree when nodes are collapsed), and dwg only occurs between populations that share a most recent common ancestor
-
+    #24. parameter estimation
 
 
 if __name__ == "__main__":
