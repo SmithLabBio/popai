@@ -9,6 +9,10 @@ import pandas as pd
 import os
 import demes
 import sys
+import random # only used for demes plotting
+import demesdraw
+import matplotlib.pyplot as plt
+
 
 def parse_arguments():
     # get command line input from user using optparse.
@@ -120,6 +124,15 @@ def remove_conflicting(all_combos):
             keep_combos.append(item)
     return(keep_combos)
 
+def get_derived_populations(internal_node):
+    derived_1 = internal_node.child_nodes()[0].label
+    derived_2 = internal_node.child_nodes()[1].label
+    if derived_1 == None:
+        derived_1 = str(internal_node.child_nodes()[0].taxon).strip("'")
+    if derived_2 == None:
+        derived_2 = str(internal_node.child_nodes()[1].taxon).strip("'")
+    return(derived_1, derived_2)
+
 def create_baseline_demographies(species_tree):
 
     """Here we create our baseline models with the correct population divergences set to zero, and migration where needed. We will draw other parameters from priors later."""
@@ -138,21 +151,24 @@ def create_baseline_demographies(species_tree):
     # now generate the demographies for all combos
     for combo in all_combos:
         demography = msprime.Demography()
-        # add populations and set intial size to 1000 (this will be edited in a later stage)
-        demography = add_populations(demography, species_tree)
-        # add divergences and set initial size to 1000 if the node is not collapsed, and 0 otherwise
+        added_populations = []
+
+        # add populations that should be added, and set initial sizes (these will be changed later.)
         for internal_node in species_tree.postorder_internal_node_iter():
-            derived_1 = internal_node.child_nodes()[0].label
-            derived_2 = internal_node.child_nodes()[1].label
-            if derived_1 == None:
-                derived_1 = str(internal_node.child_nodes()[0].taxon).strip("'")
-            if derived_2 == None:
-                derived_2 = str(internal_node.child_nodes()[1].taxon).strip("'")
+            derived_1, derived_2 = get_derived_populations(internal_node)
             ancestral = str(internal_node.label).strip("'")
-            if internal_node in combo:
-                demography.add_population_split(time=0, derived=[derived_1, derived_2], ancestral=ancestral)
-            else:
+            if internal_node not in combo:
+                demography.add_population(name=derived_1, initial_size=1000)
+                demography.add_population(name=derived_2, initial_size=1000)
+        demography.add_population(name=str(species_tree.seed_node.label).strip("'"), initial_size=1000)
+
+        # add non-zero divergence events
+        for internal_node in species_tree.postorder_internal_node_iter():
+            if internal_node not in combo:
+                derived_1, derived_2 = get_derived_populations(internal_node)
+                ancestral = str(internal_node.label).strip("'")
                 demography.add_population_split(time=1000, derived=[derived_1, derived_2], ancestral=ancestral)
+
         demographies.append(demography)
         del(demography)
 
@@ -252,7 +268,6 @@ def add_sc_demographies(baseline_demographies, migration_df, symmetric, maxmig):
             # sort the events and add the demography to the list
             migration_demography.sort_events()
             migration_demographies.append(migration_demography)
-
         
     return(migration_demographies)
 
@@ -331,13 +346,16 @@ def draw_divergence_times(population_size_draws, model, divergence_times, replic
                 divergence_time_draws[event.ancestral] = np.repeat(0, replicates)
     return(divergence_time_draws)
 
-def draw_migration_rates(population_size_keys, model, migration_rate, replicates, rng):
+def draw_migration_rates(population_size_keys, model, migration_rate, replicates, symmetric, rng):
 
     # draw migration rates
     migration_rate_draws = {}
     for event in model.events:
         if hasattr(event, 'rate'):
-            migration_rate_draws["%s_%s" % (population_size_keys[event.populations[0]], population_size_keys[event.populations[1]])] =  rng.uniform(low=migration_rate[0], high=migration_rate[1], size=replicates)
+            if symmetric=='True':
+                migration_rate_draws["%s_%s" % (population_size_keys[event.populations[0]], population_size_keys[event.populations[1]])] =  rng.uniform(low=migration_rate[0], high=migration_rate[1], size=replicates)
+            else:
+                migration_rate_draws["%s_%s" % (population_size_keys[event.source], population_size_keys[event.dest])] =  rng.uniform(low=migration_rate[0], high=migration_rate[1], size=replicates)
     return(migration_rate_draws)
 
 def get_migration_stops(replicates, divergence_time_draws):
@@ -351,25 +369,47 @@ def get_migration_stops(replicates, divergence_time_draws):
     migration_stop = [np.ceil(x/2) for x in minimum_divergence]
     return(migration_stop)
 
-def draw_parameters_baseline(baseline_demographies, divergence_times, population_sizes, replicates, output_directory, seed):
+def get_migration_starts(model, replicates, divergence_time_draws, population_size_keys, symmetric):
+    migration_start = {}
+    for rep in range(replicates):
+        for event in model.events:
+            if hasattr(event, 'rate'):
+                if symmetric == "True":
+                    daughter1 = event.populations[0]
+                    daughter2 = event.populations[1]
+                else:
+                    daughter1 = event.source
+                    daughter2 = event.dest
+
+                for divevent in model.events:
+                    if hasattr(divevent, 'ancestral'):
+                        if daughter1 in divevent.derived and daughter2 in divevent.derived:
+                            ancestor = divevent.ancestral
+                tdiv_ancestor = divergence_time_draws[ancestor][rep]
+                tdiv_daughter1 = divergence_time_draws[daughter1][rep]
+                tdiv_daughter2 = divergence_time_draws[daughter2][rep]
+                startime = ((tdiv_ancestor-max(tdiv_daughter1, tdiv_daughter2))/2) + max(tdiv_daughter1, tdiv_daughter2)
+                try:
+                    migration_start["%s_%s" % (population_size_keys[daughter1], population_size_keys[daughter2])].append(startime)
+                except:
+                    migration_start["%s_%s" % (population_size_keys[daughter1], population_size_keys[daughter2])] = []
+                    migration_start["%s_%s" % (population_size_keys[daughter1], population_size_keys[daughter2])].append(startime)
+    return(migration_start)
+
+def draw_parameters_baseline(demographies, divergence_times, population_sizes, replicates, rng):
     models_with_parameters = []
-    rng_base = np.random.default_rng(seed)
-    rng_seeds = rng_base.integers(2**32, size=len(baseline_demographies))
 
     """Draw parameters for models."""
-    modcount=0
-    for model in baseline_demographies:
-
-        rng = np.random.default_rng(rng_seeds[modcount])
-        modcount+=1
+    for original_model in demographies:
 
         this_model_with_parameters = []
 
-        population_size_draws, population_size_keys = draw_population_sizes(model, population_sizes, replicates, rng)
+        population_size_draws, population_size_keys = draw_population_sizes(original_model, population_sizes, replicates, rng)
         
-        divergence_time_draws = draw_divergence_times(population_size_draws, model,divergence_times, replicates, rng)
+        divergence_time_draws = draw_divergence_times(population_size_draws, original_model, divergence_times, replicates, rng)
 
         for rep in range(replicates):
+            model = copy.deepcopy(original_model)
             for population in model.populations:
                 population.initial_size = population_size_draws[population.name][rep]
             for event in model.events:
@@ -377,41 +417,30 @@ def draw_parameters_baseline(baseline_demographies, divergence_times, population
                     event.time = divergence_time_draws[event.ancestral][rep]
 
             this_model_with_parameters.append(model)
+            del(model)
+
         models_with_parameters.append(this_model_with_parameters)
 
     return(models_with_parameters)
 
-def draw_parameters_sc(sc_demographies, divergence_times, population_sizes, replicates, output_directory, seed, migration_rate):
+def draw_parameters_sc(demographies, divergence_times, population_sizes, replicates, migration_rate, symmetric, rng):
     models_with_parameters = []
-    rng_base = np.random.default_rng(seed)
-    rng_seeds = rng_base.integers(2**32, size=len(sc_demographies))
 
     """Draw parameters for models."""
-    modcount=0
-    for model in sc_demographies:
-
-        rng = np.random.default_rng(rng_seeds[modcount])
-        modcount+=1
+    for original_model in demographies:
 
         this_model_with_parameters = []
 
-        population_size_draws, population_size_keys = draw_population_sizes(model, population_sizes, replicates, rng)
+        population_size_draws, population_size_keys = draw_population_sizes(original_model, population_sizes, replicates, rng)
 
-        divergence_time_draws = draw_divergence_times(population_size_draws, model,divergence_times, replicates, rng)
+        divergence_time_draws = draw_divergence_times(population_size_draws, original_model,divergence_times, replicates, rng)
 
-        migration_rate_draws = draw_migration_rates(population_size_keys, model, migration_rate, replicates, rng)
+        migration_rate_draws = draw_migration_rates(population_size_keys, original_model, migration_rate, replicates, symmetric, rng)
 
         migration_stop = get_migration_stops(replicates, divergence_time_draws)
-        minimum_divergence = []
-        for rep in range(replicates):
-            min = np.inf
-            for key in divergence_time_draws:
-                if divergence_time_draws[key][rep] > 0 and divergence_time_draws[key][rep] < min:
-                    min = divergence_time_draws[key][rep]
-            minimum_divergence.append(min)
-        migration_stop = [np.ceil(x/2) for x in minimum_divergence]
 
         for rep in range(replicates):
+            model = copy.deepcopy(original_model)
             for population in model.populations:
                 population.initial_size = population_size_draws[population.name][rep]
             for event in model.events:
@@ -421,13 +450,61 @@ def draw_parameters_sc(sc_demographies, divergence_times, population_sizes, repl
                     event.time = migration_stop[rep]
             for key in migration_rate_draws.keys():
                 model.migration_matrix[int(str(key.split('_')[0])),int(str(key.split('_')[1]))] = migration_rate_draws[key][rep]
-                model.migration_matrix[int(str(key.split('_')[1])),int(str(key.split('_')[0]))] = migration_rate_draws[key][rep]
+                if symmetric == "True":
+                    model.migration_matrix[int(str(key.split('_')[1])),int(str(key.split('_')[0]))] = migration_rate_draws[key][rep]
             this_model_with_parameters.append(model)
+            del(model)
 
         models_with_parameters.append(this_model_with_parameters)
 
     return(models_with_parameters)
 
+def draw_parameters_dwg(demographies, divergence_times, population_sizes, replicates, migration_rate, symmetric, rng):
+    models_with_parameters = []
+
+    """Draw parameters for models."""
+    for original_model in demographies:
+
+        this_model_with_parameters = []
+
+        population_size_draws, population_size_keys = draw_population_sizes(original_model, population_sizes, replicates, rng)
+
+        divergence_time_draws = draw_divergence_times(population_size_draws, original_model,divergence_times, replicates, rng)
+
+        migration_rate_draws = draw_migration_rates(population_size_keys, original_model, migration_rate, replicates, symmetric, rng)
+
+        migration_start = get_migration_starts(original_model, replicates, divergence_time_draws, population_size_keys, symmetric)
+
+        for rep in range(replicates):
+            model = copy.deepcopy(original_model)
+            for population in model.populations:
+                population.initial_size = population_size_draws[population.name][rep]
+            for event in model.events:
+                if hasattr(event, 'ancestral'):
+                    event.time = divergence_time_draws[event.ancestral][rep]
+                elif hasattr(event, 'rate'):
+                    if symmetric=="True":
+                        event.time = migration_start["%s_%s" % (population_size_keys[event.populations[0]], population_size_keys[event.populations[1]])][rep]
+                        event.rate = migration_rate_draws["%s_%s" % (population_size_keys[event.populations[0]], population_size_keys[event.populations[1]])][rep]
+                    else:
+                        event.time = migration_start["%s_%s" % (population_size_keys[event.source], population_size_keys[event.dest])][rep]
+                        event.rate = migration_rate_draws["%s_%s" % (population_size_keys[event.source], population_size_keys[event.dest])][rep]
+
+            model.sort_events()
+            this_model_with_parameters.append(model)
+            del(model)
+
+        models_with_parameters.append(this_model_with_parameters)
+
+    return(models_with_parameters)
+
+def verify(demographies):
+    for model in demographies:
+        demo_to_plot = random.sample(model, 1)[0]
+        graph = demo_to_plot.to_demes()
+        fig, ax = plt.subplots()
+        demesdraw.tubes(graph, ax=ax, seed=1)
+        plt.show()
 
 def main():
 
@@ -463,39 +540,16 @@ def main():
 
     # draw parameters from priors for each set of demographies
     rng = np.random.default_rng(seed)
-    random_seeds = rng.integers(2**32, size=3)
 
-    parameterized_baseline_demographies = draw_parameters_baseline(baseline_demographies, divergence_times, population_sizes, replicates=replicates, output_directory=output_directory, seed=random_seeds[0])
-    parameterized_sc_demographies = draw_parameters_sc(sc_demographies, divergence_times, population_sizes, replicates=replicates, output_directory=output_directory, seed=random_seeds[1], migration_rate=migration_rate)
+    # draw parameters for models
+    parameterized_baseline_demographies = draw_parameters_baseline(demographies=baseline_demographies, divergence_times=divergence_times, population_sizes=population_sizes, replicates=replicates, rng=rng)
+    parameterized_sc_demographies = draw_parameters_sc(demographies=sc_demographies, divergence_times=divergence_times, population_sizes=population_sizes, replicates=replicates, migration_rate=migration_rate, symmetric=symmetric, rng=rng)
+    parameterized_dwg_demographies = draw_parameters_dwg(demographies=dwg_demographies, divergence_times=divergence_times, population_sizes=population_sizes, replicates=replicates, migration_rate=migration_rate, symmetric=symmetric, rng=rng)
 
-
-
-    # to do:
-    # 1. add random seeds
-    # 1. check how the rng thing works with numpy
-    # 2. take msprime models from users
-    # 3. draw parameters from priors
-    # 6. perform simulations
-    # 7. option to save simulated data in useful format
-    # 8. create input for CNN
-    # 9. create input for RF with SFS
-    #10. crete input for RF with sumstats
-    #11. create input for CNN with sumstats
-    #12. create input for CNN with SFS
-    #13. create function to train CNN
-    #14. create function to train RF with SFS
-    #15. create function to train RF with sumstats
-    #16. create function to train CNN with SFS
-    #17. create function to train CNN with sumstats
-    #18. create function to output training information.
-    #18. create function to apply trained models.
-    #19. create functioin to output results.
-    #20. test on simulated datasets for a variety of model setups.
-    #21. write preprint
-    #22. create documentation
-    #23. turn into python package
-    #24. parameter estimation
-
+    # write parameterized models to demes file
+    verify(parameterized_baseline_demographies)
+    verify(parameterized_sc_demographies)
+    verify(parameterized_dwg_demographies)
 
 if __name__ == "__main__":
     main()

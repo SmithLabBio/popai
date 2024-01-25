@@ -1,0 +1,39 @@
+Demography
+╟  Populations
+║  ┌───────────────────────────────────────────────────────────────────────────────────────────────┐
+║  │ id │name  │description  │initial_size  │ growth_rate │  default_sampling_time│extra_metadata  │
+║  ├───────────────────────────────────────────────────────────────────────────────────────────────┤
+║  │ 0  │A     │             │1223.5        │      0      │                      0│{}              │
+║  │ 1  │B     │             │4066.7        │      0      │                      0│{}              │
+║  │ 2  │C     │             │9608.6        │      0      │                      0│{}              │
+║  │ 3  │AB    │             │5154.5        │      0      │                      0│{}              │
+║  │ 4  │ABC   │             │5459.5        │      0      │                      0│{}              │
+║  └───────────────────────────────────────────────────────────────────────────────────────────────┘
+╟  Migration Matrix
+║  ┌────────────────────────────┐
+║  │     │ A │ B │ C │ AB │ ABC │
+║  ├────────────────────────────┤
+║  │    A│ 0 │ 0 │ 0 │ 0  │  0  │
+║  │    B│ 0 │ 0 │ 0 │ 0  │  0  │
+║  │    C│ 0 │ 0 │ 0 │ 0  │  0  │
+║  │   AB│ 0 │ 0 │ 0 │ 0  │  0  │
+║  │  ABC│ 0 │ 0 │ 0 │ 0  │  0  │
+║  └────────────────────────────┘
+╟  Events
+║  ┌─────────────────────────────────────────────────────────────────────────────┐
+║  │  time│type        │parameters        │effect                                │
+║  ├─────────────────────────────────────────────────────────────────────────────┤
+║  │     0│Population  │derived=[A, B],   │Moves all lineages from derived       │
+║  │      │Split       │ancestral=AB      │populations 'A' and 'B' to the        │
+║  │      │            │                  │ancestral 'AB' population. Also set   │
+║  │      │            │                  │the derived populations to inactive,  │
+║  │      │            │                  │and all migration rates to and from   │
+║  │      │            │                  │the derived populations to zero.      │
+║  │┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈│
+║  │     0│Population  │derived=[AB, C],  │Moves all lineages from derived       │
+║  │      │Split       │ancestral=ABC     │populations 'AB' and 'C' to the       │
+║  │      │            │                  │ancestral 'ABC' population. Also set  │
+║  │      │            │                  │the derived populations to inactive,  │
+║  │      │            │                  │and all migration rates to and from   │
+║  │      │            │                  │the derived populations to zero.      │
+║  └─────────────────────────────────────────────────────────────────────────────┘

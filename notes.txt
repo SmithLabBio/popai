@@ -1,0 +1,22 @@
+    # to do:
+    # 2. take msprime models from users
+    # 6. perform simulations
+    # 7. option to save simulated data in useful format
+    # 8. create input for CNN
+    # 9. create input for RF with SFS
+    #10. crete input for RF with sumstats
+    #11. create input for CNN with sumstats
+    #12. create input for CNN with SFS
+    #13. create function to train CNN
+    #14. create function to train RF with SFS
+    #15. create function to train RF with sumstats
+    #16. create function to train CNN with SFS
+    #17. create function to train CNN with sumstats
+    #18. create function to output training information.
+    #18. create function to apply trained models.
+    #19. create functioin to output results.
+    #20. test on simulated datasets for a variety of model setups.
+    #21. write preprint
+    #22. create documentation
+    #23. turn into python package
+    #24. parameter estimation
