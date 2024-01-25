@@ -514,9 +514,6 @@ def main():
     # get information from the configuration file
     species_tree, replicates, migration_df, symmetric, maxmig, secondary, dwg, migration_rate, output_directory, seed = parse_config(configfile=options.configfile)
 
-    # create output directory
-    os.system('mkdir -p %s' % output_directory)
-
     # get priors from species tree
     population_sizes, divergence_times = get_priors(species_tree=species_tree)
 
