@@ -1,0 +1,141 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module generate_models</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>generate_models</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/Users/megansmith/Documents/GitHub/delimitpy/delimitpy/source/generate_models.py">/Users/megansmith/Documents/GitHub/delimitpy/delimitpy/source/generate_models.py</a></font></td></tr></table>
+    <p><tt>This&nbsp;module&nbsp;contains&nbsp;all&nbsp;Classes&nbsp;for&nbsp;reading&nbsp;user&nbsp;input&nbsp;and&nbsp;creating&nbsp;msprime&nbsp;demographies&nbsp;to&nbsp;be&nbsp;used&nbsp;in&nbsp;downstream&nbsp;simulation.</tt></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="configparser.html">configparser</a><br>
+<a href="copy.html">copy</a><br>
+<a href="demes.html">demes</a><br>
+</td><td width="25%" valign=top><a href="demesdraw.html">demesdraw</a><br>
+<a href="dendropy.html">dendropy</a><br>
+<a href="logging.html">logging</a><br>
+</td><td width="25%" valign=top><a href="msprime.html">msprime</a><br>
+<a href="numpy.html">numpy</a><br>
+<a href="pandas.html">pandas</a><br>
+</td><td width="25%" valign=top><a href="matplotlib.pyplot.html">matplotlib.pyplot</a><br>
+<a href="random.html">random</a><br>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ee77aa">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Classes</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#ee77aa"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl>
+<dt><font face="helvetica, arial"><a href="builtins.html#object">builtins.object</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="generate_models.html#ModelBuilder">ModelBuilder</a>
+</font></dt><dt><font face="helvetica, arial"><a href="generate_models.html#ModelConfigParser">ModelConfigParser</a>
+</font></dt></dl>
+</dd>
+</dl>
+ <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="ModelBuilder">class <strong>ModelBuilder</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt><a href="#ModelBuilder">ModelBuilder</a>(config_values)<br>
+&nbsp;<br>
+Generate&nbsp;a&nbsp;model&nbsp;set&nbsp;with&nbsp;parameters&nbsp;drawn&nbsp;from&nbsp;user-defined&nbsp;priors.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="ModelBuilder-__init__"><strong>__init__</strong></a>(self, config_values)</dt><dd><tt>Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="ModelBuilder-build_models"><strong>build_models</strong></a>(self)</dt><dd><tt>Build&nbsp;msprime&nbsp;models&nbsp;for&nbsp;divergence,&nbsp;secondary&nbsp;contact,&nbsp;and&nbsp;divergence&nbsp;with&nbsp;gene&nbsp;flow&nbsp;scenarios.<br>
+&nbsp;<br>
+Parameters:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;species&nbsp;tree:&nbsp;A&nbsp;dendropy&nbsp;species&nbsp;tree&nbsp;<a href="builtins.html#object">object</a>&nbsp;with&nbsp;annotations&nbsp;specifying&nbsp;distributions&nbsp;on&nbsp;population&nbsp;sizes&nbsp;and&nbsp;divergence&nbsp;times.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;list&nbsp;of&nbsp;base&nbsp;msprime&nbsp;demographies&nbsp;with&nbsp;divergence&nbsp;only&nbsp;(without&nbsp;accurate&nbsp;divergence&nbsp;times&nbsp;and&nbsp;population&nbsp;sizes.)<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Error:&nbsp;If&nbsp;baseline&nbsp;demographies&nbsp;cannot&nbsp;be&nbsp;created.</tt></dd></dl>
+
+<dl><dt><a name="ModelBuilder-draw_parameters"><strong>draw_parameters</strong></a>(self)</dt><dd><tt>Draw&nbsp;parameters&nbsp;for&nbsp;all&nbsp;models.<br>
+&nbsp;<br>
+Parameters:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;divergence_demographies&nbsp;(List):&nbsp;A&nbsp;list&nbsp;of&nbsp;divergence&nbsp;demography&nbsp;objects&nbsp;returned&nbsp;from&nbsp;build_models.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sc_demographies&nbsp;(List):&nbsp;A&nbsp;list&nbsp;of&nbsp;secondary&nbsp;contact&nbsp;demography&nbsp;objects&nbsp;returned&nbsp;from&nbsp;build_models.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dwg_demographies&nbsp;(List):&nbsp;A&nbsp;list&nbsp;of&nbsp;divergence&nbsp;with&nbsp;gene&nbsp;flow&nbsp;demography&nbsp;objects&nbsp;returned&nbsp;from&nbsp;build_models.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List:&nbsp;a&nbsp;list&nbsp;of&nbsp;base&nbsp;demographies&nbsp;with&nbsp;divergence&nbsp;only&nbsp;(without&nbsp;accurate&nbsp;divergence&nbsp;times&nbsp;and&nbsp;population&nbsp;sizes.)<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Error&nbsp;if&nbsp;priors&nbsp;are&nbsp;incorrectly&nbsp;defined.</tt></dd></dl>
+
+<dl><dt><a name="ModelBuilder-validate_models"><strong>validate_models</strong></a>(self, divergence_demographies, sc_demographies, dwg_demographies)</dt><dd><tt>Plot&nbsp;example&nbsp;models&nbsp;from&nbsp;divergence,&nbsp;secondary&nbsp;contact,&nbsp;and&nbsp;divergence&nbsp;with&nbsp;gene&nbsp;flow&nbsp;scenarios.<br>
+&nbsp;<br>
+Parameters:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;divergence_demographies&nbsp;(List):&nbsp;A&nbsp;list&nbsp;of&nbsp;parameterized&nbsp;divergence&nbsp;demography&nbsp;objects&nbsp;returned&nbsp;from&nbsp;draw_parameters.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sc_demographies&nbsp;(List):&nbsp;A&nbsp;list&nbsp;of&nbsp;parameterized&nbsp;secondary&nbsp;contact&nbsp;demography&nbsp;objects&nbsp;returned&nbsp;from&nbsp;draw_parameters.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dwg_demographies&nbsp;(List):&nbsp;A&nbsp;list&nbsp;of&nbsp;parameterized&nbsp;divergence&nbsp;with&nbsp;gene&nbsp;flow&nbsp;demography&nbsp;objects&nbsp;returned&nbsp;from&nbsp;draw_parameters.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Nothing<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Error:&nbsp;If&nbsp;models&nbsp;cannot&nbsp;be&nbsp;plotted.</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="ModelConfigParser">class <strong>ModelConfigParser</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt><a href="#ModelConfigParser">ModelConfigParser</a>(configfile)<br>
+&nbsp;<br>
+Parse&nbsp;user&nbsp;input&nbsp;from&nbsp;the&nbsp;configuration&nbsp;file.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="ModelConfigParser-__init__"><strong>__init__</strong></a>(self, configfile)</dt><dd><tt>Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="ModelConfigParser-parse_config"><strong>parse_config</strong></a>(self)</dt><dd><tt>Parse&nbsp;a&nbsp;configuration&nbsp;file&nbsp;and&nbsp;return&nbsp;a&nbsp;dictionary&nbsp;containing&nbsp;the&nbsp;parsed&nbsp;values.<br>
+&nbsp;<br>
+Parameters:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;configfile&nbsp;(str):&nbsp;Path&nbsp;to&nbsp;the&nbsp;configuration&nbsp;file.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dict:&nbsp;A&nbsp;dictionary&nbsp;containing&nbsp;the&nbsp;parsed&nbsp;configuration&nbsp;values.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;KeyError:&nbsp;If&nbsp;a&nbsp;required&nbsp;key&nbsp;is&nbsp;missing&nbsp;in&nbsp;the&nbsp;configuration&nbsp;file.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ValueError:&nbsp;If&nbsp;there&nbsp;is&nbsp;an&nbsp;issue&nbsp;with&nbsp;parsing&nbsp;or&nbsp;converting&nbsp;the&nbsp;configuration&nbsp;values.</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table></td></tr></table>
+</body></html>

@@ -1,3 +1,5 @@
+"""This module contains all Classes for reading user input and creating msprime demographies to be used in downstream simulation."""
+
 import configparser # ModelConfigParser
 import dendropy # ModelConfigParser, ModelBuilder
 import pandas as pd # ModelConfigParser, ModelBuilder
@@ -15,6 +17,9 @@ import logging # ModelBuilder
 
 
 class ModelConfigParser:
+
+    """Parse user input from the configuration file."""
+
     def __init__(self, configfile):
         self.configfile = configfile
 
@@ -57,6 +62,8 @@ class ModelConfigParser:
         return(config_dict)
 
 class ModelBuilder:
+
+    """Generate a model set with parameters drawn from user-defined priors."""
 
     def __init__(self, config_values):
         self.config = config_values
