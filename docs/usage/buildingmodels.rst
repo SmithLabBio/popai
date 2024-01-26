@@ -18,7 +18,7 @@ Given some user-input, delimitpy will create some default models that may be use
 These models will incorporate divergence between populations, gene flow upon secondary contact between present-day populations,
 and divergence with gene flow between sister populations.
 
-To generate these models, the user must provide delimitpy with a `configuration file. <https://github.com/SmithLabBio/delimitpy/blob/main/config.txt>`_::
+To generate these models, the user must provide delimitpy with a `configuration file <https://github.com/SmithLabBio/delimitpy/blob/main/config.txt>`_.::
 
     [Model]
     species tree file = tree.nex # Path to a species tree in nexus format.
@@ -38,7 +38,7 @@ To generate these models, the user must provide delimitpy with a `configuration 
 Species Tree
 ------------
 
-The user must provide a path to a nexus file with a species tree. There are some specific requirements for the `species tree file<https://github.com/SmithLabBio/delimitpy/blob/main/tree.nex>`_.::
+The user must provide a path to a nexus file with a species tree. There are some specific requirements for the `species tree file <https://github.com/SmithLabBio/delimitpy/blob/main/tree.nex>`_.::
 
     #NEXUS
     BEGIN TAXA;
@@ -51,7 +51,9 @@ The user must provide a path to a nexus file with a species tree. There are some
     END;
 
 Requirements:
+
 * Internal nodes must be labeled with names.
+
 * For each leaf and internal node, include an annotation indicating the minimum and maximum values of the uniform distribution on the effective population size for the corresponding population.::
 
     [&ne=1000-1000]
