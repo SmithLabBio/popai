@@ -12,6 +12,7 @@ Welcome to delimitpy's documentation!
 
    usage/installation.rst
    usage/buildingmodels.rst
+   notebooks/buildingmodels.ipynb
 
 
 

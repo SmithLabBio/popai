@@ -78,33 +78,3 @@ The user must provide a path to a file with a `migration matrix <https://github.
 Note that T indicates that migration is allowed between two taxa, while F indicates that migration is not allowed. The elements along the diagonal will be ignored. Ancestral populations must be included.
 
 
-==================================
-Generating a default set of models
-==================================
-
-Now, let's walk through generating a default set of models in delimitpy::
-
-    from delimitpy import generate_models
-
-    # Parse the configuration file
-    config_parser = generate_models.ModelConfigParser("config.txt")
-    config_values = config_parser.parse_config()
-
-    # build the models
-    model_builder = generate_models.ModelBuilder(config_values)
-    model_builder.build_models()
-
-    # parameterize the models
-    parameterized_divergence_demographies, parameterized_sc_demographies, parameterized_dwg_demographies = model_builder.draw_parameters()
-
-:example:    
-.. jupyter-execute::
-
-    from delimitpy import generate_models
-
-    # Parse the configuration file
-    config_parser = generate_models.ModelConfigParser("config.txt")
-    config_values = config_parser.parse_config()
-    print(config_values)
-
-
