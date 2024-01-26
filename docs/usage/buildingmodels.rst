@@ -97,7 +97,8 @@ Now, let's walk through generating a default set of models in delimitpy::
     # parameterize the models
     parameterized_divergence_demographies, parameterized_sc_demographies, parameterized_dwg_demographies = model_builder.draw_parameters()
 
-.. exec-code:: python
+:example:    
+.. jupyter-execute::
 
     from delimitpy import generate_models
 
