@@ -1,6 +1,6 @@
 [Model]
-species tree file = tree.nex
-migration matrix = migration.txt
+species tree file = ../../tree.nex
+migration matrix = ../../migration.txt
 symmetric = True
 secondary contact = True
 divergence with gene flow = True

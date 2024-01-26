@@ -1,4 +1,6 @@
 setup.py
+delimitpy/__init__.py
+delimitpy/generate_models.py
 delimitpy.egg-info/PKG-INFO
 delimitpy.egg-info/SOURCES.txt
 delimitpy.egg-info/dependency_links.txt
