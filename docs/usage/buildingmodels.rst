@@ -21,8 +21,8 @@ and divergence with gene flow between sister populations.
 To generate these models, the user must provide delimitpy with a `configuration file. <https://github.com/SmithLabBio/delimitpy/blob/main/config.txt>`_::
 
     [Model]
-    species tree file = tree.nex # path to a species tree in nexus format
-    migration matrix = migration.txt # path to a migration matrix
+    species tree file = tree.nex # Path to a species tree in nexus format.
+    migration matrix = migration.txt # Path to a migration matrix
     symmetric = True # True if migration rates should always be symmetric, and only symmetric migration events should be included.
     secondary contact = True # True if you wish to consider secondary contact models.
     divergence with gene flow = True # True if you wish to consider divergence with gene flow models.
@@ -30,7 +30,32 @@ To generate these models, the user must provide delimitpy with a `configuration 
     migration rate = U(1e-3, 1e-2) # Prior from which to draw migration rates. Only uniform priors are supported at present.
 
     [Other]
-    output directory = test # Directory for storing output (should exist)
-    seed = 1234 # random seed
-    replicates = 10 # Number of replicates to simulate per model
+    output directory = test # Directory for storing output (should exist).
+    seed = 1234 # Random seed.
+    replicates = 10 # Number of replicates to simulate per model.
 
+------------
+Species Tree
+------------
+
+The user must provide a path to a nexus file with a species tree. There are some specific requirements for the `species tree file<https://github.com/SmithLabBio/delimitpy/blob/main/tree.nex>`_.::
+
+    #NEXUS
+    BEGIN TAXA;
+        Dimensions NTax=3;
+        TaxLabels A B C;
+    END;
+
+    BEGIN TREES;
+        Tree species=((A[&ne=1000-10000],B[&ne=1000-10000])AB[&ne=1000-10000,div=1000-50000],C[&ne=1000-10000])ABC[&ne=1000-10000,div=10000-100000];
+    END;
+
+Requirements:
+* Internal nodes must be labeled with names.
+* For each leaf and internal node, include an annotation indicating the minimum and maximum values of the uniform distribution on the effective population size for the corresponding population.::
+
+    [&ne=1000-1000]
+
+* For each linternal node, include an annotation indicating the minimum and maximum values of the uniform distribution on the divergence time (in generations before the present).::
+
+    [&div=10000-100000]

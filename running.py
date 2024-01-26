@@ -1,4 +1,4 @@
-import generate_models
+from delimitpy import generate_models
 
 # Parse the configuration file
 config_parser = generate_models.ModelConfigParser("config.txt")
