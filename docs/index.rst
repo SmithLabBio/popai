@@ -10,8 +10,8 @@ Welcome to delimitpy's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   usage/installation
-   usage/buildingmodels
+   usage/installation.rst
+   usage/buildingmodels.rst
 
 
 
