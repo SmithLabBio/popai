@@ -10,6 +10,9 @@ Welcome to delimitpy's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   usage/installation
+   usage/buildingmodels
+
 
 
 Indices and tables
