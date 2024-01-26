@@ -1,7 +1,6 @@
 import configparser # ModelConfigParser
 import dendropy # ModelConfigParser, ModelBuilder
 import pandas as pd # ModelConfigParser, ModelBuilder
-import sys # ModelConfigParser, ModelBuilder
 
 import msprime # ModelBuilder
 import copy # ModelBuilder
