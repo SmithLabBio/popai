@@ -7,12 +7,11 @@ Welcome to delimitpy's documentation!
 =====================================
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
    :caption: Contents:
 
    usage/installation.rst
    usage/buildingmodels.rst
-   usage/buildingmodels.ipynb
    notebook/buildingmodels.ipynb
 
 
