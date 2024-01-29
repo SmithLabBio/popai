@@ -13,7 +13,11 @@ import random # ModelBuilder only used for demes plotting
 import demesdraw # ModelBuilder
 import matplotlib.pyplot as plt # ModelBuilder
 
-import logging # ModelBuilder
+import logging # ModelBuilder, ModelReader
+
+import yaml # ModelWriter
+
+import os # ModelReader
 
 
 class ModelConfigParser:
@@ -54,6 +58,8 @@ class ModelConfigParser:
             config_dict["symmetric"] = config.getboolean("Model", "symmetric")
             config_dict["secondary contact"] = config.getboolean("Model", "secondary contact")
             config_dict["divergence with gene flow"] = config.getboolean("Model", "divergence with gene flow")
+            config_dict["mutation_rate"] = [float(val.strip("U(").strip(")")) for val in config['Simulations']["mutation rate"].split(",")]
+            config_dict["substitution model"] = config["Simulations"]["substitution model"]
         except KeyError as e:
             raise KeyError(f"Error in config: Missing key in configuration file: {e}")
         except Exception as e:
@@ -131,7 +137,7 @@ class ModelBuilder:
             Error if priors are incorrectly defined.
         """
         # get priors
-        population_sizes, divergence_times = self._get_priors()
+        population_sizes, divergence_times = _get_priors(self.config)
 
         # draw parameters for divergence models
         parameterized_divergence_demographies = self._draw_parameters_divergence(divergence_times=divergence_times, population_sizes=population_sizes)
@@ -142,10 +148,15 @@ class ModelBuilder:
         # draw parameters for divergence with gene flow models
         parameterized_dwg_demographies = self._draw_parameters_dwg(divergence_times=divergence_times, population_sizes=population_sizes)
 
-        # return them
-        return(parameterized_divergence_demographies, parameterized_sc_demographies, parameterized_dwg_demographies)
+        # flatten models and create labels
+        full_model_list = parameterized_divergence_demographies+parameterized_sc_demographies+parameterized_dwg_demographies
+        labels = list(range(len(full_model_list)))
+        expanded_labels = [[val]*len(sublist) for val, sublist in zip(labels, full_model_list)]
 
-    def validate_models(self, divergence_demographies, sc_demographies, dwg_demographies):
+        # return them
+        return(full_model_list, expanded_labels)
+
+    def validate_models(self, demographies, labels):
         """
         Plot example models from divergence, secondary contact, and divergence with gene flow scenarios.
 
@@ -162,13 +173,7 @@ class ModelBuilder:
         """
         try:
             # Plot divergence demographies
-            self._plot_models(divergence_demographies, "Divergence")
-
-            # Plot secondary contact demographies
-            self._plot_models(sc_demographies, "Secondary Contact")
-
-            # Plot divergence with gene flow demographies
-            self._plot_models(dwg_demographies, "Divergence with Gene Flow")
+            self._plot_models(demographies, labels)
 
 
         except ValueError as ve:
@@ -176,33 +181,6 @@ class ModelBuilder:
 
         except Exception as e:
             raise Exception(f"Error: Issue when plotting example msprime demographies: {e}")
-
-    def _get_priors(self):
-        """Get priors for population sizes and divergence times from the species tree."""
-        # build dictionary of priors for population sizes
-        population_sizes = {}
-        divergence_times = {}
-
-        # get priors from species tree
-        try:
-            for node in self.config['species tree'].postorder_node_iter():
-                min_ne, max_ne = map(int, node.annotations['ne'].value.strip("'").split("-"))
-                if node.is_leaf():
-                    population_sizes[node.taxon.label.strip("'")] = [min_ne, max_ne]
-                else:
-                    node_label = node.label.strip("'")
-                    population_sizes[node_label] = [min_ne, max_ne]
-                    min_div, max_div = map(int, node.annotations['div'].value.strip("'").split("-"))
-                    divergence_times[node_label] = [min_div, max_div]
-
-        except (ValueError) as ve:
-            raise ValueError(f"Error: Issue when getting priors from species tree: {ve}")
-        except (KeyError) as ke:
-            raise KeyError(f"Error: Issue when getting priors from species tree: {ke}")
-        except Exception as e:
-            raise Exception(f"Error: Issue when getting priors from species tree: {e}")
-
-        return(population_sizes, divergence_times)
 
     def _create_divergence_demographies(self):
         """Create baseline divergence demographies."""
@@ -279,8 +257,8 @@ class ModelBuilder:
 
                     # if not symmetric then do asymmetric
                     else:
-                        migration_demography.set_migration_rate(source=populationpairlist[0], dest=populationpairlist[1], rate=migrateholder)
-                        migration_demography.add_migration_rate_change(time=migtimeholder, source=populationpairlist[0], dest=populationpairlist[1], rate=0)
+                        migration_demography.set_migration_rate(source=populationpair[0], dest=populationpair[1], rate=migrateholder)
+                        migration_demography.add_migration_rate_change(time=migtimeholder, source=populationpair[0], dest=populationpair[1], rate=0)
 
                 # sort the events and add the demography to the list
                 migration_demography.sort_events()
@@ -323,7 +301,7 @@ class ModelBuilder:
                         migration_demography.add_symmetric_migration_rate_change(migtimeholder, populationpair, rate=migrateholder)
                     # if not symmetric then do asymmetric
                     else:
-                        migration_demography.add_migration_rate_change(time=migtimeholder, source=populationpairlist[0], dest=populationpairlist[1], rate=migrateholder)
+                        migration_demography.add_migration_rate_change(time=migtimeholder, source=populationpair[0], dest=populationpair[1], rate=migrateholder)
 
                 # sort the events and add the demography to the list
                 migration_demography.sort_events()
@@ -598,17 +576,349 @@ class ModelBuilder:
 
         return(migration_start)
 
-    def _plot_models(self, demographies, title):
+    def _plot_models(self, demographies, labels):
         """Plot example models for a given type of demography."""
 
-        for model in demographies:
-            demo_to_plot = random.sample(model, 1)[0]
+        for model in enumerate(demographies):
+            demo_to_plot = random.sample(model[1], 1)[0]
             graph = demo_to_plot.to_demes()
 
             # Plot the model
             fig, ax = plt.subplots()
             demesdraw.tubes(graph, ax=ax, seed=1)
-            plt.title(title)
+            plt.title('Model: %s' % labels[model[0][0]])
             plt.show()
 
+class ModelWriter:
 
+    """Write models generated by delimitpy to a file."""
+
+    def __init__(self, config, divergence_demographies, sc_demographies, dwg_demographies):
+        self.config = config
+        self.divergence_demographies = divergence_demographies
+        self.sc_demographies = sc_demographies
+        self.dwg_demographies = dwg_demographies
+
+    def write_to_yaml(self):
+        """
+        Writes delimitpy generated models to a yaml file, which can later be read by delimitpy.
+
+        Parameters:
+            config_dict Dict: dictionary crated by ModelConfigParser function parse_config.
+            divergence_demographies List of Lists: Parameterized divergence demographies generated by ModelBuilder function draw_parameters.
+            sc_demographies List of Lists: Parameterized secondary contact demographies generated by ModelBuilder function draw_parameters.
+            dwg_demographies List of Lists: Parameterized divergence with gene flow demographies generated by ModelBuilder function draw_parameters.
+
+        Outputs:
+            yaml files for each model (not for each parameterization)
+
+        Returns:
+
+        Raises:
+        """
+
+        self._divergence_to_yaml()
+        self._sc_to_yaml(start=len(self.divergence_demographies))
+        self._dwg_to_yaml(start=len(self.divergence_demographies)+len(self.sc_demographies))
+
+    def _divergence_to_yaml(self):
+
+        # get population size and divergence time priors
+        population_sizes, divergence_times = _get_priors(self.config)
+
+        for model in enumerate(self.divergence_demographies):
+
+            # create a dict for the yaml file
+            yaml_dict = {}
+
+            # add description
+            yaml_dict = self._get_description(model, yaml_dict, 'Divergence')
+
+            # write population information to dictionary
+            yaml_dict = self._get_popinfo(model, yaml_dict, population_sizes)
+
+            # write divergence information to dictionary
+            yaml_dict = self._get_divinfo(model, yaml_dict, divergence_times)
+
+            # write yaml to file
+            f = open('%s/Model_%s.yaml' % (self.config['output directory'], model[0]), 'w')
+            yaml.dump(yaml_dict, f)
+            f.close()
+
+    def _sc_to_yaml(self, start):
+
+        # get population size and divergence time priors
+        population_sizes, divergence_times = _get_priors(self.config)
+
+        for model in enumerate(self.sc_demographies):
+
+            # create a dict for the yaml file
+            yaml_dict = {}
+
+            # add description
+            yaml_dict = self._get_description(model, yaml_dict, 'Secondary Contact', start=start)
+
+            # write population information to dictionary
+            yaml_dict = self._get_popinfo(model, yaml_dict, population_sizes)
+
+            # write divergence information to dictionary
+            yaml_dict = self._get_divinfo(model, yaml_dict, divergence_times)
+
+            # write migration events
+            yaml_dict = self._get_scinfo(model, yaml_dict)
+
+            # write yaml to file
+            f = open('%s/Model_%s.yaml' % (self.config['output directory'], model[0]+start), 'w')
+            yaml.dump(yaml_dict, f, Dumper=NoAliasDumper)
+            f.close()
+
+    def _dwg_to_yaml(self, start):
+
+        # get population size and divergence time priors
+        population_sizes, divergence_times = _get_priors(self.config)
+
+        for model in enumerate(self.dwg_demographies):
+
+            # create a dict for the yaml file
+            yaml_dict = {}
+
+            # add description
+            yaml_dict = self._get_description(model, yaml_dict, 'Divergence with gene flow', start=start)
+
+            # write population information to dictionary
+            yaml_dict = self._get_popinfo(model, yaml_dict, population_sizes)
+
+            # write divergence information to dictionary
+            yaml_dict = self._get_divinfo(model, yaml_dict, divergence_times)
+
+            # write migration events
+            yaml_dict = self._get_dwginfo(model, yaml_dict)
+
+            # write yaml to file
+            f = open('%s/Model_%s.yaml' % (self.config['output directory'], model[0]+start), 'w')
+            yaml.dump(yaml_dict, f, Dumper=NoAliasDumper)
+            f.close()
+
+    def _get_description(self, model, yaml_dict, type, start=0):
+        # get number of populations in the present and write description
+        npops_present = int((len(model[1][0].populations)+1)/2)
+        description = "Model %s: %s with %s populations." % (model[0]+start, type, npops_present)
+        yaml_dict['description'] = description
+        return(yaml_dict)
+
+    def _get_popinfo(self, model, yaml_dict, population_sizes):
+        yaml_dict['populations'] = []
+        yaml_dict['priors'] = {}
+        for population in enumerate(model[1][0].populations):
+            yaml_dict['populations'].append({})
+            yaml_dict['populations'][population[0]]['name'] = population[1].name
+            yaml_dict['populations'][population[0]]['size'] = 'Ne_' + population[1].name
+            yaml_dict['priors']['Ne_'+ population[1].name] = population_sizes[population[1].name]
+        return(yaml_dict)
+
+    def _get_divinfo(self, model, yaml_dict, divergence_times):
+        yaml_dict['divergences'] = []
+        count=0
+        for event in model[1][0].events:
+            if hasattr(event, 'ancestral'):
+                yaml_dict['divergences'].append({})
+                yaml_dict['divergences'][count]['derived'] = event.derived
+                yaml_dict['divergences'][count]['ancestral'] = event.ancestral
+                yaml_dict['divergences'][count]['time'] = 'Tdiv_'+event.ancestral
+                yaml_dict['priors']['Tdiv_'+event.ancestral] = divergence_times[event.ancestral]
+                count+=1
+        return(yaml_dict)
+    
+    def _get_scinfo(self, model, yaml_dict):
+        yaml_dict['migration'] = []
+        yaml_dict['relations'] = {}
+        count=0
+        for event in model[1][0].events:
+            if hasattr(event, "rate"):
+                yaml_dict['migration'].append({})
+                if hasattr(event, "populations"):
+                    yaml_dict['migration'][count]['type'] = 'symmetric'
+                    pop0 = event.populations[0]
+                    pop1 = event.populations[1]
+                else:
+                    yaml_dict['migration'][count]['type'] = 'asymmetric'
+                    pop0 = event.source
+                    pop1 = event.dest
+
+                yaml_dict['migration'][count]['source'] = pop0
+                yaml_dict['migration'][count]['dest'] = pop1
+                yaml_dict['migration'][count]['rate'] = 'Mig_%s_%s' % (pop0, pop1)
+                yaml_dict['migration'][count]['start_time'] = 0
+                yaml_dict['migration'][count]['end_time'] = 'Tmigend_%s_%s' % (pop0, pop1)
+                yaml_dict['priors']['Mig_%s_%s' % (pop0, pop1)] = self.config['migration_rate']
+                time_values = [entry['time'] for entry in yaml_dict['divergences']]
+                time_values = 'min('+','.join(time_values)+')/2'
+                yaml_dict["relations"]['Tmigend_%s_%s' % (pop0, pop1)] = time_values
+                count+=1
+        return(yaml_dict)
+
+    def _get_dwginfo(self, model, yaml_dict):
+        yaml_dict['migration'] = []
+        yaml_dict['relations'] = {}
+        count=0
+        for event in model[1][0].events:
+            if hasattr(event, "rate"):
+                yaml_dict['migration'].append({})
+                if hasattr(event, "populations"):
+                    yaml_dict['migration'][count]['type'] = 'symmetric'
+                    pop0 = event.populations[0]
+                    pop1 = event.populations[1]
+                else:
+                    yaml_dict['migration'][count]['type'] = 'asymmetric'
+                    pop0 = event.source
+                    pop1 = event.dest
+
+                yaml_dict['migration'][count]['source'] = pop0
+                yaml_dict['migration'][count]['dest'] = pop1
+                yaml_dict['migration'][count]['rate'] = 'Mig_%s_%s' % (pop0, pop1)
+                yaml_dict['migration'][count]['start_time'] = 'Tmigstart_%s_%s' % (pop0, pop1)
+                yaml_dict['priors']['Mig_%s_%s' % (pop0, pop1)] = self.config['migration_rate']
+
+                # get migration start times
+                pop0div = 0
+                pop1div = 0
+                for event in model[1][0].events:
+                    if hasattr(event, 'ancestral'):
+                        if pop0 in event.derived and pop1 in event.derived:
+                            ancestraldiv = event.ancestral
+                        if event.ancestral == pop0:
+                            pop0div = event.ancestral
+                        if event.ancestral == pop1:
+                            pop1div = event.ancestral
+                if pop0div != 0 and pop1div != 0:
+                    time_value = '(Tdiv_%s - min(Tdiv_%s, Tdiv_%s))/2 + min(Tdiv_%s, Tdiv_%s)' % (ancestraldiv, pop0div, pop1div, pop0div, pop1div)
+                elif pop0div != 0:
+                    time_value = '(Tdiv_%s - Tdiv_%s)/2 + Tdiv_%s' % (ancestraldiv, pop0div, pop0div)
+                elif pop1div != 0:
+                    time_value = '(Tdiv_%s - Tdiv_%s)/2 + Tdiv_%s' % (ancestraldiv, pop1div, pop1div)
+                else:
+                    time_value = 'Tdiv_%s/2' % (ancestraldiv)
+                yaml_dict["relations"]['Tmigstart_%s_%s' % (pop0, pop1)] = time_value
+                
+                count+=1
+        return(yaml_dict)
+
+class ModelReader:
+
+    """Read models from .yaml file."""
+
+    def __init__(self, path_to_yaml, replicates, seed):
+        self.path_to_yaml = path_to_yaml
+        self.replicates = replicates
+        self.seed = seed
+        
+        # Configure logging
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+
+        # RNG
+        self.rng = np.random.default_rng(self.seed)
+
+    def read_yaml(self):
+
+        # list the yaml files in the directory
+        yaml_files = os.listdir(self.path_to_yaml)
+        yaml_files = [x for x in yaml_files if x.endswith('.yaml')]
+        
+        # log the information
+        self.logger.info(f"Reading {len(yaml_files)} models from yaml files.")
+
+        for i in enumerate(yaml_files):
+
+            with open(os.path.join(self.path_to_yaml, i[1]), 'r') as f:
+                yaml_info = yaml.safe_load(f)
+
+            # draw the population sizes from priors
+            population_size_draws = {}
+            for population in yaml_info['populations']:
+                sizeprior = yaml_info['priors'][population['size']]
+                population_size_draws[population['name']] = self.rng.uniform(low=sizeprior[0], high=sizeprior[1], size=self.replicates)
+
+            # find dependencies between divergence times
+            divergence_dependencies = {}
+            for divergence in yaml_info['divergences']:
+                divergence_dependencies[divergence['ancestral']] = None
+                for divergence2 in yaml_info['divergences']:
+                    if divergence2['ancestral'] in divergence['derived']:
+                        divergence_dependencies[divergence['ancestral']] = divergence2['ancestral']
+
+            # ensure divergence times are listed in order
+            divergence_list_ordered = []
+            added = []
+            while len(divergence_list_ordered) < len(yaml_info['divergences']):
+                for divergence in yaml_info['divergences']:
+                    if divergence_dependencies[divergence['ancestral']] is None and divergence['ancestral'] not in added:
+                        divergence_list_ordered.append(divergence)
+                        added.append(divergence['ancestral'])
+                    elif divergence_dependencies[divergence['ancestral']] in added and divergence['ancestral'] not in added:
+                        divergence_list_ordered.append(divergence)
+                        added.append(divergence['ancestral'])
+
+            # draw divergence times from priors
+            divergence_time_draws = {}
+            for divergence in divergence_list_ordered:
+                divprior = yaml_info['priors']['Tdiv_%s' % divergence['ancestral']]
+                if divergence_dependencies[divergence['ancestral']] is None:
+                    divergence_time_draws[divergence['ancestral']] = self.rng.uniform(low=divprior[0], high=divprior[1], size=self.replicates)
+                else:
+                    if divergence['derived'][0] in divergence_time_draws and divergence['derived'][1] in divergence_time_draws:
+                        min_values = [max(x) for x in zip(divergence_time_draws[divergence['derived'][0]], divergence_time_draws[divergence['derived'][1]], np.repeat(divprior[0], self.replicates))]
+                    elif divergence['derived'][0] in divergence_time_draws:
+                        min_values = [max(x) for x in zip(divergence_time_draws[divergence['derived'][0]], np.repeat(divprior[0], self.replicates))]
+                    elif divergence['derived'][1] in divergence_time_draws:
+                        min_values = [max(x) for x in zip(divergence_time_draws[divergence['derived'][1]], np.repeat(divprior[0], self.replicates))]
+
+                    divergence_time_draws[divergence['ancestral']] = [self.rng.uniform(low=x, high=divprior[1]) for x in min_values]
+
+            # draw migration rates from priors and get times
+            # STOPPED HERE SATURDAY
+            migration_rates = {}
+            migration_times = {}
+            if 'migration' in yaml_info :
+                for migration in yaml_info['migration']:
+                    migprior = yaml_info['priors'][migration['rate']]
+                    migration_rates[migration['rate']] = self.rng.uniform(low=migprior[0], high=migprior[1], size=self.replicates)
+
+                    if 'end_time' in migration:
+                        endtime=yaml_info['relations']['Tmigend_%s_%s' % (migration['source'], migration['dest'])]
+                        mintimes = endtime.split('(')[1].split(')')[0].split(',')
+                        
+
+
+                    
+
+def _get_priors(config):
+    """Get priors for population sizes and divergence times from the species tree."""
+    # build dictionary of priors for population sizes
+    population_sizes = {}
+    divergence_times = {}
+
+    # get priors from species tree
+    try:
+        for node in config['species tree'].postorder_node_iter():
+            min_ne, max_ne = map(int, node.annotations['ne'].value.strip("'").split("-"))
+            if node.is_leaf():
+                population_sizes[node.taxon.label.strip("'")] = [min_ne, max_ne]
+            else:
+                node_label = node.label.strip("'")
+                population_sizes[node_label] = [min_ne, max_ne]
+                min_div, max_div = map(int, node.annotations['div'].value.strip("'").split("-"))
+                divergence_times[node_label] = [min_div, max_div]
+
+    except (ValueError) as ve:
+        raise ValueError(f"Error: Issue when getting priors from species tree: {ve}")
+    except (KeyError) as ke:
+        raise KeyError(f"Error: Issue when getting priors from species tree: {ke}")
+    except Exception as e:
+        raise Exception(f"Error: Issue when getting priors from species tree: {e}")
+
+    return(population_sizes, divergence_times)
+
+class NoAliasDumper(yaml.Dumper):
+    def ignore_aliases(self, data):
+        return True

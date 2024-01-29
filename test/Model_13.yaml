@@ -1,0 +1,65 @@
+description: 'Model 13: Divergence with gene flow with 3 populations.'
+divergences:
+- ancestral: AB
+  derived:
+  - A
+  - B
+  time: Tdiv_AB
+- ancestral: ABC
+  derived:
+  - AB
+  - C
+  time: Tdiv_ABC
+migration:
+- dest: B
+  rate: Mig_A_B
+  source: A
+  start_time: Tmigstart_A_B
+  type: symmetric
+- dest: AB
+  rate: Mig_C_AB
+  source: C
+  start_time: Tmigstart_C_AB
+  type: symmetric
+populations:
+- name: A
+  size: Ne_A
+- name: B
+  size: Ne_B
+- name: AB
+  size: Ne_AB
+- name: C
+  size: Ne_C
+- name: ABC
+  size: Ne_ABC
+priors:
+  Mig_A_B:
+  - 0.001
+  - 0.01
+  Mig_C_AB:
+  - 0.001
+  - 0.01
+  Ne_A:
+  - 1000
+  - 10000
+  Ne_AB:
+  - 1000
+  - 10000
+  Ne_ABC:
+  - 1000
+  - 10000
+  Ne_B:
+  - 1000
+  - 10000
+  Ne_C:
+  - 1000
+  - 10000
+  Tdiv_AB:
+  - 1000
+  - 50000
+  Tdiv_ABC:
+  - 10000
+  - 100000
+relations:
+  Tmigstart_A_B: Tdiv_AB/2
+  Tmigstart_C_AB: (Tdiv_ABC - Tdiv_AB)/2 + Tdiv_AB

@@ -1,0 +1,17 @@
+[Model]
+species tree file = tree.nex
+migration matrix = migration.txt
+symmetric = True
+secondary contact = True
+divergence with gene flow = True
+max migration events = 2
+migration rate = U(1e-3, 1e-2)
+
+[Other]
+output directory = test
+seed = 1234
+replicates = 10
+
+[Simulations]
+mutation rate = U(1e-8, 1e-7)
+substitution model = JC69
