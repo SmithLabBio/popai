@@ -21,6 +21,6 @@
     -create documentation
     -turn into python package
     -parameter estimation
-    -take empirical imput
-    -automatically get sample sizes from empirical input
-    -automatically get sequence length from empirical input
+    -double check random seeds
+    -parallelize Simulations
+    -

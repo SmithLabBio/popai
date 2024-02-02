@@ -10,8 +10,12 @@ migration rate = U(1e-3, 1e-2)
 [Other]
 output directory = test
 seed = 1234
-replicates = 10
+replicates = 1000
 
 [Simulations]
 mutation rate = U(1e-8, 1e-7)
 substitution model = JC69
+
+[Data]
+alignments = ./test_dataset/
+popfile = populations.txt

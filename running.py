@@ -1,7 +1,9 @@
-from delimitpy import generate_models, simulate_data
+from delimitpy import parse_input, generate_models, simulate_data, generate_test_data, build_predictors
+import os
+import numpy as np
 
 # Parse the configuration file
-config_parser = generate_models.ModelConfigParser("config_local.txt")
+config_parser = parse_input.ModelConfigParser("config_local.txt")
 config_values = config_parser.parse_config()
 
 # build the models
@@ -22,7 +24,24 @@ parameterized_models, labels = model_builder.draw_parameters()
 #model_reader = generate_models.ModelReader('./test', 10, seed=1234)
 #model_reader.read_yaml()
 
-sample_sizes = {"A":12, "B":10, "C":14}
-data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, sample_sizes=sample_sizes)
+
+
+# Simulate data
+data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values)
 simulated_ancestries = data_simulator.simulate_ancestry()
 simulated_mutations = data_simulator.simulate_mutations()
+arrays = data_simulator.mutations_to_numpy()
+sfs = data_simulator.mutations_to_sfs()
+stats = data_simulator.mutations_to_stats()
+np.save(os.path.join(config_values["output directory"], 'labels.npy'), np.array(labels), allow_pickle=True)
+np.save(os.path.join(config_values["output directory"], 'numpy_arrays.npy'), np.array(arrays), allow_pickle=True)
+np.save(os.path.join(config_values["output directory"], 'sfs.npy'), np.array(sfs), allow_pickle=True)
+np.save(os.path.join(config_values["output directory"], 'stats.npy'), np.array(stats), allow_pickle=True)
+
+arrays = np.load(os.path.join(config_values["output directory"], 'numpy_arrays.npy'))
+sfs = np.load(os.path.join(config_values["output directory"], 'sfs.npy'))
+stats = np.load(os.path.join(config_values["output directory"], 'stats.npy'))
+
+# Fit models
+random_forest_sfs_predictor = build_predictors.RandomForests_SFS(config_values, sfs, labels)
+random_forest_sfs_predictor.build_rf_sfs()
