@@ -49,6 +49,7 @@ class DataProcessor:
 
         # convert to numpy array
         encoded_alignments = np.array(encoded_alignments)
+        print(encoded_alignments.shape)
 
         # remove invariable columns
         frequencies = np.array([[np.sum(encoded_alignments[:, j] == i) for i in range(-1, 4)] for j in range(encoded_alignments.shape[1])])
