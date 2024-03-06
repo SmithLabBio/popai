@@ -11,7 +11,7 @@ Welcome to delimitpy's documentation!
    :caption: Contents:
 
    usage/installation.rst
-   notebooks/parsingdata.ipynb
+   usage/parsinginput.rst
    usage/buildingmodels.rst
    notebooks/buildingmodels.ipynb
 

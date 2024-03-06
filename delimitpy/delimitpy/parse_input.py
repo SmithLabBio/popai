@@ -63,8 +63,8 @@ class ModelConfigParser:
 
             # get population sampling info
             pop_df = pd.read_csv(config_dict["popfile"], delimiter='\t')
-            config_dict["population_dictionary"] = pop_df.set_index('trait')['species'].to_dict()
-            config_dict["sampling_dict"] = pop_df['species'].value_counts().to_dict()
+            config_dict["population_dictionary"] = pop_df.set_index('individual')['population'].to_dict()
+            config_dict["sampling_dict"] = pop_df['population'].value_counts().to_dict()
 
             # get fastas and lengths
             fasta_list = os.listdir(config_dict["fasta_folder"])
