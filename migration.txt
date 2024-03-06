@@ -1,6 +1,0 @@
-,A,B,C,AB,ABC
-A,T,T,T,T,T
-B,T,T,T,T,T
-C,T,T,T,T,T
-AB,T,T,T,T,T
-ABC,T,T,T,T,T

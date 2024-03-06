@@ -1,9 +1,0 @@
-description: 'Model 1: Divergence with 1 populations.'
-divergences: []
-populations:
-- name: ABC
-  size: Ne_ABC
-priors:
-  Ne_ABC:
-  - 1000
-  - 10000

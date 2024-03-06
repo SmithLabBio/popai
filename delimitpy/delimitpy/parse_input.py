@@ -69,7 +69,8 @@ class ModelConfigParser:
             # get fastas and lengths
             fasta_list = os.listdir(config_dict["fasta_folder"])
             fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta')]
-            config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(path=os.path.join(config_dict["fasta_folder"], x), schema="fasta") for x in fasta_list]
+            taxa = dendropy.TaxonNamespace()
+            config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(path=os.path.join(config_dict["fasta_folder"], x), schema="fasta", taxon_namespace=taxa) for x in fasta_list]
             config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
 
             config_dict['variable'] = self.count_variable(config_dict['fastas'])
