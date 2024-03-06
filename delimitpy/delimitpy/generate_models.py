@@ -541,13 +541,14 @@ class ModelBuilder:
         """Plot example models for a given type of demography."""
 
         for model in enumerate(demographies):
+            print(model[0])
             demo_to_plot = random.sample(model[1], 1)[0]
             graph = demo_to_plot.to_demes()
 
             # Plot the model
             fig, ax = plt.subplots()
             demesdraw.tubes(graph, ax=ax, seed=1)
-            plt.title('Model: %s' % labels[model[0][0]])
+            #plt.title('Model: %s' % labels[model[0][0]])
             plt.show()
 
 class ModelWriter:

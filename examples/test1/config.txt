@@ -1,6 +1,6 @@
 [Model]
-species tree file = ../../tree.nex # Path to a species tree in nexus format.
-migration matrix = ../../migration.txt # Path to a migration matrix
+species tree file = ../../examples/test1/tree.nex # Path to a species tree in nexus format.
+migration matrix = ../../examples/test1/migration.txt # Path to a migration matrix
 symmetric = True # True if migration rates should always be symmetric, and only symmetric migration events should be included.
 secondary contact = True # True if you wish to consider secondary contact models.
 divergence with gene flow = False # True if you wish to consider divergence with gene flow models.
