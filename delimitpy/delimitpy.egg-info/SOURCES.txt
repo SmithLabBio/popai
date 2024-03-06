@@ -1,6 +1,11 @@
 setup.py
 delimitpy/__init__.py
+delimitpy/build_predictors.py
 delimitpy/generate_models.py
+delimitpy/generate_test_data.py
+delimitpy/parse_input.py
+delimitpy/process_empirical.py
+delimitpy/simulate_data.py
 delimitpy.egg-info/PKG-INFO
 delimitpy.egg-info/SOURCES.txt
 delimitpy.egg-info/dependency_links.txt
