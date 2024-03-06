@@ -124,6 +124,7 @@ class ModelBuilder:
         Raises:
             Error: If models cannot be plotted.
         """
+        print('aahhahahahaha')
         try:
             # Plot divergence demographies
             self._plot_models(demographies, labels)
