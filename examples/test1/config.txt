@@ -8,7 +8,7 @@ max migration events = 2 # Maximum number of migration events to consider in one
 migration rate = U(1e-5, 1e-4) # Prior from which to draw migration rates. Only uniform priors are supported at present.
 
 [Other]
-output directory = example_results # Directory for storing output (should exist).
+output directory = ../../example_results # Directory for storing output (should exist).
 seed = 1234 # Random seed.
 replicates = 10 # Number of replicates to simulate per model.
 
