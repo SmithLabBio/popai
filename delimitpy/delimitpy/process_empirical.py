@@ -80,7 +80,6 @@ class DataProcessor:
                             x.default_sampling_time is None]
         reordered_dict = {key: self.config["sampling_dict"][key] for key in population_order}
 
-        print('finding projection values')
         sampled = 0
         pop_failure_masks = []
         
@@ -115,7 +114,6 @@ class DataProcessor:
             sampling_indices[key] = [current, value + current]
             current = current+value
 
-        print('build sfs')
         sampled = 0
         pop_failure_masks = []
         # remove columns that do not meet thresholds
