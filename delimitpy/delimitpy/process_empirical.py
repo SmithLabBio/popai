@@ -93,10 +93,10 @@ class DataProcessor:
         all_combinations = itertools.product(*pop_failure_masks)
         results = {}
         for thresholds in all_combinations:
-            thethresholds = [pop_failure_masks[j][thresholds[j]] for j in range(len(pop_failure_masks))]
-            print(thresholds)
-            combined_mask = np.logical_and.reduce(thethresholds)
-            results[thresholds] = np.sum(combined_mask)
+            if all(value % 2 == 0 for value in thresholds):
+                thethresholds = [pop_failure_masks[j][thresholds[j]] for j in range(len(pop_failure_masks))]
+                combined_mask = np.logical_and.reduce(thethresholds)
+                results[thresholds] = np.sum(combined_mask)
         results = {key: value for key, value in results.items() if value != 0}
         
         return results
