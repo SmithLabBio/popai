@@ -14,7 +14,7 @@ Welcome to delimitpy's documentation!
    usage/parsinginput.rst
    usage/buildingmodels.rst
    notebooks/buildingmodels.ipynb
-   notebooks/parsinginput.ipynb
+   notebooks/buildingSFS.ipynb
 
 
 
