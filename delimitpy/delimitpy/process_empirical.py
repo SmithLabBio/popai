@@ -103,6 +103,12 @@ class DataProcessor:
 
     def numpy_to_2d_sfs(self, encoded_alignment, downsampling, replicates = 1):
 
+        # check taht using even values
+        key_even = all(value % 2 == 0 for value in downsampling.values())
+        if not key_even:
+            raise ValueError(f"Error in downampling, all keys must be even: {e}")
+
+
         # get order in which to process individuals
         population_order = [x.name for x in self.models[-1][0].populations if
                             x.default_sampling_time is None]
