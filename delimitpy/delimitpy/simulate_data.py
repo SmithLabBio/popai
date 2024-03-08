@@ -13,11 +13,17 @@ class DataSimulator:
 
     """Simulate data under specified demographies."""
 
-    def __init__(self, models, labels, config, cores):
+    def __init__(self, models, labels, config, cores, downsampling):
         self.models = models
         self.labels = labels
         self.config = config
         self.cores = cores
+        self.downsampling = downsampling
+        
+        # check taht using even values
+        key_even = all(value % 2 == 0 for value in self.downsampling.values())
+        if not key_even:
+            raise ValueError(f"Error in downampling, all keys must be even.")
 
         self.rng = np.random.default_rng(self.config['seed'])
 
@@ -61,13 +67,13 @@ class DataSimulator:
                 while search:
                     if searchnode.parent_node.label in populations:
                         sampling_dict[searchnode.parent_node.label] += \
-                            self.config['sampling_dict'][species.taxon.label] / 2
+                            self.downsampling[species.taxon.label] / 2
                         search = False
                     else:
                         searchnode = searchnode.parent_node
             else:
                 sampling_dict[species.taxon.label] += \
-                    self.config['sampling_dict'][species.taxon.label]/2
+                    self.downsampling[species.taxon.label]/2
         sampling_dict = {key: value for key, value in sampling_dict.items() if value != 0}
 
         model_ts = []
