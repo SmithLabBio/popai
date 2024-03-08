@@ -106,7 +106,7 @@ class DataProcessor:
         # check taht using even values
         key_even = all(value % 2 == 0 for value in downsampling.values())
         if not key_even:
-            raise ValueError(f"Error in downampling, all keys must be even: {e}")
+            raise ValueError(f"Error in downampling, all keys must be even.")
 
 
         # get order in which to process individuals
@@ -191,7 +191,7 @@ class DataProcessor:
         # check taht using even values
         key_even = all(value % 2 == 0 for value in downsampling.values())
         if not key_even:
-            raise ValueError(f"Error in downampling, all keys must be even: {e}")
+            raise ValueError(f"Error in downampling, all keys must be even.")
 
         all_sfs = []
 
