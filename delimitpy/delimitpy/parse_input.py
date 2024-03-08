@@ -98,7 +98,9 @@ class ModelConfigParser:
                 
                     site_list.append(item[individual][site])
             
-                if len(set(site_list)) > 1:
+                if len(set(site_list)) > 1 and -1 not in site_list:
+                    total+=1
+                elif len(set(site_list)) > 2 and -1 in site_list:
                     total+=1
         
         return(total)
