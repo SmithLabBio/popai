@@ -185,9 +185,9 @@ class DataSimulator:
         # shorten arrays that are too short, and pad arrays that are too long.
         median_size = int(np.ceil(np.median(sizes)))
 
-        self.logger.info("Median simulated data has %s basepairs, and your input has %s basepairs."\
+        self.logger.info("Median simulated data has %s SNPs, and your input has %s SNPs."\
                          "If these numbers are very different, you may want to change some priors.", 
-                         median_size, self.max_sites)
+                         median_size, self.config['variable'])
 
         for model, values in all_arrays.items():
             for i, matrix in enumerate(values):

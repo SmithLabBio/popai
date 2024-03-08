@@ -73,6 +73,8 @@ class ModelConfigParser:
             config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(path=os.path.join(config_dict["fasta_folder"], x), schema="fasta", taxon_namespace=taxa) for x in fasta_list]
             config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
 
+            config_dict['variable'] = self.count_variable(config_dict['fastas'])
+
         except KeyError as e:
             raise KeyError(f"Error in empirical data config: Missing key in configuration file: {e}")
         except Exception as e:
@@ -95,10 +97,13 @@ class ModelConfigParser:
                 for individual in range(len(item)):
                 
                     site_list.append(item[individual][site])
-            
-                if len(set(site_list)) > 1 and -1 not in site_list:
+                site_list = [str(x) for x in site_list]
+                if len(set(site_list)) > 1 and not any(item not in ['A', 'T', 'C', 'G'] for item in site_list):
                     total+=1
-                elif len(set(site_list)) > 2 and -1 in site_list:
-                    total+=1
+                else:
+                    unique_items = set(site_list) - set(['A', 'T', 'C', 'G'])
+
+                    if len(set(site_list)) > 1+len(unique_items):
+                        total+=1
         
         return(total)
