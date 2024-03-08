@@ -181,7 +181,9 @@ class DataProcessor:
                             pop2_count = Counter(site_data_pop2_sampled[k])[minor_allele]
                             # add to the sfs
                             sfs_list[k][key][pop1_count, pop2_count] += 1
-                        # convert SFS to binned
+        for item in range(len(sfs_list)):
+            for subitem in sfs_list[item].keys():
+                sfs_list[item][subitem][0,0] = 0
         
         return sfs_list
 
@@ -244,9 +246,12 @@ class DataProcessor:
                         
                         counts_per_population[population] = Counter(site_data_pop)[minor_allele]
 
-                    string_for_count = [str(x) for x in list(counts_per_population.values())]
-                    combo_key = '_'.join(string_for_count)
-                    rep_sfs_dict[combo_key]+=1
+                    string_for_count = [x for x in list(counts_per_population.values())]
+                    if sum(string_for_count) != 0:
+                        string_for_count = [str(x) for x in string_for_count]
+                        combo_key = '_'.join(string_for_count)
+                        rep_sfs_dict[combo_key]+=1
+
 
             # convert SFS to binned
             if not nbins is None:
