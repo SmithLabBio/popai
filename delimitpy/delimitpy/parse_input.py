@@ -73,8 +73,6 @@ class ModelConfigParser:
             config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(path=os.path.join(config_dict["fasta_folder"], x), schema="fasta", taxon_namespace=taxa) for x in fasta_list]
             config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
 
-            config_dict['variable'] = self.count_variable(config_dict['fastas'])
-
         except KeyError as e:
             raise KeyError(f"Error in empirical data config: Missing key in configuration file: {e}")
         except Exception as e:

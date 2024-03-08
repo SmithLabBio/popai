@@ -13,12 +13,13 @@ class DataSimulator:
 
     """Simulate data under specified demographies."""
 
-    def __init__(self, models, labels, config, cores, downsampling):
+    def __init__(self, models, labels, config, cores, downsampling, max_sites):
         self.models = models
         self.labels = labels
         self.config = config
         self.cores = cores
         self.downsampling = downsampling
+        self.max_sites = max_sites
         
         # check taht using even values
         key_even = all(value % 2 == 0 for value in self.downsampling.values())
@@ -186,20 +187,20 @@ class DataSimulator:
 
         self.logger.info("Median simulated data has %s basepairs, and your input has %s basepairs."\
                          "If these numbers are very different, you may want to change some priors.", 
-                         median_size, self.config['variable'])
+                         median_size, self.max_sites)
 
         for model, values in all_arrays.items():
             for i, matrix in enumerate(values):
                 if len(matrix) > 0:
-                    if matrix.shape[1] > self.config['variable']:
-                        all_arrays[model][i] = matrix[:, :self.config['variable']]
-                    elif matrix.shape[1] < self.config['variable']:
-                        num_missing_columns = self.config['variable'] - matrix.shape[1]
+                    if matrix.shape[1] > self.max_sites:
+                        all_arrays[model][i] = matrix[:, :self.max_sites]
+                    elif matrix.shape[1] < self.max_sites:
+                        num_missing_columns = self.max_sites - matrix.shape[1]
                         missing_columns = np.full((matrix.shape[0], num_missing_columns), -1)
                         modified_matrix = np.concatenate((matrix, missing_columns), axis=1)
                         all_arrays[model][i] = modified_matrix
                 else:
-                    num_missing_columns = self.config['variable'] - 0
+                    num_missing_columns = self.max_sites - 0
                     modified_matrix = np.full((sum(self.config["sampling_dict"].values()),
                                                num_missing_columns), -1)
                     all_arrays[model][i] = modified_matrix
