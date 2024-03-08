@@ -188,6 +188,11 @@ class DataProcessor:
     def numpy_to_msfs(self, encoded_alignment, downsampling, replicates = 1, nbins=None):
         """Translate simulated mutations into site frequency spectra"""
 
+        # check taht using even values
+        key_even = all(value % 2 == 0 for value in downsampling.values())
+        if not key_even:
+            raise ValueError(f"Error in downampling, all keys must be even: {e}")
+
         all_sfs = []
 
         # change the order of the sampling dictionary to match the population order in the models
