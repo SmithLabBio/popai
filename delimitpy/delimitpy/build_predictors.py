@@ -158,8 +158,11 @@ class NeuralNetSFS:
 
     def __init__(self, config, sfs, labels):
         self.config = config
-        self.sfs = sfs
-        self.labels = labels
+        self.sfs = [item for sublist in sfs for item in sublist]
+        self.sfs = np.array(self.sfs)
+        self.nclasses = len(labels)
+        self.labels = np.array([item for sublist in labels for item in sublist])
+        self.labels = keras.utils.to_categorical(self.labels)
         self.rng = np.random.default_rng(self.config['seed'])
 
     def build_neuralnet_sfs(self):
@@ -167,29 +170,17 @@ class NeuralNetSFS:
         """Build a neural network classifier that takes the
         multidimensional SFS as input."""
 
-        # prep labels
-        labels = [item for sublist in self.labels for item in sublist]
-        labels = np.array(labels)
-        labels = keras.utils.to_categorical(labels)
-
-        # prep features
-        #sfs_arrays = [np.expand_dims(np.array(x), axis=-1) for x in self.sfs]
-        #print(len(sfs_arrays))
-        #print(sfs_arrays[0].shape)
-        sfs_arrays = np.array(self.sfs)
-        print(sfs_arrays.shape)
-
         # split train and test
         train_test_seed = self.rng.integers(2**32, size=1)[0]
 
-        x_train, x_test, y_train, y_test = train_test_split(sfs_arrays,
-                labels, test_size=0.2, random_state=train_test_seed)
+        x_train, x_test, y_train, y_test = train_test_split(self.sfs,
+                self.labels, test_size=0.2, random_state=train_test_seed)
 
         # build model
         network_input = keras.Input(shape=x_train.shape[1:])
         x = keras.layers.Dense(100, activation='relu')(network_input)
         x = keras.layers.Dense(50, activation='relu')(x)
-        x = keras.layers.Dense(len(self.labels), activation='softmax')(x)
+        x = keras.layers.Dense(self.nclasses, activation='softmax')(x)
 
         # fit model
         model = keras.Model(inputs=network_input, outputs=x)
