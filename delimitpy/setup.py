@@ -12,5 +12,14 @@ setup(
         'demes',
         'demesdraw',
         'matplotlib',
+        'argparse',
     ],
+    entry_points={
+        'console_scripts': [
+            'process_empirical_data=delimitpy.cli_process_empirical_data:main',
+            'simulate_data=delimitpy.cli_simulate_data:main',
+            'train_models=delimitpy.cli_train_models:main',
+            'apply_models=delimitpy.cli_apply_models:main'
+        ],
+    }
 )

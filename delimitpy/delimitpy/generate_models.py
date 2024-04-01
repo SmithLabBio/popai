@@ -10,6 +10,7 @@ import numpy as np # ModelBuilder
 import demesdraw # ModelBuilder
 import matplotlib.pyplot as plt # ModelBuilder
 import yaml # ModelWriter
+from matplotlib.backends.backend_pdf import PdfPages
 
 class ModelBuilder:
 
@@ -113,7 +114,7 @@ class ModelBuilder:
         # return them
         return(full_model_list, expanded_labels)
 
-    def validate_models(self, demographies, labels):
+    def validate_models(self, demographies, labels, outplot=None):
         """
         Plot example models from divergence, secondary contact, 
         and divergence with gene flow scenarios.
@@ -125,6 +126,8 @@ class ModelBuilder:
                 demography objects returned from draw_parameters.
             dwg_demographies (List): A list of parameterized divergence with 
                 gene flow demography objects returned from draw_parameters.
+            labels (List): model labels
+            outplot (string): path to store output figures. Default is to show.
 
         Returns:
             Nothing
@@ -135,7 +138,7 @@ class ModelBuilder:
 
         try:
             # Plot divergence demographies
-            self._plot_models(demographies, labels)
+            self._plot_models(demographies, labels, outplot)
 
 
         except ValueError as ve:
@@ -609,18 +612,32 @@ class ModelBuilder:
 
         return migration_start
 
-    def _plot_models(self, demographies, labels):
+    def _plot_models(self, demographies, labels, outplot):
         """Plot example models for a given type of demography."""
 
-        for model in enumerate(demographies):
-            demo_to_plot = random.sample(model[1], 1)[0]
-            graph = demo_to_plot.to_demes()
+        if outplot is None:
+            for model in enumerate(demographies):
+                demo_to_plot = random.sample(model[1], 1)[0]
+                graph = demo_to_plot.to_demes()
 
-            # Plot the model
-            fig = plt.subplots()
-            demesdraw.tubes(graph, ax=fig[1], seed=1)
-            plt.title(f"Model: {labels[model[0]][0]}")
-            plt.show()
+                # Plot the model
+                fig = plt.subplots()
+                demesdraw.tubes(graph, ax=fig[1], seed=1)
+                plt.title(f"Model: {labels[model[0]][0]}")
+                plt.show()
+
+        else:
+            with PdfPages(outplot) as pdf:
+                for model in enumerate(demographies):
+                    demo_to_plot = random.sample(model[1], 1)[0]
+                    graph = demo_to_plot.to_demes()
+
+                    # Plot the model
+                    fig, ax = plt.subplots()
+                    demesdraw.tubes(graph, ax=ax, seed=1)
+                    plt.title(f"Model: {labels[model[0]][0]}")
+                    pdf.savefig(fig)
+                    plt.close(fig)
 
 class ModelWriter:
 

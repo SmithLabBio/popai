@@ -64,8 +64,11 @@ class CnnSFS:
         self.sfs_2d = [item for sublist in sfs_2d for item in sublist]
         self.nclasses = len(labels)
         self.labels = np.array([item for sublist in labels for item in sublist])
-        self.labels = keras.utils.to_categorical(self.labels)
         self.rng = np.random.default_rng(self.config['seed'])
+        try:
+            self.labels = keras.utils.to_categorical(self.labels)
+        except:
+            pass
 
     def build_cnn_sfs(self):
 
@@ -95,11 +98,8 @@ class CnnSFS:
         train_labels = self.labels[train_indices]
         val_labels = self.labels[val_indices]
 
-        print(train_labels.shape, val_labels.shape)
-
         # to arrays
         train_features = [np.expand_dims(np.array(x), axis=-1) for x in train_features]
-        print(train_features[0].shape)
         val_features = [np.expand_dims(np.array(x), axis=-1) for x in val_features]
 
         # build model
@@ -169,8 +169,12 @@ class NeuralNetSFS:
         self.sfs = np.array(self.sfs)
         self.nclasses = len(labels)
         self.labels = np.array([item for sublist in labels for item in sublist])
-        self.labels = keras.utils.to_categorical(self.labels)
         self.rng = np.random.default_rng(self.config['seed'])
+        try:
+            self.labels = keras.utils.to_categorical(self.labels)
+        except:
+            pass
+
 
     def build_neuralnet_sfs(self):
 

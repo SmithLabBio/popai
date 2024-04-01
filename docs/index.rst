@@ -14,7 +14,7 @@ Welcome to delimitpy's documentation!
    usage/parsinginput.rst
    usage/buildingmodels.rst
    notebooks/delimitpy_walkthrough.ipynb
-
+   usage/cli_tutorial.rst
 
 
 Indices and tables

@@ -5,3 +5,4 @@ numpy
 demes
 demesdraw
 matplotlib
+argparse
