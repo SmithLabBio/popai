@@ -56,24 +56,21 @@ class CnnSFS:
 
     def __init__(self, config, sfs_2d, labels):
         self.config = config
-        self.sfs_2d = sfs_2d
-        self.labels = labels
+        self.sfs_2d = [item for sublist in sfs_2d for item in sublist]
+        self.nclasses = len(labels)
+        self.labels = np.array([item for sublist in labels for item in sublist])
+        self.labels = keras.utils.to_categorical(self.labels)
         self.rng = np.random.default_rng(self.config['seed'])
 
     def build_cnn_sfs(self):
 
         """Build a CNN that takes 2D SFS as input."""
 
-        # get label
-        labels = [item for sublist in self.labels for item in sublist]
-        labels = np.array(labels)
-        labels = keras.utils.to_categorical(labels)
-
         # get features
         list_of_features = self._convert_2d_dictionary(self.sfs_2d)
 
         # shuffle data
-        num_samples = len(labels)
+        num_samples = len(self.labels)
 
         # Create an array of indices and shuffle it
         indices = np.arange(num_samples)
@@ -90,8 +87,10 @@ class CnnSFS:
                           for j in range(len(list_of_features))]
         val_features = [[list_of_features[j][i] for i in val_indices]\
                         for j in range(len(list_of_features))]
-        train_labels = labels[train_indices]
-        val_labels = labels[val_indices]
+        train_labels = self.labels[train_indices]
+        val_labels = self.labels[val_indices]
+
+        print(train_labels.shape, val_labels.shape)
 
         # to arrays
         train_features = [np.expand_dims(np.array(x), axis=-1) for x in train_features]
@@ -110,7 +109,7 @@ class CnnSFS:
 
         concatenated = keras.layers.Concatenate()(my_layers)
         x = keras.layers.Dense(64, activation='relu')(concatenated)
-        x = keras.layers.Dense(len(self.labels), activation='softmax')(x)
+        x = keras.layers.Dense(self.nclasses, activation='softmax')(x)
 
         model = keras.Model(inputs=inputs, outputs=x)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
