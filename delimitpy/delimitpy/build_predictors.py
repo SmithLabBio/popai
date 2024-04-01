@@ -15,7 +15,6 @@ class RandomForestsSFS:
         self.sfs = np.array(self.sfs)
         self.labels = [item for sublist in labels for item in sublist]
         self.rng = np.random.default_rng(self.config['seed'])
-        print(len(self.sfs), len(self.labels))
 
     def build_rf_sfs(self):
 
@@ -26,7 +25,6 @@ class RandomForestsSFS:
 
         x_train, x_test, y_train, y_test = train_test_split(self.sfs,
                 self.labels, test_size=0.2, random_state=train_test_seed)
-        print(x_train.shape)
 
         sfs_rf = RandomForestClassifier(n_estimators=100, oob_score=True)
 
@@ -45,7 +43,7 @@ class RandomForestsSFS:
         return sfs_rf, conf_matrix
 
     def predict(self, model, new_data):
-
+        new_data = np.array(new_data)
         predicted = model.predict(new_data)
         predicted_prob = model.predict_proba(new_data)
         return(predicted, predicted_prob)
@@ -200,58 +198,8 @@ class NeuralNetSFS:
     
     def predict(self, model, new_data):
 
+        new_data = np.array(new_data)
         predicted = model.predict(new_data)
         predicted = model.predict(new_data)
         predicted_labels = np.argmax(predicted, axis=1)
         return(predicted_labels, predicted)
-
-
-class RandomForestsStats:
-
-    """Build a RF predictor that takes the SFS as input."""
-
-    def __init__(self, config, stats, labels):
-        self.config = config
-        self.stats = stats
-        self.labels = labels
-        self.rng = np.random.default_rng(self.config['seed'])
-
-    def build_rf_stats(self):
-
-        """Build a random forest classifier that takes the
-        multidimensional SFS as input."""
-
-        labels = [item for sublist in self.labels for item in sublist]
-
-        train_test_seed = self.rng.integers(2**32, size=1)[0]
-
-        stats_nona = np.nan_to_num(self.stats, copy=True, nan=0.0, posinf=None, neginf=None)
-
-        x_train, x_test, y_train, y_test = train_test_split(stats_nona,
-                labels, test_size=0.2, random_state=train_test_seed)
-        print(x_train.shape)
-
-        stats_rf = RandomForestClassifier(n_estimators=100, oob_score=True)
-
-        stats_rf.fit(x_train, y_train)
-        print("Out-of-Bag (OOB) Error:", 1.0 - stats_rf.oob_score_)
-
-
-        cv_scores = cross_val_score(stats_rf, x_test, y_test, cv=2)
-        print("Cross-validation scores:", cv_scores)
-
-        y_pred_cv = cross_val_predict(stats_rf, x_test, y_test, cv=2)
-        conf_matrix = confusion_matrix(y_test, y_pred_cv)
-        print("Confusion Matrix:")
-        print(conf_matrix)
-
-        return stats_rf, conf_matrix
-
-    def predict(self, model, new_data):
-
-        new_array = np.array(new_data)
-        print(new_array.shape)
-        predicted = model.predict(new_array)
-        predicted_prob = model.predict_proba(new_array)
-        print(predicted, predicted_prob)
-        return(predicted, predicted_prob)
