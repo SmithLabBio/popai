@@ -4,8 +4,10 @@ import time # for testing only
 from collections import Counter
 from itertools import product
 from concurrent.futures import ThreadPoolExecutor
+import os
 import msprime
 import numpy as np
+import matplotlib.pyplot as plt
 logging.getLogger('msprime').setLevel("WARNING")
 
 
@@ -20,17 +22,47 @@ class DataSimulator:
         self.cores = cores
         self.downsampling = downsampling
         self.max_sites = max_sites
-        
-        # check taht using even values
+
+        # check that using even values
         key_even = all(value % 2 == 0 for value in self.downsampling.values())
         if not key_even:
-            raise ValueError(f"Error in downampling, all keys must be even.")
+            raise ValueError("Error in downampling, all keys must be even.")
 
         self.rng = np.random.default_rng(self.config['seed'])
 
         # Configure logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
+
+        # get overall simulating dict for full demography
+        self.simulating_dict = self._get_simulating_dict()
+
+    def _get_simulating_dict(self):
+        simulating_dict = {}
+        population_count = len(self.config['sampling dict'])
+        count=0
+        while len(simulating_dict) != population_count:
+            populations = [x.name for x in self.models[count][0].populations]
+            simulating_dict = {population: 0 for population in populations}
+            for species in self.config['species tree'].leaf_nodes():
+                if species.taxon.label not in populations:
+                    search = True
+                    searchnode = species
+                    while search:
+                        if searchnode.parent_node.label in populations:
+                            simulating_dict[searchnode.parent_node.label] += \
+                                self.downsampling[species.taxon.label] / 2
+                            search = False
+                        else:
+                            searchnode = searchnode.parent_node
+                else:
+                    simulating_dict[species.taxon.label] += \
+                        self.downsampling[species.taxon.label]/2
+            simulating_dict = {key: value for key, value in simulating_dict.items() if value != 0}
+
+            count+=1
+        return simulating_dict
+
 
     def simulate_ancestry(self):
 
@@ -58,25 +90,26 @@ class DataSimulator:
     def _run_ancestry_sims(self, demography):
 
         # figure out how to sample individuals
-        sampling_dict = {}
+        simulating_dict = {}
         populations = [x.name for x in demography[0].populations]
-        sampling_dict = {population: 0 for population in populations}
+        simulating_dict = {population: 0 for population in populations}
         for species in self.config['species tree'].leaf_nodes():
             if species.taxon.label not in populations:
                 search = True
                 searchnode = species
                 while search:
                     if searchnode.parent_node.label in populations:
-                        sampling_dict[searchnode.parent_node.label] += \
+                        simulating_dict[searchnode.parent_node.label] += \
                             self.downsampling[species.taxon.label] / 2
                         search = False
                     else:
                         searchnode = searchnode.parent_node
             else:
-                sampling_dict[species.taxon.label] += \
+                simulating_dict[species.taxon.label] += \
                     self.downsampling[species.taxon.label]/2
-        sampling_dict = {key: value for key, value in sampling_dict.items() if value != 0}
+        simulating_dict = {key: value for key, value in simulating_dict.items() if value != 0}
 
+        # simulate the tree sequences
         model_ts = []
         for parameterization in enumerate(demography):
             parameter_ts = []
@@ -84,7 +117,7 @@ class DataSimulator:
             fragment_seeds = self.rng.integers(2**32, size=len(self.config['lengths']))
             for k,length in enumerate(self.config['lengths']):
                 # simulate data
-                ts = msprime.sim_ancestry(sampling_dict, demography=parameterization[1],
+                ts = msprime.sim_ancestry(simulating_dict, demography=parameterization[1],
                                           random_seed = fragment_seeds[k], sequence_length=length,
                                           recombination_rate=0)
                 parameter_ts.append(ts)
@@ -116,8 +149,8 @@ class DataSimulator:
 
     def _run_mutation_sims(self, ancestries):
 
-        mutation_rates = self.rng.uniform(low=self.config["mutation_rate"][0],
-                                          high=self.config["mutation_rate"][1],
+        mutation_rates = self.rng.uniform(low=self.config["mutation rate"][0],
+                                          high=self.config["mutation rate"][1],
                                           size=self.config["replicates"])
         mutation_rates = np.round(mutation_rates, decimals=20)
 
@@ -153,7 +186,6 @@ class DataSimulator:
 
             for dataset in values:
 
-
                 fragment_array_list= []
 
                 for fragment in dataset:
@@ -165,7 +197,18 @@ class DataSimulator:
                         nucleotide_encoding = alleles[variant.genotypes]
                         integer_encoding = [integer_encoding_dict[allele]
                                             for allele in nucleotide_encoding]
-                        fragment_list.append(np.array(integer_encoding))
+
+                        # reorder based on sampling dict
+                        ordered_integer_encoding = []
+                        indices = {}
+                        count=0
+                        for pop, samples in self.simulating_dict.items():
+                            indices[pop] = (int(count), int(count+samples))
+                            count += samples
+                        for pop in self.config['sampling dict']:
+                            ordered_integer_encoding+=integer_encoding[\
+                                indices[pop][0]*2:indices[pop][1]*2]
+                        fragment_list.append(np.array(ordered_integer_encoding))
 
                     if len(fragment_list)>0:
                         fragment_array = np.column_stack(fragment_list)
@@ -201,29 +244,27 @@ class DataSimulator:
                         all_arrays[model][i] = modified_matrix
                 else:
                     num_missing_columns = self.max_sites - 0
-                    modified_matrix = np.full((sum(self.config["sampling_dict"].values()),
+                    modified_matrix = np.full((sum(self.config["sampling dict"].values()),
                                                num_missing_columns), -1)
                     all_arrays[model][i] = modified_matrix
 
         return all_arrays
 
     def mutations_to_sfs(self, numpy_array_dict, nbins=None):
-        """Translate simulated mutations into site frequency spectra"""
+
+        """Convert numpy arrays to multidimensional site frequency spectra"""
 
         all_sfs = []
 
-        # change the order of the sampling dictionary to match the population order in the models
-        population_order = [x.name for x in self.models[-1][0].populations if
-                            x.default_sampling_time is None]
-        reordered_dict = {key: self.config["sampling_dict"][key] for key in population_order}
-
         # get indices for samples
+        reordered_downsampling = {key: self.downsampling[key] for \
+                                  key in self.config["sampling dict"]}
+
         current = 0
         sampling_indices = {}
-        for key, value in reordered_dict.items():
+        for key, value in reordered_downsampling.items():
             sampling_indices[key] = [current, value + current]
             current = current+value
-
 
         for values in numpy_array_dict.values():
 
@@ -232,7 +273,7 @@ class DataSimulator:
             for replicate in values:
 
                 # Generate all possible combinations of counts per population
-                combos = product(*(range(count + 1) for count in reordered_dict.values()))
+                combos = product(*(range(count + 1) for count in reordered_downsampling.values()))
                 rep_sfs_dict = {'_'.join(map(str, combo)): 0 for combo in combos}
 
                 for site in range(replicate.shape[1]):
@@ -245,7 +286,7 @@ class DataSimulator:
                         minor_allele = min(set(site_data), key=site_data.count)
                         # find poulation counts
                         counts_per_population = {}
-                        for population in reordered_dict.keys():
+                        for population in self.config['sampling dict'].keys():
                             site_data_pop = site_data[sampling_indices[population][0]:
                                                       sampling_indices[population][1]]
                             counts_per_population[population] = Counter(site_data_pop)[minor_allele]
@@ -256,10 +297,11 @@ class DataSimulator:
                 # convert SFS to binned
                 if not nbins is None:
                     thresholds = []
-                    for value in reordered_dict.values():
+                    for value in reordered_downsampling.values():
                         thresholds.append([int(np.floor(value/nbins*(x+1))) for x in range(nbins)])
                     threshold_combos = list(product(*thresholds))
-                    binned_rep_sfs_dict = {'_'.join(map(str, combo)): 0 for combo in threshold_combos}
+                    binned_rep_sfs_dict = {'_'.join(map(str, combo)): \
+                                           0 for combo in threshold_combos}
 
                     for key, value in rep_sfs_dict.items():
                         new_string = ''
@@ -272,129 +314,66 @@ class DataSimulator:
                     rep_sfs_dict = binned_rep_sfs_dict
 
                 rep_sfs_dict = [value for value in rep_sfs_dict.values()]
-                model_replicates.append(rep_sfs_dict)
+                model_replicates.append(np.array(rep_sfs_dict))
 
             all_sfs.append(model_replicates)
 
-        all_sfs = [item for sublist in all_sfs for item in sublist]
         return all_sfs
 
-    def mutations_to_stats(self, mutation_dict):
-        """Convert mutations to summary statistics."""
-
-        all_stats = []
-
-        # change the order of the sampling dictionary to match the population order in the models
-        population_order = [x.name for x in self.models[-1][0].populations if
-                            x.default_sampling_time is None]
-        reordered_dict = {key: self.config["sampling_dict"][key] for key in population_order}
-
-        # get indices for samples
-        current = 0
-        sampling_indices = {}
-        for key, value in reordered_dict.items():
-            sampling_indices[key] = [current, value + current]
-            current = current+value
-
-        for values in mutation_dict.values():
-
-            for replicate in values:
-
-                summary_stats_replicate = []
-
-
-                for fragment in replicate:
-
-                    fragment_stats = []
-
-                    # diversity
-                    fragment_stats.append(fragment.diversity())
-                    # segregating sites
-                    fragment_stats.append(fragment.segregating_sites())
-                    ## tajima's D
-                    #fragment_stats.append(fragment.Tajimas_D())
-
-                    # diversity, segregating sites, Tajima's D within populations
-
-                    for population in reordered_dict.keys():
-                        fragment_stats.append(fragment.diversity(sample_sets=\
-                            range(sampling_indices[population][0],sampling_indices[population][1])))
-                        fragment_stats.append(fragment.segregating_sites(sample_sets=\
-                            range(sampling_indices[population][0],sampling_indices[population][1])))
-                        #fragment_stats.append(fragment.Tajimas_D(sample_sets=\
-                        #    range(sampling_indices[population][0],sampling_indices[population][1])))
-
-
-                    processed=[]
-                    for population in reordered_dict.keys():
-                        for population2 in reordered_dict.keys():
-                            if population != population2 and (population2, population)\
-                                not in processed:
-                                fragment_stats.append(fragment.divergence([range\
-                                    (sampling_indices[population][0],sampling_indices\
-                                    [population][1]), range(sampling_indices[population2][0]\
-                                    ,sampling_indices[population2][1])]))
-                                #fragment_stats.append(fragment.f2([range(sampling_indices\
-                                #    [population][0],sampling_indices[population][1]),
-                                #    range(sampling_indices[population2][0],\
-                                #    sampling_indices[population2][1])]))
-                                #fragment_stats.append(fragment.Fst([range(sampling_indices\
-                                #    [population][0],sampling_indices[population][1]),
-                                #    range(sampling_indices[population2][0],\
-                                #    sampling_indices[population2][1])]))
-                                processed.append((population, population2))
-                    print(len(fragment_stats))
-                    summary_stats_replicate.append(fragment_stats)
-
-                transposed_summary_stats_replicate = list(map(list, zip(*summary_stats_replicate)))
-                replicate_means = [np.mean(sublist) for sublist in
-                                   transposed_summary_stats_replicate]
-                replicate_stds = [np.std(sublist) for sublist in transposed_summary_stats_replicate]
-                replicate_statistics = np.array(replicate_means + replicate_stds)
-                all_stats.append(replicate_statistics)
-
-
-
-        return all_stats
-
-    def _create_numpy_2d_arrays(self, reordered_dict):
+    def _create_numpy_2d_arrays(self):
 
         # create empty dictionary to store arrays
         sfs_2d = {}
 
         # get a list of populations
-        populations = list(reordered_dict.keys())
+        populations = list(self.config['sampling dict'].keys())
 
         # iterate over each pair of populations
-        for i in range(len(populations)):
-            for j in range(i+1, len(populations)):
-                pop1 = populations[i]
-                pop2 = populations[j]
-
-                # create an empty 2D numpy array with the correct shape
-                array_shape = (reordered_dict[pop1]+1, reordered_dict[pop2]+1)
-                sfs_2d[(pop1, pop2)] = np.zeros(array_shape)
+        for i, pop1 in enumerate(populations):
+            for j, pop2 in enumerate(populations):
+                if i < j:
+                    # create an empty 2D numpy array with the correct shape
+                    array_shape = (self.downsampling[pop1]+1, self.downsampling[pop2]+1)
+                    sfs_2d[(pop1, pop2)] = np.zeros(array_shape)
 
         return sfs_2d
+
+    def plot_2dsfs(self, sfs_list):
+        """Plot average 2 dimensional Site frequency spectra."""
+        count=0
+        for item in sfs_list:
+            averages = {}
+            for key in item[0].keys():
+                arrays = [d[key] for d in item]
+                average_array  = np.mean(arrays, axis=0)
+                averages[key] = average_array
+            # Create heatmaps
+            for key, value in averages.items():
+                outfile  = os.path.join(self.config["output directory"], \
+                                        f"2D_SFS_{key}_model_{count}.png")
+                plt.imshow(value, cmap='viridis', origin="lower")
+                plt.colorbar()  # Add colorbar to show scale
+                plt.title(f"2D SFS {key} for model {count}.")
+                plt.savefig(outfile)
+                plt.close()
+            count+=1
+
 
     def mutations_to_2d_sfs(self, numpy_array_dict):
         """Translate simulated mutations into 2d site frequency spectra"""
 
         all_sfs = []
 
-        # change the order of the sampling dictionary to match the population order in the models
-        population_order = [x.name for x in self.models[-1][0].populations
-                            if x.default_sampling_time is None]
-        reordered_dict = {key: self.config["sampling_dict"][key] for key in population_order}
 
         # get indices for samples
+        reordered_downsampling = {key: self.downsampling[key] \
+                                  for key in self.config["sampling dict"]}
+
         current = 0
         sampling_indices = {}
-        for key, value in reordered_dict.items():
+        for key, value in reordered_downsampling.items():
             sampling_indices[key] = [current, value + current]
             current = current+value
-
-
 
         for values in numpy_array_dict.values():
 
@@ -403,7 +382,7 @@ class DataSimulator:
             for replicate in values:
 
                 # generate the empty arrays
-                sfs_2d = self._create_numpy_2d_arrays(reordered_dict)
+                sfs_2d = self._create_numpy_2d_arrays()
 
                 for site in range(replicate.shape[1]): # iterate over sites
 
@@ -429,6 +408,7 @@ class DataSimulator:
                                 # find counts in each population
                                 pop1_count = Counter(site_data_pop1)[minor_allele]
                                 pop2_count = Counter(site_data_pop2)[minor_allele]
+                                #print(key, pop1_count, pop2_count)
 
                                 # add to the sfs
                                 sfs_2d[key][pop1_count, pop2_count] += 1
@@ -437,5 +417,4 @@ class DataSimulator:
 
             all_sfs.append(model_replicates)
 
-        all_sfs = [item for sublist in all_sfs for item in sublist]
         return all_sfs

@@ -11,21 +11,21 @@ class RandomForestsSFS:
 
     def __init__(self, config, sfs, labels):
         self.config = config
-        self.sfs = sfs
-        self.labels = labels
+        self.sfs = [item for sublist in sfs for item in sublist]
+        self.sfs = np.array(self.sfs)
+        self.labels = [item for sublist in labels for item in sublist]
         self.rng = np.random.default_rng(self.config['seed'])
+        print(len(self.sfs), len(self.labels))
 
     def build_rf_sfs(self):
 
         """Build a random forest classifier that takes the
         multidimensional SFS as input."""
-
-        labels = [item for sublist in self.labels for item in sublist]
-
+        
         train_test_seed = self.rng.integers(2**32, size=1)[0]
 
         x_train, x_test, y_train, y_test = train_test_split(self.sfs,
-                labels, test_size=0.2, random_state=train_test_seed)
+                self.labels, test_size=0.2, random_state=train_test_seed)
         print(x_train.shape)
 
         sfs_rf = RandomForestClassifier(n_estimators=100, oob_score=True)
