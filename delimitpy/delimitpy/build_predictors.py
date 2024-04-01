@@ -49,7 +49,7 @@ class RandomForestsSFS:
         new_data = np.array(new_data)
         predicted = model.predict(new_data)
         predicted_prob = model.predict_proba(new_data)
-        headers = ["Model {}".format(i+1) for i in range(predicted_prob.shape[1])]
+        headers = ["Model {}".format(i) for i in range(predicted_prob.shape[1])]
         replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted_prob.shape[0])]
         table_data = np.column_stack((replicate_numbers, predicted_prob))
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
@@ -133,7 +133,7 @@ class CnnSFS:
         new_features = self._convert_2d_dictionary(new_data)
         new_features = [np.expand_dims(np.array(x), axis=-1) for x in new_features]
         predicted = model.predict(new_features)
-        headers = ["Model {}".format(i+1) for i in range(predicted.shape[1])]
+        headers = ["Model {}".format(i) for i in range(predicted.shape[1])]
         replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
         table_data = np.column_stack((replicate_numbers, predicted))
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
@@ -209,7 +209,7 @@ class NeuralNetSFS:
         new_data = np.array(new_data)
         predicted = model.predict(new_data)
         predicted = model.predict(new_data)
-        headers = ["Model {}".format(i+1) for i in range(predicted.shape[1])]
+        headers = ["Model {}".format(i) for i in range(predicted.shape[1])]
         replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
         table_data = np.column_stack((replicate_numbers, predicted))
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
