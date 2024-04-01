@@ -4,6 +4,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 import numpy as np
 import keras
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class RandomForestsSFS:
 
@@ -37,10 +39,10 @@ class RandomForestsSFS:
 
         y_pred_cv = cross_val_predict(sfs_rf, x_test, y_test, cv=2)
         conf_matrix = confusion_matrix(y_test, y_pred_cv)
-        print("Confusion Matrix:")
-        print(conf_matrix)
+        conf_matrix_plot = plot_confusion_matrix(y_test, y_pred_cv)
 
-        return sfs_rf, conf_matrix
+
+        return sfs_rf, conf_matrix, conf_matrix_plot
 
     def predict(self, model, new_data):
         new_data = np.array(new_data)
@@ -203,3 +205,12 @@ class NeuralNetSFS:
         predicted = model.predict(new_data)
         predicted_labels = np.argmax(predicted, axis=1)
         return(predicted_labels, predicted)
+
+def plot_confusion_matrix(y_true, y_pred):
+    conf_matrix = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues")
+    plt.title("Confusion Matrix")
+    plt.xlabel("Predicted Labels")
+    plt.ylabel("True Labels")
+    return plt
