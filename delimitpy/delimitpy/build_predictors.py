@@ -120,10 +120,9 @@ class CnnSFS:
         val_predicted_labels = np.argmax(val_pred, axis=1)
         val_true_labels = np.argmax(val_labels, axis=1)
         conf_matrix = confusion_matrix(val_true_labels, val_predicted_labels)
-        print("Confusion Matrix:")
-        print(conf_matrix)
+        conf_matrix_plot = plot_confusion_matrix(y_test, y_pred_cv)
 
-        return model, conf_matrix
+        return model, conf_matrix, conf_matrix_plot
 
     def predict(self, model, new_data):
         new_features = self._convert_2d_dictionary(new_data)
@@ -193,10 +192,9 @@ class NeuralNetSFS:
         val_predicted_labels = np.argmax(val_pred, axis=1)
         val_true_labels = np.argmax(y_test, axis=1)
         conf_matrix = confusion_matrix(val_true_labels, val_predicted_labels)
-        print("Confusion Matrix:")
-        print(conf_matrix)
+        conf_matrix_plot = plot_confusion_matrix(y_test, y_pred_cv)
 
-        return model, conf_matrix
+        return model, conf_matrix, conf_matrix_plot
     
     def predict(self, model, new_data):
 
