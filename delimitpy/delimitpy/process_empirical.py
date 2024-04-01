@@ -290,7 +290,7 @@ class DataProcessor:
 
             # calculate average number of sites used
 
-        average_sites = np.mean([np.sum(x) for x in all_sfs])
+        average_sites = int(np.ceil(np.mean([np.sum(x) for x in all_sfs])))
         print(f"We used an average of {average_sites} to construct the mSFS.")
 
         return(all_sfs, average_sites)
