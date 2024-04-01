@@ -13,8 +13,7 @@ Welcome to delimitpy's documentation!
    usage/installation.rst
    usage/parsinginput.rst
    usage/buildingmodels.rst
-   notebooks/buildingmodels.ipynb
-   notebooks/buildingSFS.ipynb
+   notebooks/delimitpy_walkthrough.ipynb
 
 
 
