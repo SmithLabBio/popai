@@ -47,6 +47,8 @@ class ModelConfigParser:
             config_dict["secondary contact"] = config.getboolean("Model", "secondary contact")
             config_dict["divergence with gene flow"] = config.getboolean(
                 "Model", "divergence with gene flow")
+            config_dict["constant Ne"] = config.getboolean(
+                "Model", "constant Ne")
             config_dict["mutation rate"] = [float(val.strip("U(").strip(")")) for \
                 val in config['Simulations']["mutation rate"].split(",")]
             config_dict["substitution model"] = config["Simulations"]["substitution model"]
@@ -85,6 +87,16 @@ class ModelConfigParser:
             raise ValueError(f"Error parsing tree: {e}") from e
         except Exception as e:
             raise RuntimeError(f"Unexpected error occurred: {e}") from e
+        
+        if config_dict['constant Ne']:
+            mins = []
+            maxs = []
+            for node in config_dict['species tree'].postorder_node_iter():
+                min_ne, max_ne = map(int, node.annotations['ne'].value.strip("'").split("-"))
+                mins.append(min_ne)
+                maxs.append(max_ne)
+            if len(set(mins)) > 1 or len(set(maxs)) > 1:
+                raise ValueError(f"Error due to using variable population size priors when setting constant Ne to True")
 
         return config_dict
 

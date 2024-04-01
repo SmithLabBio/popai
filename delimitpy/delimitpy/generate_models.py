@@ -489,11 +489,20 @@ class ModelBuilder:
         population_size_draws = {}
         population_size_keys = {}
 
-        for index, population in enumerate(model.populations):
-            min_size, max_size = population_sizes[population.name]
-            population_size_draws[population.name] = np.round(self.rng.uniform(
+        if self.config['constant Ne']:
+            min_size, max_size = population_sizes[list(population_sizes.keys())[0]]
+            the_population_size = np.round(self.rng.uniform(
                 low=min_size, high=max_size, size=self.config['replicates']),0)
-            population_size_keys[population.name] = index
+            for index, population in enumerate(model.populations):
+                population_size_draws[population.name] = the_population_size
+                population_size_keys[population.name] = index
+        else:
+
+            for index, population in enumerate(model.populations):
+                min_size, max_size = population_sizes[population.name]
+                population_size_draws[population.name] = np.round(self.rng.uniform(
+                    low=min_size, high=max_size, size=self.config['replicates']),0)
+                population_size_keys[population.name] = index
 
         return(population_size_draws, population_size_keys)
 

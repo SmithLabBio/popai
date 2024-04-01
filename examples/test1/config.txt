@@ -6,6 +6,7 @@ secondary contact = True # True if you wish to consider secondary contact models
 divergence with gene flow = False # True if you wish to consider divergence with gene flow models.
 max migration events = 2 # Maximum number of migration events to consider in one model.
 migration rate = U(1e-5, 1e-4) # Prior from which to draw migration rates. Only uniform priors are supported at present.
+constant Ne = True # constant effective population sizes
 
 [Other]
 output directory = ../../example_results # Directory for storing output (should exist).
