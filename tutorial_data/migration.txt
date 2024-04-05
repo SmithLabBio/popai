@@ -1,6 +1,6 @@
 ,A,B,C,AB,ABC
-A,T,T,T,T,T
-B,T,T,T,T,T
-C,T,T,T,T,T
-AB,T,T,T,T,T
-ABC,T,T,T,T,T
+A,F,F,T,F,F
+B,F,F,F,F,F
+C,T,F,F,T,F
+AB,F,F,T,F,F
+ABC,F,F,F,F,F
