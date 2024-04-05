@@ -16,7 +16,7 @@ Below, we provide information on the required input data. As an example, we use 
 Configuration File
 ========================================
 
-The user must provide delimitpy with a `configuration file <https://github.com/SmithLabBio/delimitpy/blob/main/examples/test1/config.txt>`_.::
+The user must provide delimitpy with a `configuration file <https://github.com/SmithLabBio/delimitpy/blob/main/tutorial_data/config.txt>`_.::
 
 
     [Model]

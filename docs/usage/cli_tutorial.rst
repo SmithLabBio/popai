@@ -6,7 +6,7 @@ Running delimitpy through the command line
 Step 0: Downloading example input data
 ==========================================
 
-Example input data is available `here <https://www.github.com/SmithLabBio/delimitpy/tutorial_data>`
+Example input data is available `here <https://www.github.com/SmithLabBio/delimitpy/tutorial_data>`_.
 
 ==========================================
 Step 1: Processing Empirical data
