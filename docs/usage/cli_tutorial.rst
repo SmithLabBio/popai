@@ -6,9 +6,8 @@ Running delimitpy through the command line
 Step 1: Install delimitpy
 ==========================================
 
-Use pip to install delimitpy:
+Use pip to install delimitpy::
 
-.. code-block:: bash
     git clone https://github.com/SmithLabBio/delimitpy.git
     cd delimitpy/delimitpy
     pip install .
