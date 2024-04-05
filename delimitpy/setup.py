@@ -13,7 +13,6 @@ setup(
         'demesdraw',
         'matplotlib',
         'argparse',
-        'yaml'
     ],
     entry_points={
         'console_scripts': [
