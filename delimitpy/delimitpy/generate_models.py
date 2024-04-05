@@ -888,7 +888,7 @@ def _get_priors(config):
 
     return(population_sizes, divergence_times)
 
-class NoAliasDumper(yaml.Dumper):
-    """Class for yaml dumper."""
-    def ignore_aliases(self, data):
-        return True
+#class NoAliasDumper(yaml.Dumper):
+#    """Class for yaml dumper."""
+#    def ignore_aliases(self, data):
+#        return True
