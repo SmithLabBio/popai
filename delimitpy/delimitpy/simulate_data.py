@@ -3,13 +3,14 @@ import logging
 import time # for testing only
 from collections import Counter
 from itertools import product
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import msprime
 import numpy as np
 import matplotlib.pyplot as plt
 logging.getLogger('msprime').setLevel("WARNING")
-
+import sys
+import threading
 
 class DataSimulator:
 
@@ -63,35 +64,11 @@ class DataSimulator:
             count+=1
         return simulating_dict
 
-
-    def simulate_ancestry(self):
-
-        """Perform ancestry simulations with msprime"""
-
-        start_time = time.time()  # Record the start time
-        ts_ancestry_dict = {}
-        with ThreadPoolExecutor(max_workers=self.cores) as executor:
-            # Submit tasks to the ThreadPoolExecutor
-            futures = {
-                executor.submit(self._run_ancestry_sims, demography[1]): demography[0]
-                for demography in enumerate(self.models)
-            }
-            # Retrieve results as they become available
-            for future in futures:
-                model_index = futures[future]
-                ts_ancestry_dict[f'Model_{model_index}'] = future.result()
-
-        end_time = time.time()  # Record the end time
-        execution_time = end_time - start_time  # Calculate the execution time
-        self.logger.info("Ancestry simulation execution time: %s seconds.", execution_time)
-
-        return ts_ancestry_dict
-
-    def _run_ancestry_sims(self, demography):
+    def _get_simulating_dict_model(self, demography):
 
         # figure out how to sample individuals
         simulating_dict = {}
-        populations = [x.name for x in demography[0].populations]
+        populations = [x.name for x in demography.populations]
         simulating_dict = {population: 0 for population in populations}
         for species in self.config['species tree'].leaf_nodes():
             if species.taxon.label not in populations:
@@ -108,122 +85,32 @@ class DataSimulator:
                 simulating_dict[species.taxon.label] += \
                     self.downsampling[species.taxon.label]/2
         simulating_dict = {key: value for key, value in simulating_dict.items() if value != 0}
+        return(simulating_dict)
 
-        # simulate the tree sequences
-        model_ts = []
-        for parameterization in enumerate(demography):
-            parameter_ts = []
+    def simulate_ancestry(self):
 
-            fragment_seeds = self.rng.integers(2**32, size=len(self.config['lengths']))
-            for k,length in enumerate(self.config['lengths']):
-                # simulate data
-                ts = msprime.sim_ancestry(simulating_dict, demography=parameterization[1],
-                                          random_seed = fragment_seeds[k], sequence_length=length,
-                                          recombination_rate=0)
-                parameter_ts.append(ts)
-            model_ts.append(parameter_ts)
-
-        return model_ts
-
-    def simulate_mutations(self, ancestry_dict):
-
-        """Simulate mutations in msprime."""
+        """Perform ancestry simulations with msprime"""
 
         start_time = time.time()  # Record the start time
-        ts_mutation_dict = {}
-        with ThreadPoolExecutor(max_workers=self.cores) as executor:
-            # Submit tasks to the ThreadPoolExecutor
-            futures = {executor.submit(self._run_mutation_sims, values):
-                       key for key, values in ancestry_dict.items()}
 
-            # Retrieve results as they become available
+        # dictionary for storing arrays and list for storing sizes.
+        all_arrays = {}
+        sizes = []
+        lock = threading.Lock()  # Create a lock
+
+        # Use ThreadPoolExecutor to parallelize the simulation for each demography
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(self._simulate_demography, ix, demography, lock, sizes) for ix, demography in enumerate(self.models)]
+
+            # Gather results
             for future in futures:
-                model_index = futures[future]
-                ts_mutation_dict[model_index] = future.result()
+                model_name, model_arrays = future.result()
+                all_arrays[model_name] = model_arrays
+
 
         end_time = time.time()  # Record the end time
         execution_time = end_time - start_time  # Calculate the execution time
-        self.logger.info("Mutation simulation execution time: %s seconds.", execution_time)
-
-        return ts_mutation_dict
-
-    def _run_mutation_sims(self, ancestries):
-
-        mutation_rates = self.rng.uniform(low=self.config["mutation rate"][0],
-                                          high=self.config["mutation rate"][1],
-                                          size=self.config["replicates"])
-        mutation_rates = np.round(mutation_rates, decimals=20)
-
-        model_mts = []
-
-        for replicate in enumerate(ancestries):
-
-            replicate_mts = []
-            fragment_seeds = self.rng.integers(2**32, size=len(self.config['lengths']))
-
-            for fragment in enumerate(replicate[1]):
-                mts = msprime.sim_mutations(fragment[1], rate=mutation_rates[replicate[0]],
-                                            model=self.config["substitution model"],
-                                            random_seed=fragment_seeds[fragment[0]])
-                replicate_mts.append(mts)
-
-            model_mts.append(replicate_mts)
-
-        return model_mts
-
-    def mutations_to_numpy(self, mutation_dict):
-        """Translate simulated mutations into numpy array."""
-
-        integer_encoding_dict = {'A': 0, 'T': 1, 'C': 2, 'G': 3}
-
-        # create arrays for each fragment, and concatenate them together for each parameterization.
-        all_arrays = {}
-        sizes = []
-
-        for model, values in mutation_dict.items():
-
-            model_array_list = []
-
-            for dataset in values:
-
-                fragment_array_list= []
-
-                for fragment in dataset:
-
-                    fragment_list = []
-
-                    for variant in fragment.variants():
-                        alleles = np.array(variant.alleles)
-                        nucleotide_encoding = alleles[variant.genotypes]
-                        integer_encoding = [integer_encoding_dict[allele]
-                                            for allele in nucleotide_encoding]
-
-                        # reorder based on sampling dict
-                        ordered_integer_encoding = []
-                        indices = {}
-                        count=0
-                        for pop, samples in self.simulating_dict.items():
-                            indices[pop] = (int(count), int(count+samples))
-                            count += samples
-                        for pop in self.config['sampling dict']:
-                            ordered_integer_encoding+=integer_encoding[\
-                                indices[pop][0]*2:indices[pop][1]*2]
-                        fragment_list.append(np.array(ordered_integer_encoding))
-
-                    if len(fragment_list)>0:
-                        fragment_array = np.column_stack(fragment_list)
-                        fragment_array_list.append(fragment_array)
-
-                if len(fragment_array_list)>0:
-                    dataset_array = np.column_stack(fragment_array_list)
-                    sizes.append(dataset_array.shape[1])
-                else:
-                    dataset_array = np.array([])
-                    sizes.append(0)
-
-                model_array_list.append(dataset_array)
-
-            all_arrays[model] = model_array_list
+        self.logger.info("Simulation execution time: %s seconds.", execution_time)
 
         # shorten arrays that are too short, and pad arrays that are too long.
         median_size = int(np.ceil(np.median(sizes)))
@@ -248,7 +135,9 @@ class DataSimulator:
                                                num_missing_columns), -1)
                     all_arrays[model][i] = modified_matrix
 
+
         return all_arrays
+
 
     def mutations_to_sfs(self, numpy_array_dict, nbins=None):
 
@@ -358,7 +247,6 @@ class DataSimulator:
                 plt.close()
             count+=1
 
-
     def mutations_to_2d_sfs(self, numpy_array_dict):
         """Translate simulated mutations into 2d site frequency spectra"""
 
@@ -418,3 +306,51 @@ class DataSimulator:
             all_sfs.append(model_replicates)
 
         return all_sfs
+
+    def _simulate_demography(self, ix, demography, lock, sizes):
+
+        # get dictionary for simulations
+        simulating_dict = self._get_simulating_dict_model(demography=demography[0])
+        # draw mutation rates from priors
+        mutation_rates = self.rng.uniform(low=self.config["mutation rate"][0],
+                                              high=self.config["mutation rate"][1],
+                                              size=self.config["replicates"])
+        mutation_rates = np.round(mutation_rates, decimals=20)
+
+        # iterate over parameterizations
+        model_arrays = []
+        for iy, parameterization in enumerate(demography):
+
+            # list for storing arrays from this parameterization
+            parameter_arrays = []
+
+            # get seeds for simulating data for each fragment
+            fragment_seeds = self.rng.integers(2**32, size=len(self.config['lengths']))
+
+            # iterate over fragments and perform simulations
+            for k,length in enumerate(self.config['lengths']):
+
+                # simulate ancestries
+                ts = msprime.sim_ancestry(simulating_dict, demography=parameterization,
+                                              random_seed = fragment_seeds[k], sequence_length=length,
+                                              recombination_rate=0)
+                # add mutations
+                mts = msprime.sim_mutations(ts, rate=mutation_rates[iy],
+                                                model=self.config["substitution model"],
+                                                random_seed=fragment_seeds[k])
+
+                # get array
+                array = mts.genotype_matrix().transpose()
+                parameter_arrays.append(array)
+
+            # combine the parameter_ts arrays across fragments
+            dataset_array = np.column_stack(parameter_arrays)
+
+            # Update sizes with lock
+            with lock:
+                sizes.append(dataset_array.shape[1])
+
+
+            model_arrays.append(dataset_array)
+
+        return f"Model_{ix}", model_arrays

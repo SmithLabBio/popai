@@ -41,7 +41,6 @@ class ModelConfigParser:
             config_dict['max migration events']=int(config['Model']['max migration events'])
             config_dict["migration rate"] = [float(val.strip("U(").strip(")")) \
                 for val in config['Model']["migration rate"].split(",")]
-            config_dict["output directory"] = str(config["Other"]["output directory"])
             config_dict["seed"] = int(config["Other"]["seed"])
             config_dict["symmetric"] = config.getboolean("Model", "symmetric")
             config_dict["secondary contact"] = config.getboolean("Model", "secondary contact")
@@ -105,20 +104,16 @@ class ModelConfigParser:
         """Count the number of variable sites in the fasta files, 
         while accounting for the presence of IUPAC ambiguity codes, 
         which are all treated as missing."""
-
         total = 0
+        valid_bases = {'A', 'T', 'C', 'G'}
         for item in fastas:
             sites = item.max_sequence_size
             for site in range(sites):
-                site_list = []
-                for individual in enumerate(item):
-                    site_list.append(item[individual[0]][site])
-                site_list = [str(x) for x in site_list]
-                if len(set(site_list)) > 1 and not any(item not in \
-                    ['A', 'T', 'C', 'G'] for item in site_list):
-                    total+=1
-                else:
-                    unique_items = set(site_list) - set(['A', 'T', 'C', 'G'])
-                    if len(set(site_list)) > 1+len(unique_items):
-                        total+=1
+                site_list = [str(item[individual][site]) for individual in range(len(item))]
+                unique_items = set(site_list) - valid_bases
+                unique_count = len(unique_items)
+                if len(set(site_list)) > 1 and unique_count == 0:
+                    total += 1
+                elif len(set(site_list)) > 1 + unique_count:
+                    total += 1
         return total

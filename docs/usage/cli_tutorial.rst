@@ -37,3 +37,7 @@ First, we use the preview tool to decide what thresholds to use for downsampling
 
     process_empirical data -config config.txt --preview
 
+    process_empirical_data --config private/config_local.txt --downsampling "{'A':20, 'B':20, 'C':20}" --reps 1 --output private/test_cli/empirical
+    simulate_data --config private/config_local.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output private/test_cli/simulated --maxsites 1009
+    train_models --config private/config_local.txt --simulations private/test_cli/simulated --output private/test_cli/trained_models --rf --fcnn --cnn
+    apply_models --config private/config_local.txt --models private/test_cli/trained_models  --output private/test_cli/results --empirical private/test_cli/empirical --rf --fcnn --cnn

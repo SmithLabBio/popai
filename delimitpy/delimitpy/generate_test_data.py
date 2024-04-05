@@ -44,13 +44,13 @@ class TestDataGenerator:
             
             ts = msprime.sim_ancestry(self.sampling_dictionary, demography=self.model, random_seed = ancestry_seeds[fragment[0]], sequence_length=fragment[1])
             mts = msprime.sim_mutations(ts, rate=self.mutation_rate, model=self.substitution_model)
+            fasta_string = mts.as_fasta(reference_sequence=reference_sequence)
+            fasta_dict = self._fasta_to_dict(fasta_string)
 
             if missing > 0:
-                fasta_string = mts.as_fasta(reference_sequence=reference_sequence)
-                fasta_dict = self._fasta_to_dict(fasta_string)
                 for item,value in fasta_dict.items():
                     fasta_dict[item] = self._replace_with_N(value, missing)
-            
+
             self._write_fasta(fasta_dict, path = os.path.join(self.outdir, 'alignment_%s.fa' % str(fragment[0])))
                 
 

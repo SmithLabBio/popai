@@ -8,7 +8,7 @@ from delimitpy import parse_input, generate_models, simulate_data
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
     parser.add_argument('--config', help='Path to config file.')
-    parser.add_argument('--preview', action='store_true', help='Preview models delimitpy will use')
+    parser.add_argument('--plot', action='store_true', help='Plot the delimitpy models.')
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
     #parser.add_argument('-r', '--reps', type=int, help="Number of replicate downsampled SFS to build.")
     parser.add_argument('--nbins', type=int, default=None, help='Number of bins (default: None)')
@@ -35,7 +35,7 @@ def main():
     divergence_demographies, sc_demographies, dwg_demographies = model_builder.build_models()
     parameterized_models, labels = model_builder.draw_parameters(divergence_demographies, sc_demographies, dwg_demographies)
 
-    if args.preview:
+    if args.plot:
         
         # validate the models
         model_builder.validate_models(parameterized_models, labels, outplot=os.path.join(args.output, 'models.pdf'))
@@ -51,11 +51,7 @@ def main():
 
         # simulate data
         data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
-        simulated_ancestries = data_simulator.simulate_ancestry()
-        simulated_mutations = data_simulator.simulate_mutations(simulated_ancestries)
-
-        # convert simulated data to numpy arrays
-        arrays = data_simulator.mutations_to_numpy(simulated_mutations)
+        arrays = data_simulator.simulate_ancestry()
 
         # build SFS for simulate data
         sfs_2d = data_simulator.mutations_to_2d_sfs(arrays)

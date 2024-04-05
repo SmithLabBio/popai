@@ -184,7 +184,7 @@ class DataProcessor:
 
         return sfs_list
 
-    def plot_2dsfs(self, sfs_list):
+    def plot_2dsfs(self, sfs_list, output_directory):
         """Plot average 2 dimensional Site frequency spectra."""
 
         averages = {}
@@ -194,7 +194,7 @@ class DataProcessor:
             averages[key] = average_array
         # Create heatmaps
         for key, value in averages.items():
-            outfile  = os.path.join(self.config["output directory"], f"2D_SFS_{key}_empirical.png")
+            outfile  = os.path.join(output_directory, f"2D_SFS_{key}_empirical.png")
             plt.imshow(value, cmap='viridis', origin="lower")
             plt.colorbar()  # Add colorbar to show scale
             plt.title(f"2D SFS {key}")

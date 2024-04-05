@@ -649,7 +649,7 @@ class ModelWriter:
         self.sc_demographies = demographies[1]
         self.dwg_demographies = demographies[2]
 
-    def write_to_yaml(self):
+    def write_to_yaml(self, output_directory):
         """
         Writes delimitpy generated models to a yaml file, which can later be read by delimitpy.
 
@@ -671,6 +671,7 @@ class ModelWriter:
         self._divergence_to_yaml()
         self._sc_to_yaml(start=len(self.divergence_demographies))
         self._dwg_to_yaml(start=len(self.divergence_demographies)+len(self.sc_demographies))
+        self.output_directory = output_directory
 
     def _divergence_to_yaml(self):
 
@@ -692,7 +693,7 @@ class ModelWriter:
             yaml_dict = self._get_divinfo(model, yaml_dict, divergence_times)
 
             # write yaml to file
-            f = open(f"{self.config['output directory']}/Model_{model[0]}.yaml", 'w', \
+            f = open(f"{self.output_directory}/Model_{model[0]}.yaml", 'w', \
                     encoding='utf-8')
             yaml.dump(yaml_dict, f)
             f.close()
@@ -720,7 +721,7 @@ class ModelWriter:
             yaml_dict = self._get_scinfo(model, yaml_dict)
 
             # write yaml to file
-            f = open(f"{self.config['output directory']}/Model_{model[0]+start}.yaml", \
+            f = open(f"{self.output_directory}/Model_{model[0]+start}.yaml", \
                      'w', encoding='utf-8')
             yaml.dump(yaml_dict, f, Dumper=NoAliasDumper)
             f.close()
@@ -749,7 +750,7 @@ class ModelWriter:
             yaml_dict = self._get_dwginfo(model, yaml_dict)
 
             # write yaml to file
-            f = open(f"{self.config['output directory']}/Model_{model[0]+start}.yaml", \
+            f = open(f"{self.output_directory}/Model_{model[0]+start}.yaml", \
                     'w', encoding='utf-8')
             yaml.dump(yaml_dict, f, Dumper=NoAliasDumper)
             f.close()
