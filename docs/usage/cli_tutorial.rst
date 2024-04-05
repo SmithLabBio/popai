@@ -8,7 +8,7 @@ Step 1: Install delimitpy
 
 Use pip to install delimitpy:
 
-.. code-block:: python
+.. code-block:: bash
     git clone https://github.com/SmithLabBio/delimitpy.git
     cd delimitpy/delimitpy
     pip install .
