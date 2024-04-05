@@ -6,6 +6,8 @@ Running delimitpy through the command line
 Step 1: Install delimitpy
 ==========================================
 
+Use pip to install delimitpy:
+
 .. code-block:: python
     git clone https://github.com/SmithLabBio/delimitpy.git
     cd delimitpy/delimitpy
@@ -25,7 +27,7 @@ Step 1: Processing Empirical data
 
 The first step is to process the user's empirical data. This involves reading the data from fasta files, deciding which values to use for down-projection, and building the SFS.
 
-For more information on input formats, please see the `input instructions <https://delimitpy.readthedocs.io/en/latest/usage/parsinginput.html>`.
+For more information on input formats, please see the `input instructions <https://delimitpy.readthedocs.io/en/latest/usage/parsinginput.html>`_.
 
 The command line tool *process_empirical_data* can be used to process empirical data. It takes the following arguments::
 
@@ -68,7 +70,7 @@ This script will also output in the output directory the joint and multidimensio
 Step 2: Simulate data
 ==========================================
 
-Next, we need to simulate data under the models of interest. We will do so using the command line tool *simulate_data*. It takes the folloiwng arugments::
+Next, we need to simulate data under the models of interest. We will do so using the command line tool *simulate_data*. It takes the following arugments::
 
     usage: simulate_data [-h] [--config CONFIG] [--plot] [--downsampling DOWNSAMPLING] [--nbins NBINS] [--output OUTPUT] [--force] [--maxsites MAXSITES] [--cores CORES]
 
@@ -101,10 +103,10 @@ In the output directory, you should see a pdf showing your models (models.pdf), 
 Step 3: Train networks
 ==========================================
 
-    Now, we are ready to train the networks implemented in delimitpy. delimitpy includes three network architectures:
-        1. a Random Forest classifier that takes as input the bins of the multidimensional SFS (mSFS).
-        2. a Fully Connected Neural Network that takes as input the bins of the multidimensional SFS (mSFS).
-        3. A Convolutional Neural Network that takes as input the jSFS between all pairs of populations.
+Now, we are ready to train the networks implemented in delimitpy. delimitpy includes three network architectures:
+    1. a Random Forest classifier that takes as input the bins of the multidimensional SFS (mSFS).
+    2. a Fully Connected Neural Network that takes as input the bins of the multidimensional SFS (mSFS).
+    3. A Convolutional Neural Network that takes as input the jSFS between all pairs of populations.
 
 To train networks, we will use the command-line tool *train_models*. It takes the following arguments::
 
