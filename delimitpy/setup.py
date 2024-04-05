@@ -16,7 +16,8 @@ setup(
         'scikit-learn',
         'keras',
         'seaborn',
-        'tabulate'
+        'tabulate',
+        'tensorflow'
     ],
     entry_points={
         'console_scripts': [
