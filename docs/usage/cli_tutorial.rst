@@ -128,7 +128,7 @@ To train networks, we will use the command-line tool *train_models*. It takes th
 The argument *--simulations* takes as input the output directory from the previous step.
 
 .. code-block:: python
-    
+
     train_models --config delimitpy/tutorial_data/config.txt --simulations simulated/ --output trained_models --rf --fcnn --cnn
 
 This will output to the output directory the trained.model files for the FCNN and the CNN, and a pickled object storing the RF Classifier. It will also output confusion matrices showing the performance of each approach on the validation data, for which we hold out 20% of our simulated datasets. 
@@ -158,6 +158,7 @@ Finally, we can apply the networks to make classifications on our empirical data
 Provide the output paths from Step 5 and Step 3 for the --models and --empirical arguments, respectively. 
 
 .. code-block:: python
+
     apply_models --config delimitpy/tutorial_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --rf --fcnn --cnn
 
 This should save to the output directory tables showing the predicted probabilities for each model for each classifier.
