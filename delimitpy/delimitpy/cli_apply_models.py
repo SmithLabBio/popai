@@ -77,7 +77,7 @@ def main():
     if args.fcnn:
         # apply FCNN model
         neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, [], [])
-        neural_network_sfs_model = models.load_model(os.path.join(args.models, 'fcnn.model'), compile=True)
+        neural_network_sfs_model = models.load_model(os.path.join(args.models, 'fcnn.keras'), compile=True)
         results_fcnn = neural_network_sfs_predictor.predict(neural_network_sfs_model, msfs)
         with open(os.path.join(args.output, 'fcnn_predictions.txt'), 'w') as f:
             f.write(results_fcnn)
@@ -85,7 +85,7 @@ def main():
     if args.cnn:
         # apply FCNN model
         cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, [], [])
-        cnn_2d_sfs_model = models.load_model(os.path.join(args.models, 'cnn.model'), compile=True)
+        cnn_2d_sfs_model = models.load_model(os.path.join(args.models, 'cnn.keras'), compile=True)
         results_cnn = cnn_2d_sfs_predictor.predict(cnn_2d_sfs_model, jsfs)
         with open(os.path.join(args.output, 'cnn_predictions.txt'), 'w') as f:
             f.write(results_cnn)
