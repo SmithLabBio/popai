@@ -1,3 +1,3 @@
-# This is a beta release.
+# This is a beta release!
 
-# The full documentation can be found: 
+# The full documentation can be found: [https://read](https://delimitpy.readthedocs.io/en/latest/)
