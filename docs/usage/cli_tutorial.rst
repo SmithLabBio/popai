@@ -3,10 +3,21 @@ Running delimitpy through the command line
 ##############################
 
 ==========================================
-Step 0: Downloading example input data
+Step 1: Install delimitpy
 ==========================================
 
-Example input data is available `here <https://www.github.com/SmithLabBio/delimitpy/tutorial_data>`_.
+.. code-block:: python
+    git clone https://github.com/SmithLabBio/delimitpy.git
+    cd delimitpy/delimitpy
+    pip install .
+
+==========================================
+Step 2: Downloading example input data
+==========================================
+
+Example input data is available `here <https://github.com/SmithLabBio/delimitpy/tree/main/tutorial_data>`_.
+
+You should have these in the directory you cloned when installing delimitpy, in the subfolder tutorial_data.
 
 ==========================================
 Step 1: Processing Empirical data
