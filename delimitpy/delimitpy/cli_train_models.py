@@ -24,7 +24,7 @@ def main():
     os.system('mkdir -p %s' % args.output)
 
     # Parse the configuration file
-    config_parser = parse_input.ModelConfigParser("./private/config_local.txt")
+    config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
     # read the data
