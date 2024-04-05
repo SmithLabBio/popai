@@ -45,14 +45,14 @@ def main():
         # train FCNN and save model and confusion matrix
         neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, msfs, labels)
         neural_network_sfs_model, neural_network_sfs_cm, neural_network_sfs_cm_plot = neural_network_sfs_predictor.build_neuralnet_sfs()
-        neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.model'))
+        neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.keras'))
         neural_network_sfs_cm_plot.savefig(os.path.join(args.output, 'fcnn_confusion.png'))
 
     if args.cnn:
         # train CNN and save model and confusion matrix
         cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, sfs_2d, labels)
         cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot = cnn_2d_sfs_predictor.build_cnn_sfs()
-        cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.model'))
+        cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
         cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_confusion.png'))
 
 if __name__ == '__main__':
