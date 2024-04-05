@@ -13,7 +13,7 @@ setup(
         'demesdraw',
         'matplotlib',
         'argparse',
-        'sklearn',
+        'scikit-learn',
         'keras',
         'seaborn',
         'tabulate'
