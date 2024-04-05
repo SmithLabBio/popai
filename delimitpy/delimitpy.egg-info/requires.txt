@@ -1,8 +1,0 @@
-dendropy
-pandas
-msprime
-numpy
-demes
-demesdraw
-matplotlib
-argparse
