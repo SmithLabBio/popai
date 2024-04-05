@@ -13,8 +13,8 @@ Welcome to delimitpy's documentation!
    usage/installation.rst
    usage/parsinginput.rst
    usage/buildingmodels.rst
-   notebooks/delimitpy_walkthrough.ipynb
    usage/cli_tutorial.rst
+   notebooks/delimitpy_walkthrough.ipynb
 
 
 Indices and tables
