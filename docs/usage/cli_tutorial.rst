@@ -58,7 +58,7 @@ Now, we are ready to build our empirical SFS:
 
 .. code-block:: python
 
-    process_empirical_data --config delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --reps 1 --output private/test_cli/empirical
+    process_empirical_data --config delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --reps 1 --output empirical/
 
 We are only using a single replicate for this test. This makes sense because our 'empirical' data are actually simulated data, and we are not downsampling. Because of this, we do not expect much noise. For messier empirical data, use ~10 reps and ensure that results do not differ across replicates.
 
@@ -95,7 +95,7 @@ It is essential to use the same downsampling dictionary here that you used to pr
 
 .. code-block:: python
 
-    simulate_data --config private/delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output private/test_cli/simulated --maxsites 1009 --plot
+    simulate_data --config private/delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1009 --plot
 
 In the output directory, you should see a pdf showing your models (models.pdf), a pickled object storing the simulated jSFS, and a numpy matrix storing the mSFS. 
 
@@ -128,7 +128,7 @@ To train networks, we will use the command-line tool *train_models*. It takes th
 The argument *--simulations* takes as input the output directory from the previous step.
 
 .. code-block:: python
-    train_models --config delimitpy/tutorial_data/config.txt --simulations private/test_cli/simulated --output private/test_cli/trained_models --rf --fcnn --cnn
+    train_models --config delimitpy/tutorial_data/config.txt --simulations simulated/ --output trained_models --rf --fcnn --cnn
 
 This will output to the output directory the trained.model files for the FCNN and the CNN, and a pickled object storing the RF Classifier. It will also output confusion matrices showing the performance of each approach on the validation data, for which we hold out 20% of our simulated datasets. 
 
@@ -157,6 +157,6 @@ Finally, we can apply the networks to make classifications on our empirical data
 Provide the output paths from Step 5 and Step 3 for the --models and --empirical arguments, respectively. 
 
 .. code-block:: python
-    apply_models --config delimitpy/tutorial_data/config.txt --models private/test_cli/trained_models  --output private/test_cli/results --empirical private/test_cli/empirical --rf --fcnn --cnn
+    apply_models --config delimitpy/tutorial_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --rf --fcnn --cnn
 
 This should save to the output directory tables showing the predicted probabilities for each model for each classifier.
