@@ -13,6 +13,10 @@ setup(
         'demesdraw',
         'matplotlib',
         'argparse',
+        'sklearn',
+        'keras',
+        'seaborn',
+        'tabulate'
     ],
     entry_points={
         'console_scripts': [
