@@ -227,7 +227,7 @@ class DataSimulator:
 
         return sfs_2d
 
-    def plot_2dsfs(self, sfs_list):
+    def plot_2dsfs(self, sfs_list, output_directory):
         """Plot average 2 dimensional Site frequency spectra."""
         count=0
         for item in sfs_list:
@@ -238,7 +238,7 @@ class DataSimulator:
                 averages[key] = average_array
             # Create heatmaps
             for key, value in averages.items():
-                outfile  = os.path.join(self.config["output directory"], \
+                outfile  = os.path.join(output_directory, \
                                         f"2D_SFS_{key}_model_{count}.png")
                 plt.imshow(value, cmap='viridis', origin="lower")
                 plt.colorbar()  # Add colorbar to show scale
@@ -343,10 +343,11 @@ class DataSimulator:
                 array = mts.genotype_matrix().transpose()
         
                 # remove non-biallelic columns
-                frequencies = np.array([[np.sum(array[:, j] == i) \
-                    for i in range(0, np.max(array))] for j in range(array.shape[1])])
-                nonbiallelic_columns = np.where(np.sum(frequencies != 0, axis=1) > 2)[0]
-                array = np.delete(array, nonbiallelic_columns, axis=1)
+                if array.shape[1] > 0:
+                    frequencies = np.array([[np.sum(array[:, j] == i) \
+                        for i in range(0, np.max(array))] for j in range(array.shape[1])])
+                    nonbiallelic_columns = np.where(np.sum(frequencies != 0, axis=1) > 2)[0]
+                    array = np.delete(array, nonbiallelic_columns, axis=1)
 
                 parameter_arrays.append(array)
 
