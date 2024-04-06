@@ -3,14 +3,12 @@ import logging
 import time # for testing only
 from collections import Counter
 from itertools import product
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import msprime
 import numpy as np
 import matplotlib.pyplot as plt
 logging.getLogger('msprime').setLevel("WARNING")
 import sys
-import threading
 
 class DataSimulator:
 
@@ -96,20 +94,13 @@ class DataSimulator:
         # dictionary for storing arrays and list for storing sizes.
         all_arrays = {}
         sizes = []
-        lock = threading.Lock()  # Create a lock
 
-        # Use ThreadPoolExecutor to parallelize the simulation for each demography
-        with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(self._simulate_demography, ix, demography, lock, sizes) for ix, demography in enumerate(self.models)]
-
-            # Gather results
-            for future in futures:
-                model_name, model_arrays = future.result()
-                all_arrays[model_name] = model_arrays
-
+        for ix, demography in enumerate(self.models):
+            all_arrays["Model_{ix}"], sizes = self._simulate_demography(ix, demography)
 
         end_time = time.time()  # Record the end time
         execution_time = end_time - start_time  # Calculate the execution time
+
         self.logger.info("Simulation execution time: %s seconds.", execution_time)
 
         # shorten arrays that are too short, and pad arrays that are too long.
@@ -307,7 +298,8 @@ class DataSimulator:
 
         return all_sfs
 
-    def _simulate_demography(self, ix, demography, lock, sizes):
+    #def _simulate_demography(self, ix, demography, lock, sizes):
+    def _simulate_demography(self, ix, demography):
 
         # get dictionary for simulations
         simulating_dict = self._get_simulating_dict_model(demography=demography[0])
@@ -354,11 +346,12 @@ class DataSimulator:
             # combine the parameter_ts arrays across fragments
             dataset_array = np.column_stack(parameter_arrays)
 
-            # Update sizes with lock
-            with lock:
-                sizes.append(dataset_array.shape[1])
+            ## Update sizes with lock
+            #with lock:
+            #    sizes.append(dataset_array.shape[1])
 
 
             model_arrays.append(dataset_array)
 
-        return f"Model_{ix}", model_arrays
+        #return f"Model_{ix}", model_arrays
+        return model_arrays, dataset_array.shape[1]
