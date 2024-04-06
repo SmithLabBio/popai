@@ -52,6 +52,7 @@ class TestDataGenerator:
             ts = msprime.sim_ancestry(self.sampling_dictionary, demography=self.model, random_seed = ancestry_seeds[fragment[0]], sequence_length=fragment[1])
             mts = msprime.sim_mutations(ts, rate=self.mutation_rate, model=self.substitution_model)
 
+            format="fasta"
             if format == "fasta":
                 fasta_string = mts.as_fasta(reference_sequence=reference_sequence)
                 fasta_dict = self._fasta_to_dict(fasta_string)
@@ -70,7 +71,15 @@ class TestDataGenerator:
 
                 self._write_fasta(fasta_dict, path = os.path.join(self.outdir, 'alignment_%s.fa' % str(fragment[0])))
             
-            elif format == "vcf":
+            format="vcf"
+            if format == "vcf":
+
+                samples = mts.samples()
+                for sample_id, h in zip(samples, mts.haplotypes(samples=samples)):
+                    pop = mts.node(sample_id).population
+                    print(mts.node(sample_id))
+                    print(f"Sample {sample_id:<2} ({ts.population(pop).metadata['name']:^5}): {h}")
+                
                 vcf_lines = mts.as_vcf().split("\n")
                 
                 if vcf_header == None:

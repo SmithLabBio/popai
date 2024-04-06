@@ -98,7 +98,7 @@ class DataProcessor:
 
             # get all samples for that poulation/species
             samples_from_population = [key for key, value in \
-                self.config["population dictionary"].items() if value == population]
+                self.config["original population dictionary"].items() if value == population]
             
             for item in samples_from_population:
                 

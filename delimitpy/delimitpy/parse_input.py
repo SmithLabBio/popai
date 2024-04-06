@@ -69,11 +69,21 @@ class ModelConfigParser:
 
             # get population sampling info
             pop_df = pd.read_csv(config_dict["popfile"], delimiter='\t')
-            config_dict["population dictionary"] = pop_df.set_index('individual')\
+            config_dict["original population dictionary"] = pop_df.set_index('individual')\
                 ['population'].to_dict()
-            config_dict["sampling dict"] = pop_df['population'].value_counts().to_dict()
+
 
             if config["Data"]["alignments"] == "None":
+
+                config_dict["population dictionary"] = {}
+                for key,value in config_dict["original population dictionary"].items():
+                    config_dict["population dictionary"][f"{key}_a"] = value
+                    config_dict["population dictionary"][f"{key}_b"] = value
+
+                config_dict["sampling dict"] = pop_df['population'].value_counts().to_dict()
+                for key,value in config_dict["sampling dict"].items():
+                    config_dict["sampling dict"][key] = value*2
+
 
                 # get lengths
                 lengths = [x for x in config_dict["vcf"] if "length" in x]
@@ -86,6 +96,8 @@ class ModelConfigParser:
 
 
             else:
+                config_dict["population dictionary"] = config_dict["original population dictionary"]
+
                 # get fastas and lengths
                 fasta_list = os.listdir(config_dict["fasta folder"])
                 fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta')]
