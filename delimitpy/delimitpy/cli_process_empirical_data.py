@@ -23,7 +23,10 @@ def main():
 
     # Process empirical data
     data_processor = process_empirical.DataProcessor(config=config_values)
-    empirical_array = data_processor.fasta_to_numpy()
+    if "fastas" in config_values:
+        empirical_array = data_processor.fasta_to_numpy()
+    else:
+        empirical_array = data_processor.vcf_to_numpy()
     
     # If we are checking downsampling, print downsampling results
     if args.preview:
