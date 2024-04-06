@@ -48,7 +48,7 @@ The command line tool *process_empirical_data* can be used to process empirical 
 
 First, we use the preview tool to decide what thresholds to use for downsampling. 
 
-SFS cannot be generated from datasets that include missing data. To circumvent this, we use a downsampling approach such as that described in Satler and Carstens [(2017)](https://doi.org/10.1111/mec.14137). We must choose thresholds for each populations (i.e., the minumum number of individuals that must be sampled for a SNP to be used.)
+SFS cannot be generated from datasets that include missing data. To circumvent this, we use a downsampling approach such as that described in Satler and Carstens [(2017)](https://doi.org/10.1111/mec.14137). We must choose thresholds for each population (i.e., the minumum number of individuals that must be sampled for a SNP to be used.)
 
 We will use a folded SFS, meaning that we will build the SFS based on minor allele frequencies.
 
@@ -114,8 +114,8 @@ Step 5: Train networks
 ==========================================
 
 Now, we are ready to train the networks implemented in delimitpy. delimitpy includes three network architectures:
-    1. a Random Forest classifier that takes as input the bins of the multidimensional SFS (mSFS).
-    2. a Fully Connected Neural Network that takes as input the bins of the multidimensional SFS (mSFS).
+    1. A Random Forest classifier that takes as input the bins of the multidimensional SFS (mSFS).
+    2. A Fully Connected Neural Network that takes as input the bins of the multidimensional SFS (mSFS).
     3. A Convolutional Neural Network that takes as input the jSFS between all pairs of populations.
 
 To train networks, we will use the command-line tool *train_models*. It takes the following arguments::
