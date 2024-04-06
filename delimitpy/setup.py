@@ -17,7 +17,8 @@ setup(
         'keras',
         'seaborn',
         'tabulate',
-        'tensorflow'
+        'tensorflow',
+        'pandas'
     ],
     entry_points={
         'console_scripts': [
