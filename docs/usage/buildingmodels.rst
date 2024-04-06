@@ -18,63 +18,20 @@ Given some user-input, delimitpy will create some default models that may be use
 These models will incorporate divergence between populations, gene flow upon secondary contact between present-day populations,
 and divergence with gene flow between sister populations.
 
-To generate these models, the user must provide delimitpy with a `configuration file <https://github.com/SmithLabBio/delimitpy/blob/main/config.txt>`_.::
+To generate these models, the user must provide delimitpy with a `configuration file <https://github.com/SmithLabBio/delimitpy/blob/main/config.txt>`_.
 
-    [Model]
-    species tree file = tree.nex # Path to a species tree in nexus format.
-    migration matrix = migration.txt # Path to a migration matrix
-    symmetric = True # True if migration rates should always be symmetric, and only symmetric migration events should be included.
-    secondary contact = True # True if you wish to consider secondary contact models.
-    divergence with gene flow = True # True if you wish to consider divergence with gene flow models.
-    max migration events = 2 # Maximum number of migration events to consider in one model.
-    migration rate = U(1e-3, 1e-2) # Prior from which to draw migration rates. Only uniform priors are supported at present.
+In the configuration file, the user provides delimitpy with several pieces of information that determine how the model set is built.
 
-    [Other]
-    output directory = test # Directory for storing output (should exist).
-    seed = 1234 # Random seed.
-    replicates = 10 # Number of replicates to simulate per model.
+* **species tree file**: The species tree (or trees) in this file are used to determine the relationships among populations in models (i.e., **the topology**). The species tree file also contains nodal annotations which tell delimitpy which priors to use for **population sizes** and **divergence times**.
+* **migration matrix**: The migration matrix in this file is used by delimitpy to decide which populations may experience migration.
+* **symmetric**: This determines whether delimitpy considers only symmetric migration events or also considers asymmetric migration.
+* **secondary contact**: This determines whether delimitpy considers secondary contact models. If true, delimitpy will consider models for which migration begins half-way between the most recent divergence event and the present and ends in the present.
+* **divergence with gene flow**: This determines whether delimitpy considers divergence with gene flow models, in which gene flow begins immediately after divergence and ends half way between the species divergence and the next divergence event (or the present if there are no more divergence events.)
+* **max migration events**: This determines the maximum number of migration events considered in any single model and is helpful for limiting model space.
+* **migration rate**: The prior from which migration rates are drawn.
+* **constant Ne**: If True, delimitpy will use the same population sizes for all populations in the model.
 
-------------
-Species Tree
-------------
+Using this information, delimitpy will build a default model set. 
 
-The user must provide a path to a nexus file with a species tree. There are some specific requirements for the `species tree file <https://github.com/SmithLabBio/delimitpy/blob/main/tree.nex>`_::
-
-    #NEXUS
-    BEGIN TAXA;
-        Dimensions NTax=3;
-        TaxLabels A B C;
-    END;
-
-    BEGIN TREES;
-        Tree species=((A[&ne=1000-10000],B[&ne=1000-10000])AB[&ne=1000-10000,div=1000-50000],C[&ne=1000-10000])ABC[&ne=1000-10000,div=10000-100000];
-    END;
-
-Requirements:
-
-* Internal nodes must be labeled with names.
-
-* For each leaf and internal node, include an annotation indicating the minimum and maximum values of the uniform distribution on the effective population size for the corresponding population.::
-
-    [&ne=1000-1000]
-
-* For each linternal node, include an annotation indicating the minimum and maximum values of the uniform distribution on the divergence time (in generations before the present)::
-
-    [&div=10000-100000]
-
-----------------
-Migration Matrix
-----------------
-
-The user must provide a path to a file with a `migration matrix <https://github.com/SmithLabBio/delimitpy/blob/main/migration.txt>`_ indicating whether migration is allowed between all pairs of lineages::
-
-    ,A,B,C,AB,ABC
-    A,T,T,T,T,T
-    B,T,T,T,T,T
-    C,T,T,T,T,T
-    AB,T,T,T,T,T
-    ABC,T,T,T,T,T
-
-Note that T indicates that migration is allowed between two taxa, while F indicates that migration is not allowed. The elements along the diagonal will be ignored. Ancestral populations must be included.
-
+Importantly, whether using the CLI or running functions from delimitpy in python directly, users can check these models visually and ensure that they look as desired. When using the CLI, the user can run the simulate_data command with the flags --plot and without the flag --simulate to only plot the models. When running in python, the user can use the validate_models function of the ModelBuilder class.
 

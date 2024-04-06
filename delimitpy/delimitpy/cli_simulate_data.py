@@ -9,6 +9,7 @@ def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
     parser.add_argument('--config', help='Path to config file.')
     parser.add_argument('--plot', action='store_true', help='Plot the delimitpy models.')
+    parser.add_argument('--simulate', action='store_true', help='Simulate data under the delimitpy models.')
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
     #parser.add_argument('-r', '--reps', type=int, help="Number of replicate downsampled SFS to build.")
     parser.add_argument('--nbins', type=int, default=None, help='Number of bins for creating a binned SFSsimu (default: None)')
@@ -40,28 +41,28 @@ def main():
         # validate the models
         model_builder.validate_models(parameterized_models, labels, outplot=os.path.join(args.output, 'models.pdf'))
 
-
-    # get dict for downsampling
-    try:
-        downsampling_dict = ast.literal_eval(args.downsampling)
-    except ValueError:
-        print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
-        return
-
-    # simulate data
-    data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
-    arrays = data_simulator.simulate_ancestry()
-
-    # build SFS for simulate data
-    sfs_2d = data_simulator.mutations_to_2d_sfs(arrays)
-    msfs = data_simulator.mutations_to_sfs(arrays)
-
-    # save these simulated data.
-    with open(os.path.join(args.output, 'simulated_jsfs.pickle'), 'wb') as f:
-        pickle.dump(sfs_2d, f)
-    np.save(os.path.join(args.output, 'simulated_msfs.npy'), np.array(msfs), allow_pickle=True)
-    np.save(os.path.join(args.output, 'labels.npy'), np.array(labels), allow_pickle=True)
-
+    if args.simulate:
+        # get dict for downsampling
+        try:
+            downsampling_dict = ast.literal_eval(args.downsampling)
+        except ValueError:
+            print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
+            return
+    
+        # simulate data
+        data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
+        arrays = data_simulator.simulate_ancestry()
+    
+        # build SFS for simulate data
+        sfs_2d = data_simulator.mutations_to_2d_sfs(arrays)
+        msfs = data_simulator.mutations_to_sfs(arrays)
+    
+        # save these simulated data.
+        with open(os.path.join(args.output, 'simulated_jsfs.pickle'), 'wb') as f:
+            pickle.dump(sfs_2d, f)
+        np.save(os.path.join(args.output, 'simulated_msfs.npy'), np.array(msfs), allow_pickle=True)
+        np.save(os.path.join(args.output, 'labels.npy'), np.array(labels), allow_pickle=True)
+    
 
 if __name__ == '__main__':
     main()

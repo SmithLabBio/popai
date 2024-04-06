@@ -80,6 +80,7 @@ Next, we need to simulate data under the models of interest. We will do so using
       -h, --help            show this help message and exit
       --config CONFIG       Path to config file.
       --plot                Plot the delimitpy models.
+      --simulate            Simulate data under the delimitpy models.
       --downsampling DOWNSAMPLING
                             Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).
       --nbins NBINS         Number of bins for creating a binned SFS (default: None)
@@ -95,7 +96,7 @@ It is essential to use the same downsampling dictionary here that you used to pr
 
 .. code-block:: python
 
-    simulate_data --config delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1009 --plot
+    simulate_data --config delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1009 --plot --simulate
 
 In the output directory, you should see a pdf showing your models (models.pdf), a pickled object storing the simulated jSFS, and a numpy matrix storing the mSFS. 
 
