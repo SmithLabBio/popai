@@ -105,7 +105,7 @@ It is essential to use the same downsampling dictionary here that you used to pr
 
 .. code-block:: python
 
-    simulate_data --config delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1009 --plot --simulate
+    simulate_data --config delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1051 --plot --simulate
 
 In the output directory, you should see a pdf showing your models (models.pdf), a pickled object storing the simulated jSFS, and a numpy matrix storing the mSFS. 
 
