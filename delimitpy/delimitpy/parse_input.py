@@ -73,10 +73,13 @@ class ModelConfigParser:
             # get fastas and lengths
             fasta_list = os.listdir(config_dict["fasta folder"])
             fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta')]
-            taxa = dendropy.TaxonNamespace()
+            #taxa = dendropy.TaxonNamespace()
+            #config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
+            #    path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
+            #        taxon_namespace=taxa) for x in fasta_list]
             config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
                 path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
-                    taxon_namespace=taxa) for x in fasta_list]
+                    ) for x in fasta_list]
             config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
 
             # get number variable sites
@@ -109,7 +112,12 @@ class ModelConfigParser:
         for item in fastas:
             sites = item.max_sequence_size
             for site in range(sites):
-                site_list = [str(item[individual][site]) for individual in range(len(item))]
+                site_list = []
+                for individual in range(len(item)):
+                    try:
+                        site_list.append(str(item[individual][site]))
+                    except:
+                        site_list.append('N')
                 unique_items = set(site_list) - valid_bases
                 unique_count = len(unique_items)
                 if len(set(site_list)) > 1 and unique_count == 0:

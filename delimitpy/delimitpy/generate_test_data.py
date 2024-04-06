@@ -22,7 +22,7 @@ class TestDataGenerator:
 
         self.rng = np.random.default_rng(self.seed)
     
-    def simulate(self, missing=0.0):
+    def simulate(self, missing=0.0, missing_ind=0.0):
 
         # get seeds and lengths
         ancestry_seeds = self.rng.integers(2**32, size=self.fragments)
@@ -50,6 +50,14 @@ class TestDataGenerator:
             if missing > 0:
                 for item,value in fasta_dict.items():
                     fasta_dict[item] = self._replace_with_N(value, missing)
+            
+            if missing_ind > 0:
+                new_fasta_dict = {}
+                for item,value in fasta_dict.items():
+                    prob_missing = np.random.uniform(0,1)
+                    if prob_missing > missing_ind:
+                        new_fasta_dict[item] = value
+                fasta_dict = new_fasta_dict
 
             self._write_fasta(fasta_dict, path = os.path.join(self.outdir, 'alignment_%s.fa' % str(fragment[0])))
                 

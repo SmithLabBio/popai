@@ -30,8 +30,8 @@ class DataProcessor:
         # dictionary for encoding
         integer_encoding_dict = {'A': 0, 'T': 1, 'C': 2, 'G': 3}
 
-        # concat the fasta files
-        fastas_all = dendropy.DnaCharacterMatrix.concatenate(self.config['fastas'])
+        ## concat the fasta files
+        #fastas_all = dendropy.DnaCharacterMatrix.concatenate(self.config['fastas'])
 
         # list for storing results
         encoded_alignments = []
@@ -44,8 +44,18 @@ class DataProcessor:
                 self.config["population dictionary"].items() if value == population]
 
             for item in samples_from_population:
-                encoded_string = np.array(self._encode_string(
-                    string=str(fastas_all[item]), encoding_dict=integer_encoding_dict))
+
+                encoded_string = []
+
+                for alignment in self.config['fastas']:
+                    try:
+                        encoded_string_current = np.array(self._encode_string(
+                            string=str(alignment[item]), encoding_dict=integer_encoding_dict))
+                    except:
+                        encoded_string_current = [-1]*alignment.max_sequence_size
+                    
+                    encoded_string.extend(encoded_string_current)
+                    
                 encoded_alignments.append(encoded_string)
 
         # convert to numpy array
