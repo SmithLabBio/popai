@@ -48,7 +48,7 @@ The command line tool *process_empirical_data* can be used to process empirical 
 
 First, we use the preview tool to decide what thresholds to use for downsampling. 
 
-SFS cannot be generated from datasets that include missing data. To circumvent this, we use a downsampling approach such as that described in Satler and Carstens [(2017)](https://doi.org/10.1111/mec.14137). We must choose thresholds for each population (i.e., the minumum number of individuals that must be sampled for a SNP to be used.)
+SFS cannot be generated from datasets that include missing data. To circumvent this, we use a downsampling approach such as that described in `Satler and Carstens (2017) <https://doi.org/10.1111/mec.14137>`_. We must choose thresholds for each population (i.e., the minumum number of individuals that must be sampled for a SNP to be used.)
 
 We will use a folded SFS, meaning that we will build the SFS based on minor allele frequencies.
 

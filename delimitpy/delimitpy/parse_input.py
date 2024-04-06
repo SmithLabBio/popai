@@ -73,17 +73,16 @@ class ModelConfigParser:
             # get fastas and lengths
             fasta_list = os.listdir(config_dict["fasta folder"])
             fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta')]
-            #taxa = dendropy.TaxonNamespace()
-            #config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
-            #    path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
-            #        taxon_namespace=taxa) for x in fasta_list]
             config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
                 path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
                     ) for x in fasta_list]
             config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
 
             # get number variable sites
-            config_dict['variable'] = self._count_variable(config_dict['fastas'])
+            config_dict['variable'], individuals = self._count_variable(config_dict['fastas'])
+            if set(pop_df['individual']) != individuals:
+                raise Exception(f"Error: The lables in your alignment do not match the labels in your population dictionary.")
+
 
         except dendropy.utility.error.DataParseError as e:
             raise ValueError(f"Error parsing tree: {e}") from e
@@ -107,10 +106,12 @@ class ModelConfigParser:
         """Count the number of variable sites in the fasta files, 
         while accounting for the presence of IUPAC ambiguity codes, 
         which are all treated as missing."""
+        individuals = []
         total = 0
         valid_bases = {'A', 'T', 'C', 'G'}
         for item in fastas:
             sites = item.max_sequence_size
+            individuals.extend([str(x) for x in item.taxon_namespace])
             for site in range(sites):
                 site_list = []
                 for individual in range(len(item)):
@@ -124,4 +125,5 @@ class ModelConfigParser:
                     total += 1
                 elif len(set(site_list)) > 1 + unique_count:
                     total += 1
-        return total
+        individuals = [x.strip("'") for x in individuals]
+        return total, set(individuals)
