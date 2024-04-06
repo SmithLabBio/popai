@@ -8,6 +8,8 @@ import os
 import dendropy
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import io
 
 class DataProcessor:
 
@@ -78,6 +80,70 @@ class DataProcessor:
                          filtered_alignments.shape[1])
 
         return filtered_alignments
+
+    def vcf_to_numpy(self):
+
+        # vcf to table
+        start_index = [i for i, item in enumerate(self.config['vcf']) if 'CHROM' in item][0]
+        relevant_lines = '\n'.join(self.config['vcf'][start_index:])
+        vcf_table = pd.read_csv(io.StringIO(relevant_lines), sep="\t", index_col=False)
+
+        # get DP index
+        format_lines = [x for x in self.config['vcf'] if 'FORMAT' in x]
+        dp_index = [i for i, item in enumerate(format_lines) if 'DP' in item][0]
+
+        encoded_alignments = []
+
+        for population in self.config['sampling dict'].keys():
+
+            # get all samples for that poulation/species
+            samples_from_population = [key for key, value in \
+                self.config["population dictionary"].items() if value == population]
+            
+            for item in samples_from_population:
+                
+                encoded_string_1 = []
+                encoded_string_2 = []
+
+                info = vcf_table[item]
+                
+                for row in info:
+                    value1 = row.split("|")[0]
+                    value2 = row.split("|")[1].split(":")[0]
+                    dp = row.split(":")[dp_index]
+
+                    if (value1 != "." or value2 != ".") and dp != '0':
+                        
+                        encoded_string_1.append(int(value1))
+                        encoded_string_2.append(int(value2))
+                    
+                    else:
+                        encoded_string_1.append(-1)
+                        encoded_string_2.append(-1)
+                
+                encoded_alignments.append(encoded_string_1)
+                encoded_alignments.append(encoded_string_2)
+        
+        encoded_alignments = np.array(encoded_alignments)
+
+        # remove invariable columns
+        frequencies = np.array([[np.sum(encoded_alignments[:, j] == i) \
+            for i in range(0, 4)] for j in range(encoded_alignments.shape[1])])
+        invariant_columns = np.where(np.sum(frequencies == 0, axis=1) >= 3)[0]
+        filtered_alignments = np.delete(encoded_alignments, invariant_columns, axis=1)
+
+        # remove non-biallelic columns
+        frequencies_2 = np.array([[np.sum(filtered_alignments[:, j] == i) \
+            for i in range(0, 4)] for j in range(filtered_alignments.shape[1])])
+        nonbiallelic_columns = np.where(np.sum(frequencies_2 != 0, axis=1) > 2)[0]
+        filtered_alignments = np.delete(filtered_alignments, nonbiallelic_columns, axis=1)
+        
+        self.logger.info("Empirical data has %s biallelic SNPs."\
+                         " If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", 
+                         filtered_alignments.shape[1])
+
+        return filtered_alignments
+
 
     def _encode_string(self, string, encoding_dict):
         encoded_string = []

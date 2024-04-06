@@ -51,8 +51,11 @@ class ModelConfigParser:
             config_dict["mutation rate"] = [float(val.strip("U(").strip(")")) for \
                 val in config['Simulations']["mutation rate"].split(",")]
             config_dict["substitution model"] = config["Simulations"]["substitution model"]
-            config_dict["fasta folder"] = config["Data"]["alignments"]
             config_dict["popfile"] = config["Data"]["popfile"]
+            if config["Data"]["alignments"] == "None":
+                config_dict["vcf"] = open(config["Data"]["vcf"], 'r').readlines()
+            else:
+                config_dict["fasta folder"] = config["Data"]["alignments"]
         except KeyError as e:
             raise KeyError(f"Error in model config: Missing key in configuration file: {e}") from e
         except dendropy.utility.error.DataParseError as e:
@@ -70,16 +73,30 @@ class ModelConfigParser:
                 ['population'].to_dict()
             config_dict["sampling dict"] = pop_df['population'].value_counts().to_dict()
 
-            # get fastas and lengths
-            fasta_list = os.listdir(config_dict["fasta folder"])
-            fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta')]
-            config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
-                path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
-                    ) for x in fasta_list]
-            config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
+            if config["Data"]["alignments"] == "None":
 
-            # get number variable sites
-            individuals = self._count_variable(config_dict['fastas'])
+                # get lengths
+                lengths = [x for x in config_dict["vcf"] if "length" in x]
+                lengths = [int(x.split("=")[3].split(">")[0]) for x in lengths]
+                config_dict['lengths'] = lengths
+
+                # get individuals
+                individuals = [x for x in config_dict["vcf"] if x.startswith("#CHROM")][0]
+                individuals = set([x.strip() for x in individuals.split("\t") if x not in ("#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT")])
+
+
+            else:
+                # get fastas and lengths
+                fasta_list = os.listdir(config_dict["fasta folder"])
+                fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta')]
+                config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
+                    path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
+                        ) for x in fasta_list]
+                config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
+
+                # get number variable sites
+                individuals = self._count_variable(config_dict['fastas'])
+            
             if set(pop_df['individual']) != individuals:
                 raise Exception(f"Error: The lables in your alignment do not match the labels in your population dictionary.")
 
