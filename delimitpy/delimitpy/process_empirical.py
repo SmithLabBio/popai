@@ -67,6 +67,16 @@ class DataProcessor:
         invariant_columns = np.where(np.sum(frequencies == 0, axis=1) >= 3)[0]
         filtered_alignments = np.delete(encoded_alignments, invariant_columns, axis=1)
 
+        # remove non-biallelic columns
+        frequencies_2 = np.array([[np.sum(filtered_alignments[:, j] == i) \
+            for i in range(0, 4)] for j in range(filtered_alignments.shape[1])])
+        nonbiallelic_columns = np.where(np.sum(frequencies_2 != 0, axis=1) > 2)[0]
+        filtered_alignments = np.delete(filtered_alignments, nonbiallelic_columns, axis=1)
+        
+        self.logger.info("Empirical data has %s biallelic SNPs."\
+                         " If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", 
+                         filtered_alignments.shape[1])
+
         return filtered_alignments
 
     def _encode_string(self, string, encoding_dict):
@@ -261,11 +271,14 @@ class DataProcessor:
                     # find poulation counts
                     counts_per_population = {}
                     for population in self.config['sampling dict'].keys():
+
                         site_data_pop = site_data[sampling_indices[population][0]:
                                                 sampling_indices[population][1]]
-                        site_data_pop = [x for x in site_data_pop if not x == -1]
-                        site_data_pop = list(self.rng.choice(site_data_pop, \
-                            downsampling[population]))
+
+                        if downsampling != self.config['sampling dict']:
+                            site_data_pop = [x for x in site_data_pop if not x == -1]
+                            site_data_pop = list(self.rng.choice(site_data_pop, \
+                                downsampling[population]))
 
                         counts_per_population[population] = Counter(site_data_pop)[minor_allele]
 
@@ -274,7 +287,6 @@ class DataProcessor:
                         string_for_count = [str(x) for x in string_for_count]
                         combo_key = '_'.join(string_for_count)
                         rep_sfs_dict[combo_key]+=1
-
 
             # convert SFS to binned
             if not nbins is None:

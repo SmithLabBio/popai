@@ -115,9 +115,9 @@ class DataSimulator:
         # shorten arrays that are too short, and pad arrays that are too long.
         median_size = int(np.ceil(np.median(sizes)))
 
-        self.logger.info("Median simulated data has %s SNPs, and your input has %s SNPs."\
-                         "If these numbers are very different, you may want to change some priors.", 
-                         median_size, self.config['variable'])
+        self.logger.info("Median simulated data has %s biallelic SNPs."\
+                         " If this is very different than the number of SNPs in your empirical data, you may want to change some priors.", 
+                         median_size)
 
         for model, values in all_arrays.items():
             for i, matrix in enumerate(values):
@@ -341,6 +341,13 @@ class DataSimulator:
 
                 # get array
                 array = mts.genotype_matrix().transpose()
+        
+                # remove non-biallelic columns
+                frequencies = np.array([[np.sum(array[:, j] == i) \
+                    for i in range(0, np.max(array))] for j in range(array.shape[1])])
+                nonbiallelic_columns = np.where(np.sum(frequencies != 0, axis=1) > 2)[0]
+                array = np.delete(array, nonbiallelic_columns, axis=1)
+
                 parameter_arrays.append(array)
 
             # combine the parameter_ts arrays across fragments

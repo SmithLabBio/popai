@@ -79,7 +79,7 @@ class ModelConfigParser:
             config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
 
             # get number variable sites
-            config_dict['variable'], individuals = self._count_variable(config_dict['fastas'])
+            individuals = self._count_variable(config_dict['fastas'])
             if set(pop_df['individual']) != individuals:
                 raise Exception(f"Error: The lables in your alignment do not match the labels in your population dictionary.")
 
@@ -107,23 +107,24 @@ class ModelConfigParser:
         while accounting for the presence of IUPAC ambiguity codes, 
         which are all treated as missing."""
         individuals = []
-        total = 0
-        valid_bases = {'A', 'T', 'C', 'G'}
+        #total = 0
+        #valid_bases = {'A', 'T', 'C', 'G'}
         for item in fastas:
-            sites = item.max_sequence_size
+            #sites = item.max_sequence_size
             individuals.extend([str(x) for x in item.taxon_namespace])
-            for site in range(sites):
-                site_list = []
-                for individual in range(len(item)):
-                    try:
-                        site_list.append(str(item[individual][site]))
-                    except:
-                        site_list.append('N')
-                unique_items = set(site_list) - valid_bases
-                unique_count = len(unique_items)
-                if len(set(site_list)) > 1 and unique_count == 0:
-                    total += 1
-                elif len(set(site_list)) > 1 + unique_count:
-                    total += 1
+            #for site in range(sites):
+            #    site_list = []
+            #    for individual in range(len(item)):
+            #        try:
+            #            site_list.append(str(item[individual][site]))
+            #        except:
+            #            site_list.append('N')
+            #    unique_items = set(site_list) - valid_bases
+            #    unique_count = len(unique_items)
+            #    if len(set(site_list)) > 1 and unique_count == 0:
+            #        total += 1
+            #    elif len(set(site_list)) > 1 + unique_count:
+            #        total += 1
         individuals = [x.strip("'") for x in individuals]
-        return total, set(individuals)
+        #return total, set(individuals)
+        return(set(individuals))
