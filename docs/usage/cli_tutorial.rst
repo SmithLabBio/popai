@@ -88,7 +88,7 @@ Next, we need to simulate data under the models of interest. We will do so using
       --maxsites MAXSITES   Max number of sites to use when building SFS from simulated
       --cores CORES         Number of cores to use when simulating data.
 
-The parameter maxsites should be set equal to the number of sites used to build the empirical SFS (which printed to the screen when you ran the simulate_data command.)
+The parameter maxsites should be set equal to the number of sites used to build the empirical SFS (which printed to the screen when you ran the *process_empirical_data* command.)
 
 It is essential to use the same downsampling dictionary here that you used to process your empirical data.
 
@@ -137,7 +137,7 @@ This will output to the output directory the trained.model files for the FCNN an
 Step 6: Apply networks
 ==========================================
 
-Finally, we can apply the networks to make classifications on our empirical data using the function *apply_models*. It has the following parameters::
+Finally, we can apply the networks to make classifications on our empirical data using the function *apply_models*. It takes the following arguments::
 
     usage: apply_models [-h] [--config CONFIG] [--models MODELS] [--empirical EMPIRICAL] [--output OUTPUT] [--force] [--rf] [--fcnn] [--cnn]
 
