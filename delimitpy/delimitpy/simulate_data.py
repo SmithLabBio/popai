@@ -96,7 +96,10 @@ class DataSimulator:
         sizes = []
 
         for ix, demography in enumerate(self.models):
-            all_arrays["Model_{ix}"], sizes = self._simulate_demography(ix, demography)
+            all_arrays[f"Model_{ix}"], sizes = self._simulate_demography(ix, demography)
+        
+        for key in all_arrays.keys():
+            print(key)
 
         end_time = time.time()  # Record the end time
         execution_time = end_time - start_time  # Calculate the execution time
