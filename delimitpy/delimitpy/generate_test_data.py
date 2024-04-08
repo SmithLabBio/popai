@@ -77,8 +77,8 @@ class TestDataGenerator:
                 samples = mts.samples()
                 for sample_id, h in zip(samples, mts.haplotypes(samples=samples)):
                     pop = mts.node(sample_id).population
-                    print(mts.node(sample_id))
-                    print(f"Sample {sample_id:<2} ({ts.population(pop).metadata['name']:^5}): {h}")
+                    #print(mts.node(sample_id))
+                    #print(f"Sample {sample_id:<2} ({ts.population(pop).metadata['name']:^5}): {h}")
                 
                 vcf_lines = mts.as_vcf().split("\n")
                 
