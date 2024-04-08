@@ -869,7 +869,6 @@ def _get_priors(config):
             else:
                 node_label = node.label.strip("'")
                 population_sizes[node_label] = [min_ne, max_ne]
-                print(node.annotations['div'], node)
                 min_div, max_div = map(int, node.annotations['div'].value.strip("'").split("-"))
                 divergence_times[node_label] = [min_div, max_div]
 
