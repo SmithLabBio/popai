@@ -18,7 +18,8 @@ setup(
         'seaborn',
         'tabulate',
         'tensorflow',
-        'pandas'
+        'pandas',
+        'pyslim'
     ],
     entry_points={
         'console_scripts': [
