@@ -467,17 +467,13 @@ class ModelBuilder:
                     elif hasattr(event, 'rate'):
                         if self.config['symmetric']:
                             event.time = migration_start[\
-                                f"{population_size_keys[event.populations[0]]}\
-                                    _{population_size_keys[event.populations[1]]}"][rep]
+                                f"{population_size_keys[event.populations[0]]}_{population_size_keys[event.populations[1]]}"][rep]
                             event.rate = migration_rate_draws[\
-                                f"{population_size_keys[event.populations[0]]}\
-                                    _{population_size_keys[event.populations[1]]}"][rep]
+                                f"{population_size_keys[event.populations[0]]}_{population_size_keys[event.populations[1]]}"][rep]
                         else:
-                            event.time = migration_start[f"{population_size_keys[event.source]}\
-                                                         _{population_size_keys[event.dest]}"][rep]
+                            event.time = migration_start[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"][rep]
                             event.rate = migration_rate_draws[f"\
-                                                    {population_size_keys[event.source]}\
-                                                    _{population_size_keys[event.dest]}"][rep]
+                                                    {population_size_keys[event.source]}_{population_size_keys[event.dest]}"][rep]
 
                 model.sort_events()
                 this_model_with_parameters.append(model)
@@ -548,14 +544,12 @@ class ModelBuilder:
         for event in model.events:
             if hasattr(event, 'rate'):
                 if self.config['symmetric']:
-                    migration_rate_draws[f"{population_size_keys[event.populations[0]]}_\
-                        {population_size_keys[event.populations[1]]}"] = \
+                    migration_rate_draws[f"{population_size_keys[event.populations[0]]}_{population_size_keys[event.populations[1]]}"] = \
                             np.round(self.rng.uniform(low=self.config["migration rate"][0], \
                                 high=self.config["migration rate"][1], \
                                     size=self.config["replicates"]),10)
                 else:
-                    migration_rate_draws[f"{population_size_keys[event.source]}_\
-                        {population_size_keys[event.dest]}"] = np.round(
+                    migration_rate_draws[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"] = np.round(
                             self.rng.uniform(low=self.config["migration rate"][0],\
                                 high=self.config["migration rate"][1], \
                                     size=self.config["replicates"]),10)
@@ -602,13 +596,10 @@ class ModelBuilder:
                         + max(tdiv_daughter1, tdiv_daughter2)
 
                     try:
-                        migration_start[f"{population_size_keys[daughter1]}_\
-                                        {population_size_keys[daughter2]}"].append(startime)
+                        migration_start[f"{population_size_keys[daughter1]}_{population_size_keys[daughter2]}"].append(startime)
                     except Exception:
-                        migration_start[f"{population_size_keys[daughter1]}_\
-                                        {population_size_keys[daughter2]}"] = []
-                        migration_start[f"{population_size_keys[daughter1]}_\
-                                        {population_size_keys[daughter2]}"].append(startime)
+                        migration_start[f"{population_size_keys[daughter1]}_{population_size_keys[daughter2]}"] = []
+                        migration_start[f"{population_size_keys[daughter1]}_{population_size_keys[daughter2]}"].append(startime)
 
         return migration_start
 
