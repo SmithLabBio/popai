@@ -302,10 +302,13 @@ class ModelBuilder:
 
         for combo in all_combos:
 
+            all_child_nodes = []
+
             for node in combo:
                 child_nodes = [child for child in node.postorder_internal_node_iter()\
                             if child not in combo]
-            if len(child_nodes)==0:
+                all_child_nodes.extend(child_nodes)
+            if len(all_child_nodes)==0:
                 keep_combos.append(combo)
 
         return keep_combos
@@ -866,6 +869,7 @@ def _get_priors(config):
             else:
                 node_label = node.label.strip("'")
                 population_sizes[node_label] = [min_ne, max_ne]
+                print(node.annotations['div'], node)
                 min_div, max_div = map(int, node.annotations['div'].value.strip("'").split("-"))
                 divergence_times[node_label] = [min_div, max_div]
 
