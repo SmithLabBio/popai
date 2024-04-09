@@ -40,24 +40,45 @@ class ModelBuilder:
         """
         try:
 
-            # get baseline divergence demographies
-            divergence_demographies = self._create_divergence_demographies()
+            all_divergence_demographies = []
+            flat_divergence_demographies = []
+            all_sc_demographies = []
+            all_dwg_demographies = []
+            total_models = 0
 
-            # get secondary contact demographies
-            if self.config['secondary contact']:
-                sc_demographies = self._create_sc_demographies(divergence_demographies)
-            else:
-                sc_demographies = []
+            for ix, tree in enumerate(self.config['species tree']):
 
-            # get divergence with gene flow demographies
-            if self.config['divergence with gene flow']:
-                dwg_demographies = self._create_dwg_demographies(divergence_demographies)
-            else:
-                dwg_demographies = []
+                # get baseline divergence demographies
+                divergence_demographies = self._create_divergence_demographies(tree)
 
-            total_models = len(divergence_demographies) + len(sc_demographies) \
-                + len(dwg_demographies)
-            self.logger.info("Creating %r different models based on user input.", total_models)
+                to_keep = []
+                for item in divergence_demographies:
+                    if not item in flat_divergence_demographies:
+                        to_keep.append(item)
+                divergence_demographies = to_keep
+
+                # get secondary contact demographies
+                if self.config['secondary contact']:
+                    sc_demographies = self._create_sc_demographies(divergence_demographies, self.config['migration df'][ix])
+                else:
+                    sc_demographies = []
+
+                # get divergence with gene flow demographies
+                if self.config['divergence with gene flow']:
+                    dwg_demographies = self._create_dwg_demographies(divergence_demographies, self.config['migration df'][ix])
+                else:
+                    dwg_demographies = []
+
+                total_models += len(divergence_demographies) + len(sc_demographies) \
+                    + len(dwg_demographies)
+                
+                # add demographies to list
+                flat_divergence_demographies.extend(divergence_demographies)
+                all_divergence_demographies.append(divergence_demographies)
+                all_sc_demographies.append(sc_demographies)
+                all_dwg_demographies.append(dwg_demographies)
+            
+            self.logger.info("Creating %r different models for based on user input.", total_models)
 
         except ValueError as ve:
             raise ValueError(f"ValueError: Issue when building baseline \
@@ -67,7 +88,7 @@ class ModelBuilder:
             raise RuntimeError(f"Error: Unexpected issue when building \
                                baseline msprime demographies: {e}") from e
 
-        return(divergence_demographies, sc_demographies, dwg_demographies)
+        return(all_divergence_demographies, all_sc_demographies, all_dwg_demographies)
 
     def draw_parameters(self, divergence_demographies, sc_demographies, dwg_demographies):
         """
@@ -87,32 +108,61 @@ class ModelBuilder:
         Raises:
             Error if priors are incorrectly defined.
         """
-        # get priors
-        population_sizes, divergence_times = _get_priors(self.config)
+        all_parameterized_divergence_demographies = []
+        all_parameterized_sc_demographies = []
+        all_parameterized_dwg_demographies = []
 
-        # draw parameters for divergence models
-        parameterized_divergence_demographies = self._draw_parameters_divergence(
-            divergence_times=divergence_times, population_sizes=population_sizes, \
-                divergence_demographies=divergence_demographies)
+        for ix, tree in enumerate(self.config['species tree']):
 
-        # draw parameters for secondary contact models
-        parameterized_sc_demographies = self._draw_parameters_sc(
-            divergence_times=divergence_times, population_sizes=population_sizes, \
-            sc_demographies=sc_demographies)
+            # get priors
+            population_sizes, divergence_times = _get_priors(tree)
 
-        # draw parameters for divergence with gene flow models
-        parameterized_dwg_demographies = self._draw_parameters_dwg(
-            divergence_times=divergence_times, population_sizes=population_sizes, \
-            dwg_demographies=dwg_demographies)
+            # draw parameters for divergence models
+            if len(divergence_demographies[ix]) > 0:
+                parameterized_divergence_demographies = self._draw_parameters_divergence(
+                    divergence_times=divergence_times, population_sizes=population_sizes, \
+                        divergence_demographies=divergence_demographies[ix])
+                all_parameterized_divergence_demographies.append(parameterized_divergence_demographies)
+            else:
+                all_parameterized_divergence_demographies.append([])
 
-        # flatten models and create labels
-        full_model_list = parameterized_divergence_demographies+\
-            parameterized_sc_demographies+parameterized_dwg_demographies
-        labels = list(range(len(full_model_list)))
-        expanded_labels = [[val]*len(sublist) for val, sublist in zip(labels, full_model_list)]
+            # draw parameters for secondary contact models
+            if len(sc_demographies[ix]) > 0:
+                parameterized_sc_demographies = self._draw_parameters_sc(
+                    divergence_times=divergence_times, population_sizes=population_sizes, \
+                    sc_demographies=sc_demographies[ix])
+                all_parameterized_sc_demographies.append(parameterized_sc_demographies)
+            else:
+                all_parameterized_sc_demographies.append([])
+
+            # draw parameters for divergence with gene flow models
+            if len(dwg_demographies[ix]) > 0:
+                parameterized_dwg_demographies = self._draw_parameters_dwg(
+                    divergence_times=divergence_times, population_sizes=population_sizes, \
+                    dwg_demographies=dwg_demographies[ix])
+                all_parameterized_dwg_demographies.append(parameterized_dwg_demographies)
+            else:
+                all_parameterized_dwg_demographies.append([])       
+            
+
+
+        # create labels
+        labels_divergence = []
+        count=0
+        for modelset in all_parameterized_divergence_demographies:
+            labels_divergence.append(list(range(count, len(modelset)+count)))
+            count+= len(modelset)
+        labels_sc = []
+        for modelset in all_parameterized_sc_demographies:
+            labels_sc.append(list(range(count, len(modelset)+count)))
+            count+= len(modelset)
+        labels_dwg = []
+        for modelset in all_parameterized_dwg_demographies:
+            labels_dwg.append(list(range(count, len(modelset)+count)))
+            count+= len(modelset)
 
         # return them
-        return(full_model_list, expanded_labels)
+        return([all_parameterized_divergence_demographies,all_parameterized_sc_demographies,all_parameterized_dwg_demographies], [labels_divergence, labels_sc, labels_dwg])
 
     def validate_models(self, demographies, labels, outplot=None):
         """
@@ -149,7 +199,7 @@ class ModelBuilder:
             raise RuntimeError(f"Unexpected Error: Issue when plotting \
                                example msprime demographies: {e}") from e
 
-    def _create_divergence_demographies(self):
+    def _create_divergence_demographies(self, tree):
         """Create baseline divergence demographies."""
 
         demographies = []
@@ -157,7 +207,7 @@ class ModelBuilder:
         div_time_holder = 1000
 
         # get a list of collapsable nodes, and then get all potential combos of these
-        collapsable_nodes = self.config['species tree'].internal_nodes()
+        collapsable_nodes = tree.internal_nodes()
         all_combos = [list(combo) for r in range(1, len(collapsable_nodes) + 1) \
                       for combo in combinations(collapsable_nodes, r)]
 
@@ -171,16 +221,16 @@ class ModelBuilder:
             demography = msprime.Demography()
 
             # add populations that should be added, and set initial sizes (changed later)
-            for internal_node in self.config['species tree'].postorder_internal_node_iter():
+            for internal_node in tree.postorder_internal_node_iter():
                 if internal_node not in combo:
                     derived_1, derived_2 = self._get_derived_populations(internal_node)
                     demography.add_population(name=derived_1, initial_size=pop_size_holder)
                     demography.add_population(name=derived_2, initial_size=pop_size_holder)
-            demography.add_population(name=str(self.config['species tree'].seed_node.label)\
+            demography.add_population(name=str(tree.seed_node.label)\
                                       .strip("'"), initial_size=pop_size_holder)
 
             # add non-zero divergence events
-            for internal_node in self.config['species tree'].postorder_internal_node_iter():
+            for internal_node in tree.postorder_internal_node_iter():
                 if internal_node not in combo:
                     derived_1, derived_2 = self._get_derived_populations(internal_node)
                     ancestral = str(internal_node.label).strip("'")
@@ -191,7 +241,7 @@ class ModelBuilder:
 
         return demographies
 
-    def _create_sc_demographies(self, divergence_demographies):
+    def _create_sc_demographies(self, divergence_demographies, migration_matrix):
         """Create baseline secondary contact demographies."""
 
         migration_demographies = []
@@ -202,7 +252,7 @@ class ModelBuilder:
         for item in divergence_demographies:
 
             # list of events to include
-            to_include = sorted(set(self._find_sc_to_include(item)))
+            to_include = sorted(set(self._find_sc_to_include(item, migration_matrix)))
 
             # keep only one per pair if symmetric rates are enforced
             if self.config['symmetric']:
@@ -245,7 +295,7 @@ class ModelBuilder:
 
         return migration_demographies
 
-    def _create_dwg_demographies(self, divergence_demographies):
+    def _create_dwg_demographies(self, divergence_demographies, migration_matrix):
         """Create baseline secondary contact demographies."""
 
         migration_demographies = []
@@ -256,7 +306,7 @@ class ModelBuilder:
         for item in divergence_demographies:
 
             # list of events to include
-            to_include = sorted(set(self._find_dwg_to_include(item)))
+            to_include = sorted(set(self._find_dwg_to_include(item, migration_matrix)))
 
             # keep only one per pair if symmetric rates are enforced
             if self.config['symmetric']:
@@ -322,7 +372,7 @@ class ModelBuilder:
 
         return(derived_1, derived_2)
 
-    def _find_sc_to_include(self, item):
+    def _find_sc_to_include(self, item, migration_matrix):
         """Find which secondary contact events we whould include for the demography, 'item'
         Include any events for which both populations exist before time zero and 
         there is migration allowed between the populations."""
@@ -330,7 +380,7 @@ class ModelBuilder:
         to_include = []
 
         # iterate over migration matrix and find populations with migration
-        for index, row in self.config['migration df'].iterrows():
+        for index, row in migration_matrix.iterrows():
             for colname, value in row.items():
                 include = [False,False]
 
@@ -351,7 +401,7 @@ class ModelBuilder:
 
         return to_include
 
-    def _find_dwg_to_include(self, item):
+    def _find_dwg_to_include(self, item, migration_matrix):
         """Find which divergence with gene flow events we whould include for the demography, 'item'.
         Include any events for which the two populations derived from the same ancestor before
         time zero and there is migration allowed between the populations."""
@@ -359,7 +409,7 @@ class ModelBuilder:
         to_include = []
 
         # iterate over migration matrix and find populations with migration
-        for index, row in self.config['migration df'].iterrows():
+        for index, row in migration_matrix.iterrows():
             for colname, value in row.items():
                 include = False
 
@@ -610,28 +660,32 @@ class ModelBuilder:
         """Plot example models for a given type of demography."""
 
         if outplot is None:
-            for model in enumerate(demographies):
-                demo_to_plot = random.sample(model[1], 1)[0]
-                graph = demo_to_plot.to_demes()
+            for typeix, type in enumerate(demographies):
+                for treeix, tree in enumerate(type):
+                    for modelix, model in enumerate(tree):
+                        demo_to_plot = random.sample(model, 1)[0]
+                        graph = demo_to_plot.to_demes()
 
-                # Plot the model
-                fig = plt.subplots()
-                demesdraw.tubes(graph, ax=fig[1], seed=1)
-                plt.title(f"Model: {labels[model[0]][0]}")
-                plt.show()
+                        # Plot the model
+                        fig = plt.subplots()
+                        demesdraw.tubes(graph, ax=fig[1], seed=1)
+                        plt.title(f"Model: {labels[typeix][treeix][modelix]}")
+                        plt.show()
 
         else:
             with PdfPages(outplot) as pdf:
-                for model in enumerate(demographies):
-                    demo_to_plot = random.sample(model[1], 1)[0]
-                    graph = demo_to_plot.to_demes()
+                for typeix, type in enumerate(demographies):
+                    for treeix, tree in enumerate(type):
+                        for modelix, model in enumerate(tree):
+                            demo_to_plot = random.sample(model, 1)[0]
+                            graph = demo_to_plot.to_demes()
 
-                    # Plot the model
-                    fig, ax = plt.subplots()
-                    demesdraw.tubes(graph, ax=ax, seed=1)
-                    plt.title(f"Model: {labels[model[0]][0]}")
-                    pdf.savefig(fig)
-                    plt.close(fig)
+                            # Plot the model
+                            fig, ax = plt.subplots()
+                            demesdraw.tubes(graph, ax=ax, seed=1)
+                            plt.title(f"Model: {labels[typeix][treeix][modelix]}")
+                            pdf.savefig(fig)
+                            plt.close(fig)
 
 #class ModelWriter:
 #
@@ -854,7 +908,7 @@ class ModelBuilder:
                 count+=1
         return yaml_dict
 
-def _get_priors(config):
+def _get_priors(tree):
     """Get priors for population sizes and divergence times from the species tree."""
     # build dictionary of priors for population sizes
     population_sizes = {}
@@ -862,7 +916,7 @@ def _get_priors(config):
 
     # get priors from species tree
     try:
-        for node in config['species tree'].postorder_node_iter():
+        for node in tree.postorder_node_iter():
             min_ne, max_ne = map(int, node.annotations['ne'].value.strip("'").split("-"))
             if node.is_leaf():
                 population_sizes[node.taxon.label.strip("'")] = [min_ne, max_ne]

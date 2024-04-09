@@ -33,11 +33,12 @@ class ModelConfigParser:
         config_dict = {}
 
         try: # read all the keys
-            config_dict['species tree'] = dendropy.Tree.get(
+            config_dict['species tree'] = dendropy.TreeList.get(
                 path=config['Model']['species tree file'], schema="nexus")
             config_dict['replicates']=int(config['Other']['replicates'])
-            config_dict['migration df']=pd.read_csv(config['Model']['migration matrix']\
-                , index_col=0)
+            migration_paths = config['Model']['migration matrix'].split(";")
+            config_dict['migration df']=[pd.read_csv(x\
+                , index_col=0) for x in migration_paths]
             config_dict['max migration events']=int(config['Model']['max migration events'])
             config_dict["migration rate"] = [float(val.strip("U(").strip(")")) \
                 for val in config['Model']["migration rate"].split(",")]
@@ -119,14 +120,15 @@ class ModelConfigParser:
             raise RuntimeError(f"Unexpected error occurred: {e}") from e
         
         if config_dict['constant Ne']:
-            mins = []
-            maxs = []
-            for node in config_dict['species tree'].postorder_node_iter():
-                min_ne, max_ne = map(int, node.annotations['ne'].value.strip("'").split("-"))
-                mins.append(min_ne)
-                maxs.append(max_ne)
-            if len(set(mins)) > 1 or len(set(maxs)) > 1:
-                raise ValueError(f"Error due to using variable population size priors when setting constant Ne to True")
+            for tree in config_dict['species tree']:
+                mins = []
+                maxs = []
+                for node in tree.postorder_node_iter():
+                    min_ne, max_ne = map(int, node.annotations['ne'].value.strip("'").split("-"))
+                    mins.append(min_ne)
+                    maxs.append(max_ne)
+                if len(set(mins)) > 1 or len(set(maxs)) > 1:
+                    raise ValueError(f"Error due to using variable population size priors when setting constant Ne to True")
 
         return config_dict
 

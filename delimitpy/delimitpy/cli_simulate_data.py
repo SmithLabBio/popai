@@ -51,7 +51,7 @@ def main():
     
         # simulate data
         data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
-        arrays = data_simulator.simulate_ancestry()
+        arrays, labels = data_simulator.simulate_ancestry()
     
         # build SFS for simulate data
         sfs_2d = data_simulator.mutations_to_2d_sfs(arrays)

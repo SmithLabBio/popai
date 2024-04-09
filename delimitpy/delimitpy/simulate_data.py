@@ -33,17 +33,14 @@ class DataSimulator:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
-        # get overall simulating dict for full demography
-        self.simulating_dict = self._get_simulating_dict()
-
-    def _get_simulating_dict(self):
+    def _get_simulating_dict(self, tree):
         simulating_dict = {}
         population_count = len(self.config['sampling dict'])
         count=0
         while len(simulating_dict) != population_count:
             populations = [x.name for x in self.models[count][0].populations]
             simulating_dict = {population: 0 for population in populations}
-            for species in self.config['species tree'].leaf_nodes():
+            for species in tree.leaf_nodes():
                 if species.taxon.label not in populations:
                     search = True
                     searchnode = species
@@ -62,13 +59,13 @@ class DataSimulator:
             count+=1
         return simulating_dict
 
-    def _get_simulating_dict_model(self, demography):
+    def _get_simulating_dict_model(self, demography, tree):
 
         # figure out how to sample individuals
         simulating_dict = {}
         populations = [x.name for x in demography.populations]
         simulating_dict = {population: 0 for population in populations}
-        for species in self.config['species tree'].leaf_nodes():
+        for species in tree.leaf_nodes():
             if species.taxon.label not in populations:
                 search = True
                 searchnode = species
@@ -94,9 +91,18 @@ class DataSimulator:
         # dictionary for storing arrays and list for storing sizes.
         all_arrays = {}
         sizes = []
+        new_labels = []
 
-        for ix, demography in enumerate(self.models):
-            all_arrays[f"Model_{ix}"], sizes = self._simulate_demography(ix, demography)
+        for typeix, type in enumerate(self.models):
+
+            for treeix, tree in enumerate(type):
+
+                for ix, demography in enumerate(tree):
+
+                    label = self.labels[typeix][treeix][ix]
+                        
+                    all_arrays[f"Model_{label}"], sizes = self._simulate_demography(ix, demography, self.config['species tree'][treeix])
+                    new_labels.append([label]*len(demography))
         
         end_time = time.time()  # Record the end time
         execution_time = end_time - start_time  # Calculate the execution time
@@ -126,8 +132,7 @@ class DataSimulator:
                                                num_missing_columns), -1)
                     all_arrays[model][i] = modified_matrix
 
-
-        return all_arrays
+        return all_arrays, new_labels
 
 
     def mutations_to_sfs(self, numpy_array_dict, nbins=None):
@@ -299,10 +304,10 @@ class DataSimulator:
         return all_sfs
 
     #def _simulate_demography(self, ix, demography, lock, sizes):
-    def _simulate_demography(self, ix, demography):
+    def _simulate_demography(self, ix, demography, tree):
 
         # get dictionary for simulations
-        simulating_dict = self._get_simulating_dict_model(demography=demography[0])
+        simulating_dict = self._get_simulating_dict_model(demography=demography[0], tree=tree)
         # draw mutation rates from priors
         mutation_rates = self.rng.uniform(low=self.config["mutation rate"][0],
                                               high=self.config["mutation rate"][1],
