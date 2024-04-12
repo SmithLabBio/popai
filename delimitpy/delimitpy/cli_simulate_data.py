@@ -83,7 +83,9 @@ def main():
         # build SFS for simulate data
         sfs_2d = data_simulator.mutations_to_2d_sfs(arrays)
         msfs = data_simulator.mutations_to_sfs(arrays)
-    
+
+        data_simulator.plot_2dsfs(sfs_2d,output_directory=args.output)
+
         # save these simulated data.
         with open(os.path.join(args.output, 'simulated_jsfs.pickle'), 'wb') as f:
             pickle.dump(sfs_2d, f)
