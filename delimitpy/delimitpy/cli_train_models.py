@@ -43,7 +43,7 @@ def main():
     if args.rf:
         # train RF and save model and confusion matrix
         random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, msfs, labels, user=user)
-        random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=ntrees)
+        random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.ntrees)
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)
         random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))
