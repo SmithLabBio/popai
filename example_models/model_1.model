@@ -1,0 +1,19 @@
+[Populations]	# list populations and min and maximum values for uniform population size priors [min,max]
+A=[10000,50000]
+B=[10000,50000]
+C=[10000,50000]
+AB=[10000,50000]
+ABC=[10000,50000]
+
+[Migration]	# migration matrix with migration rates entered as a uniform prior [min,max] M[j,k] is the rate at which lineages move from population j to population k in the coalescent process. J is row, K is column
+matrix	=	
+        A	B	C	AB	ABC
+    A	0	0	0	0	0
+    B	0	0	0	0	0
+    C	0	0	0	0	0
+    AB	0	0	0	0	0
+    ABC	0	0	0	0	0
+
+[Events]
+1=split	0	0	["A","B"]	AB
+2=split	50000	100000	["AB","C"]	ABC

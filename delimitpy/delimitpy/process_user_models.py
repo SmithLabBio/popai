@@ -81,7 +81,7 @@ class ModelReader:
                         maxtime = int(infolist[2])
                         migration_time = np.round(self.rng.uniform(low=mintime, high=maxtime, size=1),0)[0]
                         try:
-                            migration_rate = int(infolist[4])
+                            migration_rate = float(infolist[4])
                         except:
                             migration_rate_range = ast.literal_eval(infolist[4])
                             migration_rate = self.rng.uniform(low=migration_rate_range[0], high=migration_rate_range[1], size=1)[0]
@@ -94,7 +94,7 @@ class ModelReader:
                         maxtime = int(infolist[2])
                         migration_time = np.round(self.rng.uniform(low=mintime, high=maxtime, size=1),0)[0]
                         try:
-                            migration_rate = int(infolist[5])
+                            migration_rate = float(infolist[5])
                         except:
                             migration_rate_range = ast.literal_eval(infolist[5])
                             migration_rate = self.rng.uniform(low=migration_rate_range[0], high=migration_rate_range[1], size=1)[0]
