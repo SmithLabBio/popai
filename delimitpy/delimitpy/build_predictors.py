@@ -80,7 +80,7 @@ class CnnSFS:
                 min_label = min(self.labels)
                 self.labels = [x-min_label for x in self.labels]
             except:
-                raise Exception(f"Model names must end in '_x', where x is some integer.")\
+                raise Exception(f"Model names must end in '_x', where x is some integer.")
             self.nclasses = len(set(labels))
 
         try:

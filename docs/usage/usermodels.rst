@@ -42,3 +42,26 @@ Inside the models folder, the user should place their model files. There are a t
 2. Model file names must end in '_x', where x is an integer. The integers should be sequential (i.e., 1-5 for five models).
 
 For example, my directory structure could look as follows:
+
+- user_models/
+    - model_1.model
+    - model_2.model
+    - model_3.model
+
+========================================
+Model Files
+========================================
+Model files contain three major sections:
+1. Populations
+2. Migration
+3. Events
+
+In the Populations section, the user should list their populations in the following format::
+    name=[min,max]
+
+Notes:
+* Name is the name of the populations. 
+* Min and Max are the minimum and maximum bounds on a uniform prior from which population sizes will be drawn.
+* You must also include historical populations.
+
+
