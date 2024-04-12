@@ -125,7 +125,7 @@ class CnnSFS:
         inputs = []
         for item in train_features:
             this_input = keras.Input(shape=item.shape[1:])
-            x =  keras.layers.Conv2D(10, (4,4), activation="relu")(this_input)
+            x =  keras.layers.Conv2D(10, (3,3), activation="relu")(this_input)
             x = keras.layers.Flatten()(x)
             my_layers.append(x)
             inputs.append(this_input)

@@ -14,7 +14,7 @@ def main():
     parser.add_argument('--rf', action='store_true', help='Train RF classifier.')
     parser.add_argument('--fcnn', action='store_true', help='Train FCNN classifier.')
     parser.add_argument('--cnn', action='store_true', help='Train CNN classifier.')
-    parser.add_argument('--ntrees', type='int', help='Number of trees to use in the RF classifier (default=500).', default=500)
+    parser.add_argument('--ntrees', type=int, help='Number of trees to use in the RF classifier (default=500).', default=500)
 
     args = parser.parse_args()
 
