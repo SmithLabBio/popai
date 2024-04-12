@@ -27,6 +27,12 @@ def main():
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
+    # set whether user
+    if config_values['user models'] is None:
+        user = False
+    else:
+        user = True
+
     # read the data
     labels = np.load(os.path.join(args.simulations, 'labels.npy'), allow_pickle=True)
     msfs = np.load(os.path.join(args.simulations, 'simulated_msfs.npy'), allow_pickle=True)
@@ -35,7 +41,7 @@ def main():
 
     if args.rf:
         # train RF and save model and confusion matrix
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, msfs, labels)
+        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, msfs, labels, user=user)
         random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs()
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)
@@ -43,14 +49,14 @@ def main():
 
     if args.fcnn:
         # train FCNN and save model and confusion matrix
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, msfs, labels)
+        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, msfs, labels, user = user)
         neural_network_sfs_model, neural_network_sfs_cm, neural_network_sfs_cm_plot = neural_network_sfs_predictor.build_neuralnet_sfs()
         neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.keras'))
         neural_network_sfs_cm_plot.savefig(os.path.join(args.output, 'fcnn_confusion.png'))
 
     if args.cnn:
         # train CNN and save model and confusion matrix
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, sfs_2d, labels)
+        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, sfs_2d, labels, user=user)
         cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot = cnn_2d_sfs_predictor.build_cnn_sfs()
         cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
         cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_confusion.png'))

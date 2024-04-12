@@ -66,6 +66,13 @@ class ModelConfigParser:
         except Exception as e:
             raise RuntimeError(f"Unexpected error occurred: {e}") from e
 
+        try: # determine whether user supplied models
+            config_dict['user models'] = config["Model"]["user models"]
+        except:
+            config_dict['user models'] = None
+        if config_dict['user models'] == 'None':
+            config_dict['user models'] = None
+
         try: # get special information
 
             # get population sampling info

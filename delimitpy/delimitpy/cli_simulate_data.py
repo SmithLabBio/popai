@@ -3,7 +3,7 @@ import ast
 import os
 import pickle
 import numpy as np
-from delimitpy import parse_input, generate_models, simulate_data
+from delimitpy import parse_input, generate_models, simulate_data, process_user_models
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
@@ -31,28 +31,55 @@ def main():
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
-    # Build models and draw parameters
-    model_builder = generate_models.ModelBuilder(config_values)
-    divergence_demographies, sc_demographies, dwg_demographies = model_builder.build_models()
-    parameterized_models, labels = model_builder.draw_parameters(divergence_demographies, sc_demographies, dwg_demographies)
+    if config_values['user models'] is None:
 
-    if args.plot:
-        
+        # Build models and draw parameters
+        model_builder = generate_models.ModelBuilder(config_values)
+        divergence_demographies, sc_demographies, dwg_demographies = model_builder.build_models()
+        parameterized_models, labels = model_builder.draw_parameters(divergence_demographies, sc_demographies, dwg_demographies)
+
+        if args.plot:
+
+            # validate the models
+            model_builder.validate_models(parameterized_models, labels, outplot=os.path.join(args.output, 'models.pdf'))
+
+        if args.simulate:
+            # get dict for downsampling
+            try:
+                downsampling_dict = ast.literal_eval(args.downsampling)
+            except ValueError:
+                print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
+                return
+
+            # simulate data
+            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
+            arrays, labels = data_simulator.simulate_ancestry()
+
+    else:
+
+        # Build models and draw parameters
+        model_reader = process_user_models.ModelReader(config_values=config_values)
+        parameterized_models, labels = model_reader.read_models()
+
         # validate the models
-        model_builder.validate_models(parameterized_models, labels, outplot=os.path.join(args.output, 'models.pdf'))
+        if args.plot:
+                model_reader.validate_models(parameterized_models, labels, outplot=os.path.join(args.output, 'models.pdf'))
+        
+        if args.simulate:
+            # get dict for downsampling
+            try:
+                downsampling_dict = ast.literal_eval(args.downsampling)
+            except ValueError:
+                print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
+                return
 
+            # simulate data
+            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
+            arrays = data_simulator.simulate_ancestry_user()
+
+    
     if args.simulate:
-        # get dict for downsampling
-        try:
-            downsampling_dict = ast.literal_eval(args.downsampling)
-        except ValueError:
-            print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
-            return
-    
-        # simulate data
-        data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
-        arrays, labels = data_simulator.simulate_ancestry()
-    
+
         # build SFS for simulate data
         sfs_2d = data_simulator.mutations_to_2d_sfs(arrays)
         msfs = data_simulator.mutations_to_sfs(arrays)

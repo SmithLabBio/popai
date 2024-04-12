@@ -7,6 +7,7 @@ divergence with gene flow = False # True if you wish to consider divergence with
 max migration events = 1 # Maximum number of migration events to consider in one model.
 migration rate = U(1e-5, 1e-4) # Prior from which to draw migration rates. Only uniform priors are supported at present.
 constant Ne = True # population sizes equal across all populations
+user models = None
 
 [Other]
 seed = 1234 # Random seed.

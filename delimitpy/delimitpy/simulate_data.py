@@ -134,6 +134,56 @@ class DataSimulator:
 
         return all_arrays, new_labels
 
+    def simulate_ancestry_user(self):
+
+        """Perform ancestry simulations with msprime"""
+
+        start_time = time.time()  # Record the start time
+
+        # dictionary for storing arrays and list for storing sizes.
+        all_arrays = {}
+        sizes = []
+
+
+        for ix, demography in enumerate(self.models):
+                        
+            matrix, sizes = self._simulate_demography_user(demography)
+
+            if self.labels[ix] in all_arrays:
+                all_arrays[self.labels[ix]].append(matrix)
+            else:
+                all_arrays[self.labels[ix]] = [matrix]
+                
+        
+        end_time = time.time()  # Record the end time
+        execution_time = end_time - start_time  # Calculate the execution time
+
+        self.logger.info("Simulation execution time: %s seconds.", execution_time)
+
+        # shorten arrays that are too short, and pad arrays that are too long.
+        median_size = int(np.ceil(np.median(sizes)))
+
+        self.logger.info("Median simulated data has %s biallelic SNPs."\
+                         " If this is very different than the number of SNPs in your empirical data, you may want to change some priors.", 
+                         median_size)
+
+        for model, values in all_arrays.items():
+            for i, matrix in enumerate(values):
+                if len(matrix) > 0:
+                    if matrix.shape[1] > self.max_sites:
+                        all_arrays[model][i] = matrix[:, :self.max_sites]
+                    elif matrix.shape[1] < self.max_sites:
+                        num_missing_columns = self.max_sites - matrix.shape[1]
+                        missing_columns = np.full((matrix.shape[0], num_missing_columns), -1)
+                        modified_matrix = np.concatenate((matrix, missing_columns), axis=1)
+                        all_arrays[model][i] = modified_matrix
+                else:
+                    num_missing_columns = self.max_sites - 0
+                    modified_matrix = np.full((sum(self.config["sampling dict"].values()),
+                                               num_missing_columns), -1)
+                    all_arrays[model][i] = modified_matrix
+
+        return all_arrays
 
     def mutations_to_sfs(self, numpy_array_dict, nbins=None):
 
@@ -360,3 +410,90 @@ class DataSimulator:
 
         #return f"Model_{ix}", model_arrays
         return model_arrays, dataset_array.shape[1]
+
+    def _simulate_demography_user(self, demography):
+
+        # draw mutation rates from priors
+        mutation_rates = self.rng.uniform(low=self.config["mutation rate"][0],
+                                              high=self.config["mutation rate"][1],
+                                              size=1)[0]
+        mutation_rates = np.round(mutation_rates, decimals=20)
+
+        # get seeds for simulating data for each fragment
+        fragment_seeds = self.rng.integers(2**32, size=len(self.config['lengths']))
+
+        # get sampling dict
+        this_sampling_dict = {}
+        initially_active = []
+        sampled_inactive = []
+        all_relevant_descendents = []
+        all_descendents = []
+        
+        for population in demography.populations:
+            if population.initially_active is None:
+                initially_active.append(population.name)
+            elif population.initially_active == False and population.default_sampling_time == 0.0:
+                sampled_inactive.append(population.name)
+        
+        for population in sampled_inactive:
+            to_check = [population]
+            relevant_descendants = []
+            while len(to_check) > 0:
+                for item in to_check:
+                    for event in demography.events:
+                        if hasattr(event, 'ancestral'):
+                            if event.ancestral == item:
+                                to_check.extend(event.derived)
+                                to_check.remove(item)
+                                relevant_descendants.extend([x for x in to_check if x in initially_active])
+                                all_descendents.extend([x for x in to_check])
+                                to_check = [x for x in to_check if x not in initially_active]
+                            
+            this_sampling_dict[population] = 0
+            for item in relevant_descendants:         
+                this_sampling_dict[population] += self.config["sampling dict"][item]
+            all_relevant_descendents.extend(relevant_descendants)
+        
+        revised_sampling_dictionary = {}
+
+        initially_active = [x for x in initially_active if not x in all_relevant_descendents]
+
+        for population in initially_active:
+            this_sampling_dict[population] = self.config["sampling dict"][population]
+
+        for key,value in this_sampling_dict.items():
+            if key not in all_descendents:
+                if value % 2 != 0:
+                    raise Exception("Remember we simulate diploid individuals. If you have an odd number of samples, something has gone wrong.")
+                revised_sampling_dictionary[key] = value // 2
+
+        # iterate over fragments and perform simulations
+        parameter_arrays = []
+        for k,length in enumerate(self.config['lengths']):
+
+            # simulate ancestries
+            ts = msprime.sim_ancestry(revised_sampling_dictionary, demography=demography,
+                random_seed = fragment_seeds[k], sequence_length=length,
+                recombination_rate=0)
+
+            # add mutations
+            mts = msprime.sim_mutations(ts, rate=mutation_rates,
+                                            model=self.config["substitution model"],
+                                            random_seed=fragment_seeds[k])
+
+            # get array
+            array = mts.genotype_matrix().transpose()
+        
+            # remove non-biallelic columns
+            if array.shape[1] > 0:
+                frequencies = np.array([[np.sum(array[:, j] == i) \
+                    for i in range(0, np.max(array))] for j in range(array.shape[1])])
+                nonbiallelic_columns = np.where(np.sum(frequencies != 0, axis=1) > 2)[0]
+                array = np.delete(array, nonbiallelic_columns, axis=1)
+
+            parameter_arrays.append(array)
+
+        # combine the parameter_ts arrays across fragments
+        dataset_array = np.column_stack(parameter_arrays)
+
+        return dataset_array, dataset_array.shape[1]

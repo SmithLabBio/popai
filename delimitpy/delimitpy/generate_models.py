@@ -448,7 +448,7 @@ class ModelBuilder:
                 for event in model.events:
                     if hasattr(event, 'ancestral'):
                         event.time = divergence_time_draws[event.ancestral][rep]
-
+                model.sort_events()
                 this_model_with_parameters.append(model)
 
             models_with_parameters.append(this_model_with_parameters)
@@ -487,6 +487,7 @@ class ModelBuilder:
                     if self.config["symmetric"]:
                         model.migration_matrix[int(str(key.split('_')[1])),int(str(key.split('_')\
                             [0]))] = migration_rate_draws[key][rep]
+                model.sort_events()
                 this_model_with_parameters.append(model)
 
             models_with_parameters.append(this_model_with_parameters)   #
