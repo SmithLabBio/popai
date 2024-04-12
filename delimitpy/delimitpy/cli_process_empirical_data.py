@@ -43,15 +43,15 @@ def main():
         empirical_2d_sfs = data_processor.numpy_to_2d_sfs(empirical_array, downsampling=downsampling_dict, replicates = args.reps)
         empirical_msfs, average_snps = data_processor.numpy_to_msfs(empirical_array, downsampling=downsampling_dict, replicates = args.reps, nbins=args.nbins)
 
-        # make plots of empirical sfs
-        data_processor.plot_2dsfs(empirical_2d_sfs, output_directory=os.path.join(args.output))
-
         # check if output exists
         if os.path.exists(args.output) and not args.force:
             raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory.")
 
         # create output directory
         os.system('mkdir -p %s' % args.output)
+
+        # make plots of empirical sfs
+        data_processor.plot_2dsfs(empirical_2d_sfs, output_directory=os.path.join(args.output))
 
         # save to output directory
         for replicate in range(args.reps):
