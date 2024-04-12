@@ -32,23 +32,32 @@ class ModelConfigParser:
         config.read(self.configfile)
         config_dict = {}
 
+        try: # determine whether user supplied models
+            config_dict['user models'] = config["Model"]["user models"]
+        except:
+            config_dict['user models'] = None
+        if config_dict['user models'] == 'None':
+            config_dict['user models'] = None
+
+
         try: # read all the keys
-            config_dict['species tree'] = dendropy.TreeList.get(
-                path=config['Model']['species tree file'], schema="nexus")
+            if config_dict['user models'] is None:
+                config_dict['species tree'] = dendropy.TreeList.get(
+                    path=config['Model']['species tree file'], schema="nexus")
+                migration_paths = config['Model']['migration matrix'].split(";")
+                config_dict['migration df']=[pd.read_csv(x\
+                    , index_col=0) for x in migration_paths]
+                config_dict['max migration events']=int(config['Model']['max migration events'])
+                config_dict["migration rate"] = [float(val.strip("U(").strip(")")) \
+                    for val in config['Model']["migration rate"].split(",")]
+                config_dict["symmetric"] = config.getboolean("Model", "symmetric")
+                config_dict["secondary contact"] = config.getboolean("Model", "secondary contact")
+                config_dict["divergence with gene flow"] = config.getboolean(
+                    "Model", "divergence with gene flow")
+                config_dict["constant Ne"] = config.getboolean(
+                    "Model", "constant Ne")
             config_dict['replicates']=int(config['Other']['replicates'])
-            migration_paths = config['Model']['migration matrix'].split(";")
-            config_dict['migration df']=[pd.read_csv(x\
-                , index_col=0) for x in migration_paths]
-            config_dict['max migration events']=int(config['Model']['max migration events'])
-            config_dict["migration rate"] = [float(val.strip("U(").strip(")")) \
-                for val in config['Model']["migration rate"].split(",")]
             config_dict["seed"] = int(config["Other"]["seed"])
-            config_dict["symmetric"] = config.getboolean("Model", "symmetric")
-            config_dict["secondary contact"] = config.getboolean("Model", "secondary contact")
-            config_dict["divergence with gene flow"] = config.getboolean(
-                "Model", "divergence with gene flow")
-            config_dict["constant Ne"] = config.getboolean(
-                "Model", "constant Ne")
             config_dict["mutation rate"] = [float(val.strip("U(").strip(")")) for \
                 val in config['Simulations']["mutation rate"].split(",")]
             config_dict["substitution model"] = config["Simulations"]["substitution model"]
@@ -66,12 +75,6 @@ class ModelConfigParser:
         except Exception as e:
             raise RuntimeError(f"Unexpected error occurred: {e}") from e
 
-        try: # determine whether user supplied models
-            config_dict['user models'] = config["Model"]["user models"]
-        except:
-            config_dict['user models'] = None
-        if config_dict['user models'] == 'None':
-            config_dict['user models'] = None
 
         try: # get special information
 
