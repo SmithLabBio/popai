@@ -14,6 +14,7 @@ def main():
     parser.add_argument('--rf', action='store_true', help='Train RF classifier.')
     parser.add_argument('--fcnn', action='store_true', help='Train FCNN classifier.')
     parser.add_argument('--cnn', action='store_true', help='Train CNN classifier.')
+    parser.add_argument('--ntrees', type='int', help='Number of trees to use in the RF classifier (default=500).', default=500)
 
     args = parser.parse_args()
 
@@ -42,7 +43,7 @@ def main():
     if args.rf:
         # train RF and save model and confusion matrix
         random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, msfs, labels, user=user)
-        random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs()
+        random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=ntrees)
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)
         random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))

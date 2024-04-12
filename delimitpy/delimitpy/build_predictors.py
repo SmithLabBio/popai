@@ -27,7 +27,7 @@ class RandomForestsSFS:
                 raise Exception(f"Model names must end in '_x', where x is some integer.")
         self.rng = np.random.default_rng(self.config['seed'])
 
-    def build_rf_sfs(self):
+    def build_rf_sfs(self, ntrees=500):
 
         """Build a random forest classifier that takes the
         multidimensional SFS as input."""
@@ -38,7 +38,7 @@ class RandomForestsSFS:
         x_train, x_test, y_train, y_test = train_test_split(self.sfs,
                 self.labels, test_size=0.2, random_state=train_test_seed)
 
-        sfs_rf = RandomForestClassifier(n_estimators=100, oob_score=True)
+        sfs_rf = RandomForestClassifier(n_estimators=ntrees, oob_score=True)
 
         sfs_rf.fit(x_train, y_train)
         print("Out-of-Bag (OOB) Error:", 1.0 - sfs_rf.oob_score_)

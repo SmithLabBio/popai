@@ -64,9 +64,12 @@ In the Populations section, the user should list their populations in the follow
     name=[min,max]
 
 Notes:
-* Name is the name of the populations. 
+* Name is the name of the populations.
+
 * Min and Max are the minimum and maximum bounds on a uniform prior from which population sizes will be drawn.
+
 * You must also include historical populations.
+
 
 Example::
 
