@@ -71,8 +71,8 @@ class CnnSFS:
     def __init__(self, config, sfs_2d, labels, user=False):
         self.config = config
         self.sfs_2d = [item for sublist in sfs_2d for item in sublist]
-        self.nclasses = len(set(labels))
         if user == False:
+            self.nclasses = len(labels)
             self.labels = [item for sublist in labels for item in sublist]
         else:
             try:
@@ -80,7 +80,9 @@ class CnnSFS:
                 min_label = min(self.labels)
                 self.labels = [x-min_label for x in self.labels]
             except:
-                raise Exception(f"Model names must end in '_x', where x is some integer.")
+                raise Exception(f"Model names must end in '_x', where x is some integer.")\
+            self.nclasses = len(set(labels))
+
         try:
             self.labels = keras.utils.to_categorical(self.labels)
         except:
@@ -183,9 +185,9 @@ class NeuralNetSFS:
         self.config = config
         self.sfs = [item for sublist in sfs for item in sublist]
         self.sfs = np.array(self.sfs)
-        self.nclasses = len(set(labels))
         if user == False:
             self.labels = [item for sublist in labels for item in sublist]
+            self.nclasses = len(labels)
         else:
             try:
                 self.labels = [int(x.split('_')[-1]) for x in labels]
@@ -193,6 +195,7 @@ class NeuralNetSFS:
                 self.labels = [x-min_label for x in self.labels]
             except:
                 raise Exception(f"Model names must end in '_x', where x is some integer.")
+            self.nclasses = len(set(labels))
         self.rng = np.random.default_rng(self.config['seed'])
         try:
             self.labels = keras.utils.to_categorical(self.labels)

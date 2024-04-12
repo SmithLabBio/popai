@@ -35,3 +35,4 @@ Using this information, delimitpy will build a default model set.
 
 Importantly, whether using the CLI or running functions from delimitpy in python directly, users can check these models visually and ensure that they look as desired. When using the CLI, the user can run the simulate_data command with the flags --plot and without the flag --simulate to only plot the models. When running in python, the user can use the validate_models function of the ModelBuilder class.
 
+**Alternatively, delmitpy can accept user-generated models `configuration file <https://delimitpy.readthedocs.io/en/latest/usage/usermodels.html>`_.**
