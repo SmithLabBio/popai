@@ -4,3 +4,4 @@ delimitpy/build/
 delimitpy/delimitpy.egg-info/
 private_cli_test
 *.pyc
+delimitpy/delimitpy/__pycache__/
