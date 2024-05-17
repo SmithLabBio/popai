@@ -74,12 +74,24 @@ class DataProcessor:
             for i in range(0, 4)] for j in range(filtered_alignments.shape[1])])
         nonbiallelic_columns = np.where(np.sum(frequencies_2 != 0, axis=1) > 2)[0]
         filtered_alignments = np.delete(filtered_alignments, nonbiallelic_columns, axis=1)
+
+        # concert to minor allele encoding
+        encoded_array = np.empty_like(filtered_alignments)
+        for i in range(filtered_alignments.shape[1]):
+            unique_elements, counts = np.unique(filtered_alignments[filtered_alignments[:, i] != -1, i], return_counts=True)
+            sorted_indices = np.argsort(counts)
+            encoding_dict = {value: index for index, value in enumerate(sorted_indices)}
+            for j, element in enumerate(unique_elements):
+                encoded_array[filtered_alignments[:, i] == element, i] = encoding_dict[j]
+            encoded_array[filtered_alignments[:, i] == -1, i] = -1
+
+
         
         self.logger.info("Empirical data has %s biallelic SNPs."\
                          " If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", 
-                         filtered_alignments.shape[1])
+                         encoded_array.shape[1])
 
-        return filtered_alignments
+        return encoded_array
 
     def vcf_to_numpy(self):
 

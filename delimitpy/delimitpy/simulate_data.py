@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 logging.getLogger('msprime').setLevel("WARNING")
 import sys
+import pyslim
 
 class DataSimulator:
 
@@ -293,6 +294,55 @@ class DataSimulator:
                 plt.close()
             count+=1
 
+    def organize_matrix(self, array, simulating_dict):
+
+        taxon_names = [str(x).strip("'") for x in self.config['species tree'][0].taxon_namespace]
+        new_simulating_dict = {}
+        for key in simulating_dict:
+            if key not in taxon_names:
+                # find descendents
+                for node in self.config['species tree'][0].preorder_node_iter():
+                    if node.label == key:
+                        descendants = [str(x.taxon).strip("'") for x in node.leaf_nodes()]
+                        for descendant in descendants:
+                            new_simulating_dict[descendant] = simulating_dict[key] // len(descendants)
+            else:
+                new_simulating_dict[key] = simulating_dict[key]
+        if list(new_simulating_dict.keys()) != list(self.config['sampling dict'].keys()):
+            raise Exception("There is an issue with taxon order. Please contact the developers. This should not occur.")
+        
+        start = 0
+        array_list = []
+        for key, value in self.config['sampling dict'].items():
+            pop_matrix = array[start:start+value]
+            start+=value
+            reference_row = pop_matrix[np.random.randint(pop_matrix.shape[0])]
+            distances = np.linalg.norm(pop_matrix - reference_row, axis=1)
+            sorted_indices = np.argsort(distances)
+            sorted_array = pop_matrix[sorted_indices]
+            array_list.append(sorted_array)
+        array = np.vstack(array_list)
+        return(array)
+
+    def organize_matrix_user(self, array, simulating_dict):
+
+        if list(simulating_dict.keys()) != list(self.config['sampling dict'].keys()):
+            raise Exception("There is an issue with taxon order. Please contact the developers. This should not occur.")
+        
+        start = 0
+        array_list = []
+        for key, value in self.config['sampling dict'].items():
+            pop_matrix = array[start:start+value]
+            start+=value
+            reference_row = pop_matrix[np.random.randint(pop_matrix.shape[0])]
+            distances = np.linalg.norm(pop_matrix - reference_row, axis=1)
+            sorted_indices = np.argsort(distances)
+            sorted_array = pop_matrix[sorted_indices]
+            array_list.append(sorted_array)
+        array = np.vstack(array_list)
+        return(array)
+
+
     def mutations_to_2d_sfs(self, numpy_array_dict):
         """Translate simulated mutations into 2d site frequency spectra"""
 
@@ -353,7 +403,6 @@ class DataSimulator:
 
         return all_sfs
 
-    #def _simulate_demography(self, ix, demography, lock, sizes):
     def _simulate_demography(self, ix, demography, tree):
 
         # get dictionary for simulations
@@ -395,6 +444,9 @@ class DataSimulator:
                         for i in range(0, np.max(array))] for j in range(array.shape[1])])
                     nonbiallelic_columns = np.where(np.sum(frequencies != 0, axis=1) > 2)[0]
                     array = np.delete(array, nonbiallelic_columns, axis=1)
+
+                # organize matrix
+                array = self.organize_matrix(array, simulating_dict)
 
                 parameter_arrays.append(array)
 
@@ -481,8 +533,18 @@ class DataSimulator:
                                             model=self.config["substitution model"],
                                             random_seed=fragment_seeds[k])
 
-            # get array
+            # get nucleoties
             array = mts.genotype_matrix().transpose()
+            # concert to minor allele encoding
+            encoded_array = np.empty_like(array)
+            for i in range(array.shape[1]):
+                unique_elements, counts = np.unique(array[array[:, i] != -1, i], return_counts=True)
+                sorted_indices = np.argsort(counts)
+                encoding_dict = {value: index for index, value in enumerate(sorted_indices)}
+                for j, element in enumerate(unique_elements):
+                    encoded_array[array[:, i] == element, i] = encoding_dict[j]
+                encoded_array[array[:, i] == -1, i] = -1
+            array = encoded_array
         
             # remove non-biallelic columns
             if array.shape[1] > 0:
@@ -490,6 +552,9 @@ class DataSimulator:
                     for i in range(0, np.max(array))] for j in range(array.shape[1])])
                 nonbiallelic_columns = np.where(np.sum(frequencies != 0, axis=1) > 2)[0]
                 array = np.delete(array, nonbiallelic_columns, axis=1)
+
+                # organize matrix
+                array = self.organize_matrix_user(array, this_sampling_dict)
 
             parameter_arrays.append(array)
 
