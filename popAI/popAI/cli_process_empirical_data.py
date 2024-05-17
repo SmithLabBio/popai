@@ -3,7 +3,7 @@ import ast
 import os
 import pickle
 import numpy as np
-from delimitpy import parse_input, process_empirical
+from popai import parse_input, process_empirical
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for processing empirical data.')

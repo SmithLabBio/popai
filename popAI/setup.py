@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='popAI',
+    name='popai',
     version='1.0',
     packages=find_packages(),
     install_requires=[
@@ -23,10 +23,10 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'process_empirical_data=popAI.cli_process_empirical_data:main',
-            'simulate_data=popAI.cli_simulate_data:main',
-            'train_models=popAI.cli_train_models:main',
-            'apply_models=popAI.cli_apply_models:main'
+            'process_empirical_data=popai.cli_process_empirical_data:main',
+            'simulate_data=popai.cli_simulate_data:main',
+            'train_models=popai.cli_train_models:main',
+            'apply_models=popai.cli_apply_models:main'
         ],
     }
 )

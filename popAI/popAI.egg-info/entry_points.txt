@@ -1,5 +1,0 @@
-[console_scripts]
-apply_models = popAI.cli_apply_models:main
-process_empirical_data = popAI.cli_process_empirical_data:main
-simulate_data = popAI.cli_simulate_data:main
-train_models = popAI.cli_train_models:main

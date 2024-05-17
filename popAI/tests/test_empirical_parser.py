@@ -1,8 +1,8 @@
 import unittest
 import tempfile
 import os
-from delimitpy.parse_input import ModelConfigParser
-from delimitpy.process_empirical import DataProcessor
+from popai.parse_input import ModelConfigParser
+from popai.process_empirical import DataProcessor
 
 class TestEmpiricalParser(unittest.TestCase):
 

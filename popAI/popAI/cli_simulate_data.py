@@ -3,13 +3,13 @@ import ast
 import os
 import pickle
 import numpy as np
-from delimitpy import parse_input, generate_models, simulate_data, process_user_models
+from popai import parse_input, generate_models, simulate_data, process_user_models
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
     parser.add_argument('--config', help='Path to config file.')
-    parser.add_argument('--plot', action='store_true', help='Plot the delimitpy models.')
-    parser.add_argument('--simulate', action='store_true', help='Simulate data under the delimitpy models.')
+    parser.add_argument('--plot', action='store_true', help='Plot the popai models.')
+    parser.add_argument('--simulate', action='store_true', help='Simulate data under the popai models.')
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
     #parser.add_argument('-r', '--reps', type=int, help="Number of replicate downsampled SFS to build.")
     parser.add_argument('--nbins', type=int, default=None, help='Number of bins for creating a binned SFSsimu (default: None)')

@@ -1,7 +1,7 @@
 import unittest
 import tempfile
 import os
-from delimitpy.parse_input import ModelConfigParser
+from popai.parse_input import ModelConfigParser
 
 class TestModelConfigParser(unittest.TestCase):
 

@@ -1,9 +1,9 @@
-.. delimitpy documentation master file, created by
+.. popai documentation master file, created by
    sphinx-quickstart on Fri Jan 26 13:41:27 2024.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to delimitpy's documentation!
+Welcome to popai's documentation!
 =====================================
 
 .. toctree::
@@ -15,7 +15,7 @@ Welcome to delimitpy's documentation!
    usage/buildingmodels.rst
    usage/usermodels.rst
    usage/cli_tutorial.rst
-   notebooks/delimitpy_walkthrough.ipynb
+   notebooks/popai_walkthrough.ipynb
 
 
 Indices and tables

@@ -1,8 +1,8 @@
 import unittest
 import tempfile
 import os
-from delimitpy.parse_input import ModelConfigParser
-from delimitpy.generate_models import ModelBuilder
+from popai.parse_input import ModelConfigParser
+from popai.generate_models import ModelBuilder
 
 class TestModelConfigParser(unittest.TestCase):
 

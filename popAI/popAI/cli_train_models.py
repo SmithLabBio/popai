@@ -3,7 +3,7 @@ import ast
 import os
 import pickle
 import numpy as np
-from delimitpy import parse_input, build_predictors
+from popai import parse_input, build_predictors
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')

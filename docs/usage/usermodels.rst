@@ -7,12 +7,12 @@ User-specified demographic models
 Configuration File
 ========================================
 
-Instead of using the default model set, users can generate their own models for use in delimitpy. To do so, the user must add an arugment to the models section of the config file. This argument should be the path to a directory with model files.::
+Instead of using the default model set, users can generate their own models for use in popai. To do so, the user must add an arugment to the models section of the config file. This argument should be the path to a directory with model files.::
 
 
     [Model]
-    species tree file = ./delimitpy/tutorial_data/tree.nex # Path to a species tree in nexus format.
-    migration matrix = ./delimitpy/tutorial_data/migration.txt # Path to a migration matrix
+    species tree file = ./popai/tutorial_data/tree.nex # Path to a species tree in nexus format.
+    migration matrix = ./popai/tutorial_data/migration.txt # Path to a migration matrix
     symmetric = True # True if migration rates should always be symmetric, and only symmetric migration events should be included.
     secondary contact = True # True if you wish to consider secondary contact models.
     divergence with gene flow = False # True if you wish to consider divergence with gene flow models.
@@ -30,8 +30,8 @@ Instead of using the default model set, users can generate their own models for 
     substitution model = JC69 # Substitution model to use in simulations.
 
     [Data]
-    alignments = ./delimitpy/tutorial_data/alignments # Path to alignments
-    popfile = ./delimitpy/tutorial_data/populations.txt # Path to popfile
+    alignments = ./popai/tutorial_data/alignments # Path to alignments
+    popfile = ./popai/tutorial_data/populations.txt # Path to popfile
 
 ========================================
 Models Folder
@@ -111,7 +111,7 @@ The mintime and maxtime are the prior for a uniform distribution on the timing o
 
 **Entries must be separated by tabs.**
 
-delimitpy currently accepts five event types:
+popai currently accepts five event types:
 
 1. split
 
@@ -179,21 +179,21 @@ For example, if my data include three populations: A, B, and C, but I want to mo
 ========================================
 Plotting user-specified models
 ========================================
-delimitpy will plot user-specified models. **PLEASE** look at the plots, and ensure that the models are interpreted as you intended. It is challening to think of all the varieties of things people could specify, so testing this functionality is a huge challenge. If your models don't look like you think they should, check that you formatted entries correctly, and contact me so that I can provide clarification and make any necessary changes to ensure this functionality is as useful as possible!
+popai will plot user-specified models. **PLEASE** look at the plots, and ensure that the models are interpreted as you intended. It is challening to think of all the varieties of things people could specify, so testing this functionality is a huge challenge. If your models don't look like you think they should, check that you formatted entries correctly, and contact me so that I can provide clarification and make any necessary changes to ensure this functionality is as useful as possible!
 
 One caveat: we used demes for plotting, and demes will not allow events to happen at time zero, or multiple events to happen at the same time. For models with divergences or other events at time zero (e.g., models with fewer populations), we will add a very small time (e.g., 1 generation) for plotting only. Be sure to look at the time scales when plotting your models before assuming they are not correctly interpreted.
 
 ========================================
-Running delimitpy with user-specified models
+Running popai with user-specified models
 ========================================
-To run delimitpy with user specified models, follow the command line instructions. The only change will be to your input files (the configuration file, and the directory with your models.)
+To run popai with user specified models, follow the command line instructions. The only change will be to your input files (the configuration file, and the directory with your models.)
 
-Instructions for running delimitpy with user-specified models by importing modules in python are coming soon. If they still aren't here, and you need them, contact me!
+Instructions for running popai with user-specified models by importing modules in python are coming soon. If they still aren't here, and you need them, contact me!
 
 ========================================
 Examples
 ========================================
-In the `example_models <https://github.com/SmithLabBio/delimitpy/blob/main/example_models/>`_ directory, I have provided three example model files and visualizations for the three models.
+In the `example_models <https://github.com/SmithLabBio/popai/blob/main/example_models/>`_ directory, I have provided three example model files and visualizations for the three models.
 
 * Model 1: Two populations in the present (A+B and C). We will have samples from A, B, and C in the populations file and in our empirical data, but we want to test whether these are a single population. There is no divergence between A and B. The ancestor of A and B diverged from C between 50000 and 100000 generations ago.
 * Model 2: Three populations in the present (A, B, and C). A and B diverge 10000 to 20000 generations ago. There is present-day gene flow beteen A and B. The ancestor of A and B diverged from C between 50000 and 100000 generations ago.

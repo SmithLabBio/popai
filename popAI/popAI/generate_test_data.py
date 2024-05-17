@@ -84,7 +84,7 @@ class TestDataGenerator:
                 
                 if vcf_header == None:
                     vcf_header = vcf_lines[0:3]
-                    vcf_header[1] = "##source=delimitpy"
+                    vcf_header[1] = "##source=popai"
                     vcf_header_2 = [vcf_lines[3]]
                     vcf_header_3 = [vcf_lines[4]]
                     vcf_header_3.append('##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">')

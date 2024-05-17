@@ -1,15 +1,15 @@
 ##############################
-Running delimitpy through the command line
+Running popai through the command line
 ##############################
 
 ==========================================
-Step 1: Install delimitpy
+Step 1: Install popai
 ==========================================
 
-Use pip to install delimitpy::
+Use pip to install popai::
 
-    git clone https://github.com/SmithLabBio/delimitpy.git
-    cd delimitpy/delimitpy
+    git clone https://github.com/SmithLabBio/popai.git
+    cd popai/popai
     pip install .
     cd ../../
 
@@ -17,9 +17,9 @@ Use pip to install delimitpy::
 Step 2: Ensure you have the example input data 
 ==========================================
 
-Example input data is available `here <https://github.com/SmithLabBio/delimitpy/tree/main/tutorial_data>`_.
+Example input data is available `here <https://github.com/SmithLabBio/popai/tree/main/tutorial_data>`_.
 
-You should have these in the directory you cloned when installing delimitpy, in the subfolder tutorial_data.
+You should have these in the directory you cloned when installing popai, in the subfolder tutorial_data.
 
 ==========================================
 Step 3: Processing Empirical data
@@ -27,7 +27,7 @@ Step 3: Processing Empirical data
 
 The first step is to process the user's empirical data. This involves reading the data from fasta files, deciding which values to use for down-projection, and building the SFS.
 
-For more information on input formats, please see the `input instructions <https://delimitpy.readthedocs.io/en/latest/usage/parsinginput.html>`_.
+For more information on input formats, please see the `input instructions <https://popai.readthedocs.io/en/latest/usage/parsinginput.html>`_.
 
 The command line tool *process_empirical_data* can be used to process empirical data. It takes the following arguments::
 
@@ -59,7 +59,7 @@ Preview the SFS:
 
 .. code-block:: python
 
-    process_empirical_data --config delimitpy/tutorial_data/config.txt --preview
+    process_empirical_data --config popai/tutorial_data/config.txt --preview
 
 This will print to the screen information about how many SNPs are available at different downsampling thresholds. We want to maximize the number of individuals and SNPs we can use. In this tutorial, since the input data were simulated without missing data, we can use all individuals and still retain all the SNPs.
 
@@ -67,7 +67,7 @@ Now, we are ready to build our empirical SFS:
 
 .. code-block:: python
 
-    process_empirical_data --config delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --reps 1 --output empirical/
+    process_empirical_data --config popai/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --reps 1 --output empirical/
 
 We are only using a single replicate for this test. This makes sense because our 'empirical' data are actually simulated data, and we are not downsampling. Because of this, we do not expect much noise. For messier empirical data, use ~10 reps and ensure that results do not differ across replicates.
 
@@ -88,8 +88,8 @@ Next, we need to simulate data under the models of interest. We will do so using
     options:
       -h, --help            show this help message and exit
       --config CONFIG       Path to config file.
-      --plot                Plot the delimitpy models.
-      --simulate            Simulate data under the delimitpy models.
+      --plot                Plot the popai models.
+      --simulate            Simulate data under the popai models.
       --downsampling DOWNSAMPLING
                             Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).
       --nbins NBINS         Number of bins for creating a binned SFS (default: None)
@@ -105,7 +105,7 @@ It is essential to use the same downsampling dictionary here that you used to pr
 
 .. code-block:: python
 
-    simulate_data --config delimitpy/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1051 --plot --simulate
+    simulate_data --config popai/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1051 --plot --simulate
 
 In the output directory, you should see a pdf showing your models (models.pdf), a pickled object storing the simulated jSFS, and a numpy matrix storing the mSFS. 
 
@@ -113,7 +113,7 @@ In the output directory, you should see a pdf showing your models (models.pdf), 
 Step 5: Train networks
 ==========================================
 
-Now, we are ready to train the networks implemented in delimitpy. delimitpy includes three network architectures:
+Now, we are ready to train the networks implemented in popai. popai includes three network architectures:
     1. A Random Forest classifier that takes as input the bins of the multidimensional SFS (mSFS).
     2. A Fully Connected Neural Network that takes as input the bins of the multidimensional SFS (mSFS).
     3. A Convolutional Neural Network that takes as input the jSFS between all pairs of populations.
@@ -139,7 +139,7 @@ The argument *--simulations* takes as input the output directory from the previo
 
 .. code-block:: python
 
-    train_models --config delimitpy/tutorial_data/config.txt --simulations simulated/ --output trained_models --rf --fcnn --cnn
+    train_models --config popai/tutorial_data/config.txt --simulations simulated/ --output trained_models --rf --fcnn --cnn
 
 This will output to the output directory the trained.model files for the FCNN and the CNN, and a pickled object storing the RF Classifier. It will also output confusion matrices showing the performance of each approach on the validation data, for which we hold out 20% of our simulated datasets. 
 
@@ -169,6 +169,6 @@ Provide the output paths from Step 5 and Step 3 for the --models and --empirical
 
 .. code-block:: python
 
-    apply_models --config delimitpy/tutorial_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --rf --fcnn --cnn
+    apply_models --config popai/tutorial_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --rf --fcnn --cnn
 
 This should save to the output directory tables showing the predicted probabilities for each model for each classifier.
