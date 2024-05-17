@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='delimitpy',
-    version='0.2',
+    name='popAI',
+    version='1.0',
     packages=find_packages(),
     install_requires=[
         'dendropy',
@@ -23,10 +23,10 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'process_empirical_data=delimitpy.cli_process_empirical_data:main',
-            'simulate_data=delimitpy.cli_simulate_data:main',
-            'train_models=delimitpy.cli_train_models:main',
-            'apply_models=delimitpy.cli_apply_models:main'
+            'process_empirical_data=popAI.cli_process_empirical_data:main',
+            'simulate_data=popAI.cli_simulate_data:main',
+            'train_models=popAI.cli_train_models:main',
+            'apply_models=popAI.cli_apply_models:main'
         ],
     }
 )
