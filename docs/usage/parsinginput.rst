@@ -49,9 +49,15 @@ Empirical Data
 Alignments
 ------------
 
-The user will provide a path to the alignments in the configuration file (see above). These alignments must be in fasta format, and there must be one alignment per locus. 
+The user will provide a path to the alignments in the configuration file (see above). These alignments must be in fasta format, and there must be one alignment per locus. The files must end with .fa or .fasta.
 
 An `example set of alignments <https://github.com/SmithLabBio/popai/blob/main/tutorial_data/alignments>`_ is provided on GitHub.
+
+------------
+VCF
+------------
+
+As an alternative to a set of gene alignments, the user can provide a vcf. In the config file, set alignments = None, and add vcf = /path/to/input.vcf below. 
 
 ------------
 Pop File

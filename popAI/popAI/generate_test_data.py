@@ -23,7 +23,7 @@ class TestDataGenerator:
 
         self.rng = np.random.default_rng(self.seed)
     
-    def simulate(self, missing=0.0, missing_ind=0.0, format="fasta"):
+    def simulate(self, missing=0.0, missing_ind=0.0, format=["fasta"]):
 
         # get seeds and lengths
         ancestry_seeds = self.rng.integers(2**32, size=self.fragments)
@@ -50,10 +50,9 @@ class TestDataGenerator:
             reference_sequence = ''.join(reference_sequence)
             
             ts = msprime.sim_ancestry(self.sampling_dictionary, demography=self.model, random_seed = ancestry_seeds[fragment[0]], sequence_length=fragment[1])
-            mts = msprime.sim_mutations(ts, rate=self.mutation_rate, model=self.substitution_model)
+            mts = msprime.sim_mutations(ts, rate=self.mutation_rate, model=self.substitution_model, random_seed = ancestry_seeds[fragment[0]])
 
-            format="fasta"
-            if format == "fasta":
+            if "fasta" in format:
                 fasta_string = mts.as_fasta(reference_sequence=reference_sequence)
                 fasta_dict = self._fasta_to_dict(fasta_string)
 
@@ -71,8 +70,7 @@ class TestDataGenerator:
 
                 self._write_fasta(fasta_dict, path = os.path.join(self.outdir, 'alignment_%s.fa' % str(fragment[0])))
             
-            format="vcf"
-            if format == "vcf":
+            if "vcf" in format:
 
                 samples = mts.samples()
                 for sample_id, h in zip(samples, mts.haplotypes(samples=samples)):
@@ -114,21 +112,20 @@ class TestDataGenerator:
                             new_line += "\t"
                         all_vcf_data.append(new_line)
                 
-        with open(os.path.join(self.outdir, 'alignment.vcf'), 'w') as f:
-            for line in vcf_header:
-                f.write(line)
-                f.write("\n")
-            for line in vcf_header_2:
-                f.write(line)
-                f.write("\n")
-            for line in vcf_header_3:
-                f.write(line)
-                f.write("\n")
-            for line in all_vcf_data:
-                f.write(line)
-                f.write("\n")
+                with open(os.path.join(self.outdir, 'alignment.vcf'), 'w') as f:
+                    for line in vcf_header:
+                        f.write(line)
+                        f.write("\n")
+                    for line in vcf_header_2:
+                        f.write(line)
+                        f.write("\n")
+                    for line in vcf_header_3:
+                        f.write(line)
+                        f.write("\n")
+                    for line in all_vcf_data:
+                        f.write(line)
+                        f.write("\n")
 
-            #mts.write_fasta(file_or_path=os.path.join(self.outdir, 'alignment_%s.fa' % str(fragment[0])), reference_sequence=reference_sequence)
 
     def _fasta_to_dict(self, fasta_string):
         sequences = {}
