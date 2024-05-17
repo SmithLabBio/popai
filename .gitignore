@@ -4,3 +4,6 @@ delimitpy/build/
 delimitpy/delimitpy.egg-info/
 private_cli_test
 /delimitpy/delimitpy/__pycache__
+/popai/popai/__pycache__
+/popai/popai.egg-info
+.DS_Store

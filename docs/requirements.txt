@@ -3,5 +3,3 @@ nbsphinx==0.9.3
 ipykernel==6.21.1
 numpy
 matplotlib
-tensorflow
-keras
