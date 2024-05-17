@@ -1,0 +1,5 @@
+[console_scripts]
+apply_models = delimitpy.cli_apply_models:main
+process_empirical_data = delimitpy.cli_process_empirical_data:main
+simulate_data = delimitpy.cli_simulate_data:main
+train_models = delimitpy.cli_train_models:main
