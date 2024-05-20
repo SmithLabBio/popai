@@ -1,9 +1,0 @@
-#NEXUS
-BEGIN TAXA;
-      Dimensions NTax=2;
-      TaxLabels pop1 pop2;
-END;
-
-BEGIN TREES;
-      Tree species=(pop1[&ne=10000-50000], pop2[&ne=10000-50000])popanc[&ne=10000-50000,div=10000-50000];
-END;

@@ -1,4 +1,0 @@
-,pop1,pop2,popanc
-pop1,T,T,T
-pop2,T,T,T
-popanc,T,T,T
