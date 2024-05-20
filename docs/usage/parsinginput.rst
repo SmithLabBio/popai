@@ -57,7 +57,7 @@ An `example set of alignments <https://github.com/SmithLabBio/popai/blob/main/tu
 VCF
 ------------
 
-As an alternative to a set of gene alignments, the user can provide a vcf. In the config file, set alignments = None, and add vcf = /path/to/input.vcf below. 
+As an alternative to a set of gene alignments, the user can provide a vcf. In the config file, set alignments = None, and add vcf = /path/to/input.vcf below.
 
 ------------
 Pop File
@@ -66,6 +66,8 @@ Pop File
 The user will provide a path to a file assigning individuals to populations in the config file (see above). This file must consist of two columns, with the heading 'individual' and 'population'.
 
 An `example population file <https://github.com/SmithLabBio/popai/blob/main/tutorial_data/populations.txt>`_ is provided on GitHub.
+
+If you use fasta files, then "individuals" should corrsespond to haplotypes. If you use a VCF, "individuals" should correspond to individuals.
 
 ========================================
 Model Building Information

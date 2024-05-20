@@ -5,15 +5,14 @@ from collections import Counter
 from itertools import product
 import copy
 import os
-import dendropy
+import io
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import io
 
 class DataProcessor:
 
-    """Simulate data under specified demographies."""
+    """Process empirical data."""
 
     def __init__(self, config):
         self.config = config
@@ -23,23 +22,20 @@ class DataProcessor:
         self.logger = logging.getLogger(__name__)
 
         # set seed
-        self.rng = np.random.default_rng(self.config['seed'])
+        self.rng = np.random.default_rng(self.config["seed"])
 
     def fasta_to_numpy(self):
 
         """Convert a list of fasta files into a numpy array."""
 
         # dictionary for encoding
-        integer_encoding_dict = {'A': 0, 'T': 1, 'C': 2, 'G': 3}
-
-        ## concat the fasta files
-        #fastas_all = dendropy.DnaCharacterMatrix.concatenate(self.config['fastas'])
+        integer_encoding_dict = {"A": 0, "T": 1, "C": 2, "G": 3}
 
         # list for storing results
         encoded_alignments = []
 
         # iterate over populations and create ordered numpy array
-        for population in self.config['sampling dict'].keys():
+        for population in self.config["sampling dict"].keys():
 
             # get all samples from that population/species
             samples_from_population = [key for key, value in \
@@ -49,15 +45,15 @@ class DataProcessor:
 
                 encoded_string = []
 
-                for alignment in self.config['fastas']:
-                    try:
+                for alignment in self.config["fastas"]:
+                    if item in alignment:
                         encoded_string_current = np.array(self._encode_string(
                             string=str(alignment[item]), encoding_dict=integer_encoding_dict))
-                    except:
+                    else:
                         encoded_string_current = [-1]*alignment.max_sequence_size
-                    
+
                     encoded_string.extend(encoded_string_current)
-                    
+
                 encoded_alignments.append(encoded_string)
 
         # convert to numpy array
@@ -69,31 +65,18 @@ class DataProcessor:
         invariant_columns = np.where(np.sum(frequencies == 0, axis=1) >= 3)[0]
         filtered_alignments = np.delete(encoded_alignments, invariant_columns, axis=1)
 
-        # remove non-biallelic columns
-        frequencies_2 = np.array([[np.sum(filtered_alignments[:, j] == i) \
-            for i in range(0, 4)] for j in range(filtered_alignments.shape[1])])
-        nonbiallelic_columns = np.where(np.sum(frequencies_2 != 0, axis=1) > 2)[0]
-        filtered_alignments = np.delete(filtered_alignments, nonbiallelic_columns, axis=1)
-
         # concert to minor allele encoding
-        encoded_array = np.empty_like(filtered_alignments)
-        for i in range(filtered_alignments.shape[1]):
-            unique_elements, counts = np.unique(filtered_alignments[filtered_alignments[:, i] != -1, i], return_counts=True)
-            sorted_indices = np.argsort(counts)
-            encoding_dict = {value: index for index, value in enumerate(sorted_indices)}
-            for j, element in enumerate(unique_elements):
-                encoded_array[filtered_alignments[:, i] == element, i] = encoding_dict[j]
-            encoded_array[filtered_alignments[:, i] == -1, i] = -1
+        encoded_array = self._minor_encoding(filtered_alignments)
 
 
-        
-        self.logger.info("Empirical data has %s biallelic SNPs."\
-                         " If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", 
+        self.logger.info("""Empirical data has %s biallelic SNPs. If this is very different than the number of SNPs in your simulated data, you may want to change some priors.""",
                          encoded_array.shape[1])
 
         return encoded_array
 
     def vcf_to_numpy(self):
+
+        """Convert VCF to numpy array."""
 
         # vcf to table
         start_index = [i for i, item in enumerate(self.config['vcf']) if 'CHROM' in item][0]
@@ -105,37 +88,36 @@ class DataProcessor:
         dp_index = [i for i, item in enumerate(format_lines) if 'DP' in item][0]
 
         encoded_alignments = []
-
         for population in self.config['sampling dict'].keys():
 
             # get all samples for that poulation/species
             samples_from_population = [key for key, value in \
                 self.config["original population dictionary"].items() if value == population]
-            
+
             for item in samples_from_population:
-                
+
                 encoded_string_1 = []
                 encoded_string_2 = []
 
                 info = vcf_table[item]
-                
+
                 for row in info:
                     value1 = row.split("|")[0]
                     value2 = row.split("|")[1].split(":")[0]
                     dp = row.split(":")[dp_index]
 
                     if (value1 != "." or value2 != ".") and dp != '0':
-                        
+
                         encoded_string_1.append(int(value1))
                         encoded_string_2.append(int(value2))
-                    
+
                     else:
                         encoded_string_1.append(-1)
                         encoded_string_2.append(-1)
-                
+
                 encoded_alignments.append(encoded_string_1)
                 encoded_alignments.append(encoded_string_2)
-        
+
         encoded_alignments = np.array(encoded_alignments)
 
         # remove invariable columns
@@ -144,18 +126,25 @@ class DataProcessor:
         invariant_columns = np.where(np.sum(frequencies == 0, axis=1) >= 3)[0]
         filtered_alignments = np.delete(encoded_alignments, invariant_columns, axis=1)
 
-        # remove non-biallelic columns
-        frequencies_2 = np.array([[np.sum(filtered_alignments[:, j] == i) \
-            for i in range(0, 4)] for j in range(filtered_alignments.shape[1])])
-        nonbiallelic_columns = np.where(np.sum(frequencies_2 != 0, axis=1) > 2)[0]
-        filtered_alignments = np.delete(filtered_alignments, nonbiallelic_columns, axis=1)
-        
-        self.logger.info("Empirical data has %s biallelic SNPs."\
-                         " If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", 
-                         filtered_alignments.shape[1])
+        encoded_array = self._minor_encoding(filtered_alignments)
 
-        return filtered_alignments
 
+        self.logger.info("Empirical data has %s biallelic SNPs. If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", encoded_array.shape[1])
+
+        return encoded_array
+
+    def _minor_encoding(self, arr):
+        result = arr.copy()
+        for col in range(arr.shape[1]):
+            column = arr[:, col]
+            column = column[column != -1]
+            freq = Counter(column)
+            sorted_values = [item[0] for item in freq.most_common()]
+            value_to_rank = {value: rank for rank, value in enumerate(sorted_values)}
+            for original_value, new_value in value_to_rank.items():
+                result[arr[:, col] == original_value, col] = new_value
+
+        return result
 
     def _encode_string(self, string, encoding_dict):
         encoded_string = []
@@ -209,9 +198,9 @@ class DataProcessor:
             sampling_indices[key] = [current, value + current]
             current = current+value
 
+        # remove columns that do not meet thresholds
         sampled = 0
         pop_failure_masks = []
-        # remove columns that do not meet thresholds
         for name, population in self.config["sampling dict"].items():
             this_array = encoded_alignment[sampled:sampled+population,:]
             mask = this_array==-1
@@ -259,10 +248,17 @@ class DataProcessor:
                     site_data_pop2 = [x for x in site_data_pop2 if not x == -1]
 
                     # sample random sites
-                    site_data_pop1_sampled = [list(self.rng.choice(site_data_pop1, \
-                        downsampling[key[0]])) for m in range(replicates)]
-                    site_data_pop2_sampled = [list(self.rng.choice(site_data_pop2, \
-                        downsampling[key[1]])) for m in range(replicates)]
+                    if len(site_data_pop1) > downsampling[key[0]]:
+                        site_data_pop1_sampled = [list(self.rng.choice(site_data_pop1, \
+                            downsampling[key[0]])) for m in range(replicates)]
+                    else:
+                        site_data_pop1_sampled = [site_data_pop1]*replicates
+
+                    if len(site_data_pop2) > downsampling[key[1]]:
+                        site_data_pop2_sampled = [list(self.rng.choice(site_data_pop2, \
+                            downsampling[key[1]])) for m in range(replicates)]
+                    else:
+                        site_data_pop2_sampled = [site_data_pop2]*replicates
 
 
                     for k in range(replicates):
@@ -272,10 +268,9 @@ class DataProcessor:
                         # check that this site has two variants in these populations
                         if len(set(all_site_data)) == 2:
                             # get minor allele
-                            minor_allele = min(set(all_site_data), key=all_site_data.count)
                             # find counts in each population
-                            pop1_count = Counter(site_data_pop1_sampled[k])[minor_allele]
-                            pop2_count = Counter(site_data_pop2_sampled[k])[minor_allele]
+                            pop1_count = Counter(site_data_pop1_sampled[k])[1]
+                            pop2_count = Counter(site_data_pop2_sampled[k])[1]
                             # add to the sfs
                             sfs_list[k][key][pop1_count, pop2_count] += 1
 
@@ -319,9 +314,9 @@ class DataProcessor:
             current = current+value
         reordered_downsampling = {key: downsampling[key] for key in self.config["sampling dict"]}
 
+        # remove columns that do not meet thresholds
         sampled = 0
         pop_failure_masks = []
-        # remove columns that do not meet thresholds
         for name, population in self.config["sampling dict"].items():
             this_array = encoded_alignment[sampled:sampled+population,:]
             mask = this_array==-1
@@ -344,7 +339,7 @@ class DataProcessor:
                     or (len(set(site_data)) == 3 and -1 in site_data): # if it is > 1, keep going
 
                     # get minor allele
-                    minor_allele = min(set(site_data), key=site_data.count)
+                    minor_allele = 1
 
                     # find poulation counts
                     counts_per_population = {}

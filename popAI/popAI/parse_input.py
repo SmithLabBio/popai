@@ -63,7 +63,8 @@ class ModelConfigParser:
             config_dict["substitution model"] = config["Simulations"]["substitution model"]
             config_dict["popfile"] = config["Data"]["popfile"]
             if config["Data"]["alignments"] == "None":
-                config_dict["vcf"] = open(config["Data"]["vcf"], 'r').readlines()
+                with open(config["Data"]["vcf"], 'r') as f:
+                    config_dict["vcf"] = f.readlines()
             else:
                 config_dict["fasta folder"] = config["Data"]["alignments"]
         except KeyError as e:
@@ -118,17 +119,17 @@ class ModelConfigParser:
                 config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
 
                 # get number variable sites
-                individuals = self._count_variable(config_dict['fastas'])
-            
+                individuals = self._get_individuals(config_dict['fastas'])
+
             if set(pop_df['individual']) != individuals:
-                raise Exception(f"Error: The lables in your alignment do not match the labels in your population dictionary.")
+                raise Exception("Error: The lables in your alignment do not match the labels in your population dictionary.")
 
 
         except dendropy.utility.error.DataParseError as e:
             raise ValueError(f"Error parsing tree: {e}") from e
         except Exception as e:
             raise RuntimeError(f"Unexpected error occurred: {e}") from e
-        
+
         if config_dict['user models'] is None:
             if config_dict['constant Ne']:
                 for tree in config_dict['species tree']:
@@ -139,34 +140,17 @@ class ModelConfigParser:
                         mins.append(min_ne)
                         maxs.append(max_ne)
                     if len(set(mins)) > 1 or len(set(maxs)) > 1:
-                        raise ValueError(f"Error due to using variable population size priors when setting constant Ne to True")
+                        raise ValueError("Error due to using variable population size priors when setting constant Ne to True")
 
         return config_dict
 
-    def _count_variable(self, fastas):
+    def _get_individuals(self, fastas):
 
         """Count the number of variable sites in the fasta files, 
         while accounting for the presence of IUPAC ambiguity codes, 
         which are all treated as missing."""
         individuals = []
-        #total = 0
-        #valid_bases = {'A', 'T', 'C', 'G'}
         for item in fastas:
-            #sites = item.max_sequence_size
             individuals.extend([str(x) for x in item.taxon_namespace])
-            #for site in range(sites):
-            #    site_list = []
-            #    for individual in range(len(item)):
-            #        try:
-            #            site_list.append(str(item[individual][site]))
-            #        except:
-            #            site_list.append('N')
-            #    unique_items = set(site_list) - valid_bases
-            #    unique_count = len(unique_items)
-            #    if len(set(site_list)) > 1 and unique_count == 0:
-            #        total += 1
-            #    elif len(set(site_list)) > 1 + unique_count:
-            #        total += 1
         individuals = [x.strip("'") for x in individuals]
-        #return total, set(individuals)
-        return(set(individuals))
+        return set(individuals)

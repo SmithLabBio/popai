@@ -24,6 +24,7 @@ secondary contact = True
 divergence with gene flow = False
 max migration events = 2
 migration rate = U(1e-5, 1e-4)
+constant ne = True
 
 [Other]
 output directory = ./examples/test
@@ -55,29 +56,26 @@ popfile = ./tests/populations.txt
         divergence, secondary_contact, divergence_with_geneflow = builder.build_models()
 
         # parameterize models
-        parameterized_models, labels = builder.draw_parameters(
+        parameterized_models, labels, sp_tree_index = builder.draw_parameters(
             divergence, secondary_contact, divergence_with_geneflow)
 
         # simulate data
-        downsampling={"A":8, "B": 6, "C":6}
+        downsampling={"A":8, "B": 4, "C":6}
         max_sites = 332
         data_simulator = DataSimulator(parameterized_models, labels, config=config_values, \
-                                       cores=1, downsampling=downsampling, max_sites = max_sites)
-        simulated_ancestries = data_simulator.simulate_ancestry()
-        simulated_mutations = data_simulator.simulate_mutations(simulated_ancestries)
-        arrays = data_simulator.mutations_to_numpy(simulated_mutations)
+                                       cores=1, downsampling=downsampling, max_sites = max_sites, sp_tree_index=sp_tree_index)
+        arrays = data_simulator.simulate_ancestry()
         sfs_2d = data_simulator.mutations_to_2d_sfs(arrays)
         msfs = data_simulator.mutations_to_sfs(arrays)
         binned_msfs = data_simulator.mutations_to_sfs(arrays, nbins=4)
 
         # check shapes
-        self.assertEqual(len(simulated_mutations), 10)
         self.assertEqual(len(arrays), 10)
-        self.assertEqual(arrays['Model_0'][0].shape, (20, max_sites))
-        self.assertEqual(sfs_2d[0][0][('A','B')].shape, (9,7))
+        self.assertEqual(arrays[0][0].shape, (18, max_sites))
+        self.assertEqual(sfs_2d[0][0][('A','B')].shape, (9,5))
         self.assertEqual(sfs_2d[0][0][('A','C')].shape, (9,7))
-        self.assertEqual(sfs_2d[0][0][('C','B')].shape, (7,7))
-        self.assertEqual(msfs[0][0].shape, (9*7*7,))
+        self.assertEqual(sfs_2d[0][0][('C','B')].shape, (7,5))
+        self.assertEqual(msfs[0][0].shape, (9*5*7,))
         self.assertEqual(binned_msfs[0][0].shape, (4*4*4,))
 
 

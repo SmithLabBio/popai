@@ -19,6 +19,6 @@ my_test_demography.add_population_split(derived=["A","B"], ancestral="AB", time=
 my_test_demography.add_population_split(derived=["AB","C"], ancestral="ABC", time=tdiv2)
 
 # simulate the data
-test_data_generator = generate_test_data.TestDataGenerator(sampling_dictionary=sample_sizes, fragments = 20, min_length = 1000, max_length = 2000, seed = 1234, 
+test_data_generator = generate_test_data.TestDataGenerator(sampling_dictionary=sample_sizes, fragments = 20, min_length = 3000, max_length = 4000, seed = 1234, 
                                                            substitution_model="jc69", model=my_test_demography, outdir="./alignments", mutation_rate=1e-8)
 test_data_generator.simulate(missing=0.0, missing_ind=0.0, format=["fasta","vcf"])

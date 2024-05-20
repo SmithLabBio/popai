@@ -108,9 +108,10 @@ class ModelBuilder:
         Raises:
             Error if priors are incorrectly defined.
         """
-        all_parameterized_divergence_demographies = []
-        all_parameterized_sc_demographies = []
-        all_parameterized_dwg_demographies = []
+        all_parameterized_demographies = []
+        labels = []
+        sp_tree_index = []
+        labelcount=0
 
         for ix, tree in enumerate(self.config['species tree']):
 
@@ -122,60 +123,54 @@ class ModelBuilder:
                 parameterized_divergence_demographies = self._draw_parameters_divergence(
                     divergence_times=divergence_times, population_sizes=population_sizes, \
                         divergence_demographies=divergence_demographies[ix])
-                all_parameterized_divergence_demographies.append(parameterized_divergence_demographies)
-            else:
-                all_parameterized_divergence_demographies.append([])
+                these_labels = [[iy]*len(x) for iy, x in enumerate(parameterized_divergence_demographies)]
+                these_labels = [item for sublist in these_labels for item in sublist]
+                labelcount+=these_labels[-1]
+                labels.extend(these_labels)
+                these_sp_tree = [[ix] * len(these_labels)]
+                sp_tree_index.extend(these_sp_tree)
+                all_parameterized_demographies.extend(parameterized_divergence_demographies)
 
             # draw parameters for secondary contact models
             if len(sc_demographies[ix]) > 0:
                 parameterized_sc_demographies = self._draw_parameters_sc(
                     divergence_times=divergence_times, population_sizes=population_sizes, \
                     sc_demographies=sc_demographies[ix])
-                all_parameterized_sc_demographies.append(parameterized_sc_demographies)
-            else:
-                all_parameterized_sc_demographies.append([])
+                these_labels = [[iy]*len(x) for iy, x in enumerate(parameterized_sc_demographies)]
+                these_labels = [item for sublist in these_labels for item in sublist]
+                these_labels = [x+labelcount+1 for x in these_labels]
+                labelcount+=these_labels[-1]
+                labels.extend(these_labels)
+                these_sp_tree = [[ix] * len(these_labels)]
+                sp_tree_index.extend(these_sp_tree)
+                all_parameterized_demographies.extend(parameterized_sc_demographies)
 
             # draw parameters for divergence with gene flow models
             if len(dwg_demographies[ix]) > 0:
                 parameterized_dwg_demographies = self._draw_parameters_dwg(
                     divergence_times=divergence_times, population_sizes=population_sizes, \
                     dwg_demographies=dwg_demographies[ix])
-                all_parameterized_dwg_demographies.append(parameterized_dwg_demographies)
-            else:
-                all_parameterized_dwg_demographies.append([])       
+                these_labels = [[iy]*len(x) for iy, x in enumerate(parameterized_dwg_demographies)]
+                these_labels = [item for sublist in these_labels for item in sublist]
+                these_labels = [x+labelcount+1 for x in these_labels]
+                labelcount+=these_labels[-1]
+                labels.extend(these_labels)
+                these_sp_tree = [[ix] * len(these_labels)]
+                sp_tree_index.extend(these_sp_tree)
+                all_parameterized_demographies.extend([x for x in parameterized_dwg_demographies])
             
-
-
-        # create labels
-        labels_divergence = []
-        count=0
-        for modelset in all_parameterized_divergence_demographies:
-            labels_divergence.append(list(range(count, len(modelset)+count)))
-            count+= len(modelset)
-        labels_sc = []
-        for modelset in all_parameterized_sc_demographies:
-            labels_sc.append(list(range(count, len(modelset)+count)))
-            count+= len(modelset)
-        labels_dwg = []
-        for modelset in all_parameterized_dwg_demographies:
-            labels_dwg.append(list(range(count, len(modelset)+count)))
-            count+= len(modelset)
-
         # return them
-        return([all_parameterized_divergence_demographies,all_parameterized_sc_demographies,all_parameterized_dwg_demographies], [labels_divergence, labels_sc, labels_dwg])
+        all_parameterized_demographies = [item for sublist in all_parameterized_demographies for item in sublist]
+        sp_tree_index = [item for sublist in sp_tree_index for item in sublist]
+
+        return(all_parameterized_demographies, labels, sp_tree_index)
 
     def validate_models(self, demographies, labels, outplot=None):
         """
-        Plot example models from divergence, secondary contact, 
-        and divergence with gene flow scenarios.
+        Plot example models demographies.
 
         Parameters:
-            divergence_demographies (List): A list of parameterized divergence 
-                demography objects returned from draw_parameters.
-            sc_demographies (List): A list of parameterized secondary contact 
-                demography objects returned from draw_parameters.
-            dwg_demographies (List): A list of parameterized divergence with 
-                gene flow demography objects returned from draw_parameters.
+            demographies (List): demographies
             labels (List): model labels
             outplot (string): path to store output figures. Default is to show.
 
@@ -661,253 +656,31 @@ class ModelBuilder:
         """Plot example models for a given type of demography."""
 
         if outplot is None:
-            for typeix, type in enumerate(demographies):
-                for treeix, tree in enumerate(type):
-                    for modelix, model in enumerate(tree):
-                        demo_to_plot = random.sample(model, 1)[0]
-                        graph = demo_to_plot.to_demes()
+            for modelix, model in enumerate(demographies):
+                if modelix % self.config['replicates'] == 0:
+                    new_model = copy.deepcopy(model)
+                    graph = new_model.to_demes()
 
-                        # Plot the model
-                        fig = plt.subplots()
-                        demesdraw.tubes(graph, ax=fig[1], seed=1)
-                        plt.title(f"Model: {labels[typeix][treeix][modelix]}")
-                        plt.show()
+                    # Plot the model
+                    fig = plt.subplots()
+                    demesdraw.tubes(graph, ax=fig[1], seed=1)
+                    plt.title(f"Model: {labels[modelix]}")
+                    plt.show()
 
         else:
             with PdfPages(outplot) as pdf:
-                for typeix, type in enumerate(demographies):
-                    for treeix, tree in enumerate(type):
-                        for modelix, model in enumerate(tree):
-                            demo_to_plot = random.sample(model, 1)[0]
-                            graph = demo_to_plot.to_demes()
+                for modelix, model in enumerate(demographies):
+                    if modelix % self.config['replicates'] == 0:
+                        new_model = copy.deepcopy(model)
+                        new_model = self._nonzero(new_model)
+                        graph = new_model.to_demes()
 
-                            # Plot the model
-                            fig, ax = plt.subplots()
-                            demesdraw.tubes(graph, ax=ax, seed=1)
-                            plt.title(f"Model: {labels[typeix][treeix][modelix]}")
-                            pdf.savefig(fig)
-                            plt.close(fig)
-
-#class ModelWriter:
-#
-#    """Write models generated by popai to a file."""
-#
-#    def __init__(self, config, demographies):
-#        self.config = config
-#        self.divergence_demographies = demographies[0]
-#        self.sc_demographies = demographies[1]
-#        self.dwg_demographies = demographies[2]
-#
-#    def write_to_yaml(self, output_directory):
-#        """
-#        Writes popai generated models to a yaml file, which can later be read by popai.
-#
-#        Parameters:
-#            config_dict Dict: dictionary crated by ModelConfigParser function parse_config.
-#            demographies: List of Lists of:
-#                divergence_demographies List:  divergence demographies.
-#                sc_demographies List: secondary contact demographies.
-#                dwg_demographies List: divergence with gene flow demographies.
-#
-#        Outputs:
-#            yaml files for each model (not for each parameterization)
-#
-#        Returns:
-#
-#        Raises:
-#        """
-#
-#        self._divergence_to_yaml()
-#        self._sc_to_yaml(start=len(self.divergence_demographies))
-#        self._dwg_to_yaml(start=len(self.divergence_demographies)+len(self.sc_demographies))
-#        self.output_directory = output_directory
-
-    def _divergence_to_yaml(self):
-
-        # get population size and divergence time priors
-        population_sizes, divergence_times = _get_priors(self.config)
-
-        for model in enumerate(self.divergence_demographies):
-
-            # create a dict for the yaml file
-            yaml_dict = {}
-
-            # add description
-            yaml_dict = self._get_description(model, yaml_dict, 'Divergence')
-
-            # write population information to dictionary
-            yaml_dict = self._get_popinfo(model, yaml_dict, population_sizes)
-
-            # write divergence information to dictionary
-            yaml_dict = self._get_divinfo(model, yaml_dict, divergence_times)
-
-            # write yaml to file
-            f = open(f"{self.output_directory}/Model_{model[0]}.yaml", 'w', \
-                    encoding='utf-8')
-            yaml.dump(yaml_dict, f)
-            f.close()
-
-    def _sc_to_yaml(self, start):
-
-        # get population size and divergence time priors
-        population_sizes, divergence_times = _get_priors(self.config)
-
-        for model in enumerate(self.sc_demographies):
-
-            # create a dict for the yaml file
-            yaml_dict = {}
-
-            # add description
-            yaml_dict = self._get_description(model, yaml_dict, 'Secondary Contact', start=start)
-
-            # write population information to dictionary
-            yaml_dict = self._get_popinfo(model, yaml_dict, population_sizes)
-
-            # write divergence information to dictionary
-            yaml_dict = self._get_divinfo(model, yaml_dict, divergence_times)
-
-            # write migration events
-            yaml_dict = self._get_scinfo(model, yaml_dict)
-
-            # write yaml to file
-            f = open(f"{self.output_directory}/Model_{model[0]+start}.yaml", \
-                     'w', encoding='utf-8')
-            yaml.dump(yaml_dict, f, Dumper=NoAliasDumper)
-            f.close()
-
-    def _dwg_to_yaml(self, start):
-
-        # get population size and divergence time priors
-        population_sizes, divergence_times = _get_priors(self.config)
-
-        for model in enumerate(self.dwg_demographies):
-
-            # create a dict for the yaml file
-            yaml_dict = {}
-
-            # add description
-            yaml_dict = self._get_description(model, yaml_dict, \
-                'Divergence with gene flow', start=start)
-
-            # write population information to dictionary
-            yaml_dict = self._get_popinfo(model, yaml_dict, population_sizes)
-
-            # write divergence information to dictionary
-            yaml_dict = self._get_divinfo(model, yaml_dict, divergence_times)
-
-            # write migration events
-            yaml_dict = self._get_dwginfo(model, yaml_dict)
-
-            # write yaml to file
-            f = open(f"{self.output_directory}/Model_{model[0]+start}.yaml", \
-                    'w', encoding='utf-8')
-            yaml.dump(yaml_dict, f, Dumper=NoAliasDumper)
-            f.close()
-
-    def _get_description(self, model, yaml_dict, modeltype, start=0):
-        # get number of populations in the present and write description
-        npops_present = int((len(model[1].populations)+1)/2)
-        description = f"Model {model[0]+start}: {modeltype} with {npops_present} populations."
-        yaml_dict['description'] = description
-        return yaml_dict
-
-    def _get_popinfo(self, model, yaml_dict, population_sizes):
-        yaml_dict['populations'] = []
-        yaml_dict['priors'] = {}
-        for population in enumerate(model[1].populations):
-            yaml_dict['populations'].append({})
-            yaml_dict['populations'][population[0]]['name'] = population[1].name
-            yaml_dict['populations'][population[0]]['size'] = 'Ne_' + population[1].name
-            yaml_dict['priors']['Ne_'+ population[1].name] = population_sizes[population[1].name]
-        return yaml_dict
-
-    def _get_divinfo(self, model, yaml_dict, divergence_times):
-        yaml_dict['divergences'] = []
-        count=0
-        for event in model[1].events:
-            if hasattr(event, 'ancestral'):
-                yaml_dict['divergences'].append({})
-                yaml_dict['divergences'][count]['derived'] = event.derived
-                yaml_dict['divergences'][count]['ancestral'] = event.ancestral
-                yaml_dict['divergences'][count]['time'] = 'Tdiv_'+event.ancestral
-                yaml_dict['priors']['Tdiv_'+event.ancestral] = divergence_times[event.ancestral]
-                count+=1
-        return yaml_dict
-
-    def _get_scinfo(self, model, yaml_dict):
-        yaml_dict['migration'] = []
-        yaml_dict['relations'] = {}
-        count=0
-        for event in model[1].events:
-            if hasattr(event, "rate"):
-                yaml_dict['migration'].append({})
-                if hasattr(event, "populations"):
-                    yaml_dict['migration'][count]['type'] = 'symmetric'
-                    pop0 = event.populations[0]
-                    pop1 = event.populations[1]
-                else:
-                    yaml_dict['migration'][count]['type'] = 'asymmetric'
-                    pop0 = event.source
-                    pop1 = event.dest
-
-                yaml_dict['migration'][count]['source'] = pop0
-                yaml_dict['migration'][count]['dest'] = pop1
-                yaml_dict['migration'][count]['rate'] = f"Mig_{pop0}_{pop1}"
-                yaml_dict['migration'][count]['start_time'] = 0
-                yaml_dict['migration'][count]['end_time'] = f"Tmigend_{pop0}_{pop1}"
-                yaml_dict['priors'][f"Mig_{pop0}_{pop1}"] = self.config['migration rate']
-                time_values = [entry['time'] for entry in yaml_dict['divergences']]
-                time_values = 'min('+','.join(time_values)+')/2'
-                yaml_dict["relations"][f"Tmigend_{pop0}_{pop1}"] = time_values
-                count+=1
-        return yaml_dict
-
-    def _get_dwginfo(self, model, yaml_dict):
-        yaml_dict['migration'] = []
-        yaml_dict['relations'] = {}
-        count=0
-        for event in model[1].events:
-            if hasattr(event, "rate"):
-                yaml_dict['migration'].append({})
-                if hasattr(event, "populations"):
-                    yaml_dict['migration'][count]['type'] = 'symmetric'
-                    pop0 = event.populations[0]
-                    pop1 = event.populations[1]
-                else:
-                    yaml_dict['migration'][count]['type'] = 'asymmetric'
-                    pop0 = event.source
-                    pop1 = event.dest
-
-                yaml_dict['migration'][count]['source'] = pop0
-                yaml_dict['migration'][count]['dest'] = pop1
-                yaml_dict['migration'][count]['rate'] = f"Mig_{pop0}_{pop1}"
-                yaml_dict['migration'][count]['start_time'] = f"Tmigstart_{pop0}_{pop1}"
-                yaml_dict['priors'][f"Mig_{pop0}_{pop1}"] = self.config['migration rate']
-
-                # get migration start times
-                pop0div = 0
-                pop1div = 0
-                for event in model[1].events:
-                    if hasattr(event, 'ancestral'):
-                        if pop0 in event.derived and pop1 in event.derived:
-                            ancestraldiv = event.ancestral
-                        if event.ancestral == pop0:
-                            pop0div = event.ancestral
-                        if event.ancestral == pop1:
-                            pop1div = event.ancestral
-                if pop0div != 0 and pop1div != 0:
-                    time_value = f"(Tdiv_{ancestraldiv} - min(Tdiv_{pop0div}, \
-                        Tdiv_{pop1div}))/2 + min(Tdiv_{pop0div}, Tdiv_{pop1div})"
-                elif pop0div != 0:
-                    time_value = f"(Tdiv_{ancestraldiv} - Tdiv_{pop0div})/2 + Tdiv_{pop0div}"
-                elif pop1div != 0:
-                    time_value = f"(Tdiv_{ancestraldiv} - Tdiv_{pop1div})/2 + Tdiv_{pop1div}"
-                else:
-                    time_value = f"Tdiv_{ancestraldiv}/2"
-                yaml_dict["relations"][f"Tmigstart_{pop0}_{pop1}"] = time_value
-
-                count+=1
-        return yaml_dict
+                        # Plot the model
+                        fig, ax = plt.subplots()
+                        demesdraw.tubes(graph, ax=ax, seed=1)
+                        plt.title(f"Model: {labels[modelix]}")
+                        pdf.savefig(fig)
+                        plt.close(fig)
 
 def _get_priors(tree):
     """Get priors for population sizes and divergence times from the species tree."""
@@ -937,7 +710,3 @@ def _get_priors(tree):
 
     return(population_sizes, divergence_times)
 
-#class NoAliasDumper(yaml.Dumper):
-#    """Class for yaml dumper."""
-#    def ignore_aliases(self, data):
-#        return True

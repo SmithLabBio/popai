@@ -17,5 +17,6 @@ mutation rate = U(5e-9, 5e-8) # Prior from which to draw mutation rates. Only un
 substitution model = JC69 # Substitution model to use in simulations.
 
 [Data]
-alignments = ../../tutorial_data/alignments # Path to alignments
-popfile = ../../tutorial_data/populations.txt # Path to popfile
+alignments = None
+popfile = ../../tutorial_data/populations_vcf.txt # Path to popfile
+vcf = ../../tutorial_data/alignments/alignment.vcf

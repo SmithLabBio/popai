@@ -89,9 +89,10 @@ def main():
         # save these simulated data.
         with open(os.path.join(args.output, 'simulated_jsfs.pickle'), 'wb') as f:
             pickle.dump(sfs_2d, f)
+        with open(os.path.join(args.output, 'simulated_arrays.pickle'), 'wb') as f:
+            pickle.dump(arrays, f)
         np.save(os.path.join(args.output, 'simulated_msfs.npy'), np.array(msfs), allow_pickle=True)
         np.save(os.path.join(args.output, 'labels.npy'), np.array(labels), allow_pickle=True)
-    
 
 if __name__ == '__main__':
     main()

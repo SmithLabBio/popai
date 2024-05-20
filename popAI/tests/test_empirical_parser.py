@@ -23,6 +23,7 @@ secondary contact = True
 divergence with gene flow = False
 max migration events = 2
 migration rate = U(1e-5, 1e-4)
+constant Ne = True # population sizes equal across all populations
 
 [Other]
 output directory = ./examples/test
@@ -53,9 +54,9 @@ popfile = ./tests/populations.txt
         data_processor.find_downsampling(empirical_array)
         empirical_2d_sfs = data_processor.numpy_to_2d_sfs(
             empirical_array, downsampling={"A":8, "B":6, "C":6}, replicates = 10)
-        empirical_msfs = data_processor.numpy_to_msfs(
+        empirical_msfs, sites = data_processor.numpy_to_msfs(
             empirical_array, downsampling={"A":8, "B": 6, "C":6}, replicates = 10)
-        empirical_msfs_binned = data_processor.numpy_to_msfs(
+        empirical_msfs_binned, sites_binned = data_processor.numpy_to_msfs(
             empirical_array, downsampling={"A":8, "B": 6, "C":6}, replicates = 10, nbins=4)
 
         self.assertEqual(len(empirical_2d_sfs), 10)

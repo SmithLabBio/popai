@@ -13,7 +13,8 @@ def main():
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
     parser.add_argument('--rf', action='store_true', help='Train RF classifier.')
     parser.add_argument('--fcnn', action='store_true', help='Train FCNN classifier.')
-    parser.add_argument('--cnn', action='store_true', help='Train CNN classifier.')
+    parser.add_argument('--cnn', action='store_true', help='Train CNN classifier of SFS.')
+    parser.add_argument('--cnnnpy', action='store_true', help='Train CNN classifier on alignments.')
     parser.add_argument('--ntrees', type=int, help='Number of trees to use in the RF classifier (default=500).', default=500)
 
     args = parser.parse_args()
@@ -37,8 +38,11 @@ def main():
     # read the data
     labels = np.load(os.path.join(args.simulations, 'labels.npy'), allow_pickle=True)
     msfs = np.load(os.path.join(args.simulations, 'simulated_msfs.npy'), allow_pickle=True)
+    
     with open(os.path.join(args.simulations, 'simulated_jsfs.pickle'), 'rb') as f:
         sfs_2d = pickle.load(f)
+    with open(os.path.join(args.simulations, 'simulated_arrays.pickle'), 'rb') as f:
+        empirical_array = pickle.load(f)
 
     if args.rf:
         # train RF and save model and confusion matrix
@@ -61,6 +65,14 @@ def main():
         cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot = cnn_2d_sfs_predictor.build_cnn_sfs()
         cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
         cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_confusion.png'))
+
+    if args.cnnnpy:
+        # train CNN and save model and confusion matrix
+        cnn_2d_npy_predictor = build_predictors.Cnnnpy(config_values, array, labels, user=user)
+        cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot = cnn_2d_sfs_predictor.build_cnn_sfs()
+        cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
+        cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_confusion.png'))
+
 
 if __name__ == '__main__':
     main()
