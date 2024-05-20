@@ -1,0 +1,7 @@
+individual	population
+n0	pop1
+n1	pop1
+n2	pop2
+n3	pop2
+n4	pop2
+n5	pop2
