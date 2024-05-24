@@ -223,7 +223,7 @@ substitution model = JC69
 [Data]
 alignments = None
 popfile = ./tests/populations_large.txt
-vcf = alignment_large.vcf
+vcf = ./tests/mini_dataset/alignment_large.vcf
             """)
 
         # Read modified config file

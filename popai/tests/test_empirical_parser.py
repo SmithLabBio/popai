@@ -59,6 +59,7 @@ popfile = ./tests/populations.txt
         empirical_msfs_binned, sites_binned = data_processor.numpy_to_msfs(
             empirical_array, downsampling={"A":8, "B": 6, "C":6}, replicates = 10, nbins=4)
 
+
         self.assertEqual(len(empirical_2d_sfs), 10)
         self.assertEqual(len(empirical_msfs), 10)
         self.assertEqual(empirical_2d_sfs[0][('A','B')].shape, (9,7))

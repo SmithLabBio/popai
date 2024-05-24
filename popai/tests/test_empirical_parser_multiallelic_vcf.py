@@ -98,13 +98,13 @@ vcf = ./tests/mini_dataset_multiallelic/alignment.vcf
                             [2., 0., 0.],
                             [0., 0., 0.]])}
         sfs_downs_2 = {('pop2', 'pop1'): np.array([
+                            [0., 1., 1.],
+                            [0., 0., 0.],
+                            [1., 0., 0.]])}
+        sfs_downs_3 = {('pop2', 'pop1'): np.array([
                             [0., 1., 0.],
                             [2., 0., 0.],
                             [0., 0., 0.]])}
-        sfs_downs_3 = {('pop2', 'pop1'): np.array([
-                            [0., 1., 0.],
-                            [1., 0., 0.],
-                            [1., 0., 0.]])}
         self.assertEqual(set(sfs_downs_1.keys()), set(empirical_2d_sfs[0].keys()))
         self.assertEqual(set(sfs_downs_2.keys()), set(empirical_2d_sfs[1].keys()))
         self.assertEqual(set(sfs_downs_3.keys()), set(empirical_2d_sfs[2].keys()))

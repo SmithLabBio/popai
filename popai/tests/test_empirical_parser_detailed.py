@@ -63,15 +63,15 @@ popfile = ./tests/populations_mini.txt
             [1,1,0,0],
             [1,0,0,0]])
         npt.assert_array_equal(arr_comp, empirical_array)
+        
+        # test 2D sfs without downsampling
+        empirical_2d_sfs = data_processor.numpy_to_2d_sfs(
+            empirical_array, downsampling={"pop1":2, "pop2":4}, replicates = 1)
         sfs_comp = {('pop2', 'pop1'): np.array([[0., 1., 0.],
             [0., 0., 0.],
             [1., 0., 0.],
             [1., 0., 0.],
             [0., 0., 0.]])}
-        
-        # test 2D sfs without downsampling
-        empirical_2d_sfs = data_processor.numpy_to_2d_sfs(
-            empirical_array, downsampling={"pop1":2, "pop2":4}, replicates = 1)
         self.assertEqual(set(sfs_comp.keys()), set(empirical_2d_sfs[0].keys()))
         for key in sfs_comp:
             npt.assert_array_equal(sfs_comp[key], empirical_2d_sfs[0][key])
@@ -93,15 +93,15 @@ popfile = ./tests/populations_mini.txt
             empirical_array, downsampling={"pop1":2, "pop2":2}, replicates = 3)
         sfs_downs_1 = {('pop2', 'pop1'): np.array([
                             [0., 1., 1.],
-                            [2., 0., 0.],
-                            [0., 0., 0.]])}
+                            [0., 0., 0.],
+                            [2., 0., 0.]])}
         sfs_downs_2 = {('pop2', 'pop1'): np.array([
                             [0., 1., 1.],
-                            [1., 0., 0.],
-                            [1., 0., 0.]])}
+                            [0., 0., 0.],
+                            [2., 0., 0.]])}
         sfs_downs_3 = {('pop2', 'pop1'): np.array([
-                            [0., 1., 1.],
-                            [1., 0., 0.],
+                            [0., 1., 2.],
+                            [0., 0., 0.],
                             [1., 0., 0.]])}
         self.assertEqual(set(sfs_downs_1.keys()), set(empirical_2d_sfs[0].keys()))
         self.assertEqual(set(sfs_downs_2.keys()), set(empirical_2d_sfs[1].keys()))
