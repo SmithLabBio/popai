@@ -5,9 +5,9 @@ Tutorial 3: User-specified models
 If the default model set does not fit a user's goals, then they can design their own model set. Models are specified as described `here <https://popai.readthedocs.io/en/latest/usage/usermodels.html>>`_. 
 
 In this tutorial, we will compare three models:
-    * model 1: two populations: A+B and Carstens
-    * model 2: three populations: A, B, and C; A and B are sister populations
-    * model 3: model 2 + ongoing gene flow between A and B.
+    * model 0: two populations: A+B and Carstens
+    * model 1: three populations: A, B, and C; A and B are sister populations
+    * model 2: model 2 + ongoing gene flow between A and B.
 
 ==========================================
 Step 1: Prepare Input

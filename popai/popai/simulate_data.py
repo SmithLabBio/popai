@@ -228,7 +228,7 @@ class DataSimulator:
 
         return all_sfs
 
-    def plot_2dsfs(self, sfs_list, output_directory):
+    def plot_2dsfs(self, sfs_list, output_directory=None):
         """Plot average 2 dimensional Site frequency spectra."""
 
         for item in sfs_list.keys():
@@ -250,15 +250,24 @@ class DataSimulator:
                 for comparison, total_sfs in accumulation.items():
                     average_sfs[model][comparison] = total_sfs / counts[comparison]
 
-        for model, comparisons in average_sfs.items():
-            for comparison, avg_sfs in comparisons.items():
-                outfile  = os.path.join(output_directory, \
-                                        f"2D_SFS_{comparison}_model_{model}.png")
-                plt.imshow(avg_sfs, cmap='viridis', origin="lower")
-                plt.colorbar()
-                plt.title(f'{model} - {comparison}')
-                plt.savefig(outfile)
-                plt.close()
+        if output_directory==None:
+            for model, comparisons in average_sfs.items():
+                for comparison, avg_sfs in comparisons.items():
+                    plt.imshow(avg_sfs, cmap='viridis', origin="lower")
+                    plt.colorbar()
+                    plt.title(f'{model} - {comparison}')
+                    plt.show()
+        else:
+            for model, comparisons in average_sfs.items():
+                for comparison, avg_sfs in comparisons.items():
+                    outfile  = os.path.join(output_directory, \
+                                            f"2D_SFS_{comparison}_model_{model}.png")
+                    plt.imshow(avg_sfs, cmap='viridis', origin="lower")
+                    plt.colorbar()
+                    plt.title(f'{model} - {comparison}')
+                    plt.savefig(outfile)
+                    plt.close()
+        
 
     def _create_numpy_2d_arrays(self):
 

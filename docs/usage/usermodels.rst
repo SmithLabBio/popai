@@ -39,14 +39,14 @@ Models Folder
 Inside the models folder, the user should place their model files. There are a two naming requirements:
 
 1. Model files must end in the suffix '.model'.
-2. Model file names must end in '_x', where x is an integer. The integers should be sequential (i.e., 1-5 for five models).
+2. Model file names must end in '_x', where x is an integer. The integers should be sequential and begin with 0 (i.e., 0-4 for five models).
 
 For example, my directory structure could look as follows:
 
 - user_models/
+    - model_0.model
     - model_1.model
     - model_2.model
-    - model_3.model
 
 ========================================
 Model Files
@@ -195,6 +195,6 @@ Examples
 ========================================
 In the `example_models <https://github.com/SmithLabBio/popai/blob/main/example_models/>`_ directory, I have provided three example model files and visualizations for the three models.
 
-* Model 1: Two populations in the present (A+B and C). We will have samples from A, B, and C in the populations file and in our empirical data, but we want to test whether these are a single population. There is no divergence between A and B. The ancestor of A and B diverged from C between 50000 and 100000 generations ago.
-* Model 2: Three populations in the present (A, B, and C). A and B diverge 10000 to 20000 generations ago. There is present-day gene flow beteen A and B. The ancestor of A and B diverged from C between 50000 and 100000 generations ago.
-* Model 3: One population in the present (A+B+C). There is no divergence between any of our present-day populations.
+* Model 0: Two populations in the present (A+B and C). We will have samples from A, B, and C in the populations file and in our empirical data, but we want to test whether these are a single population. There is no divergence between A and B. The ancestor of A and B diverged from C between 50000 and 100000 generations ago.
+* Model 1: Three populations in the present (A, B, and C). A and B diverge 10000 to 20000 generations ago. There is present-day gene flow beteen A and B. The ancestor of A and B diverged from C between 50000 and 100000 generations ago.
+* Model 2: One population in the present (A+B+C). There is no divergence between any of our present-day populations.
