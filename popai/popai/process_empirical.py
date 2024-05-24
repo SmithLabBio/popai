@@ -255,9 +255,13 @@ class DataProcessor:
                         # check that this site has two variants in these populations
                         if len(set(all_site_data)) == 2:
                             # get minor allele
+                            counter = Counter(all_site_data)
+                            min_count = min(counter.values())
+                            least_common_numbers = [num for num, cnt in counter.items() if cnt == min_count]
+                            minor_allele = self.rng.choice(least_common_numbers)
                             # find counts in each population
-                            pop1_count = Counter(site_data_pop1_sampled[k])[1]
-                            pop2_count = Counter(site_data_pop2_sampled[k])[1]
+                            pop1_count = Counter(site_data_pop1_sampled[k])[minor_allele]
+                            pop2_count = Counter(site_data_pop2_sampled[k])[minor_allele]
                             # add to the sfs
                             sfs_list[k][key][pop1_count, pop2_count] += 1
 

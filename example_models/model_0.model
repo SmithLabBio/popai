@@ -1,4 +1,4 @@
-[Populations]	#	list	populations	and	min	and	maximum	values	for	uniform	population	size	priors	[min,max]
+[Populations]	# list populations and min and maximum values for uniform population size priors [min,max]
 A=[10000,50000]
 B=[10000,50000]
 C=[10000,50000]
@@ -16,4 +16,4 @@ matrix	=
 
 [Events]
 1=split	0	0	["A","B"]	AB
-2=split	0	0	["AB","C"]	ABC
+2=split	50000	100000	["AB","C"]	ABC

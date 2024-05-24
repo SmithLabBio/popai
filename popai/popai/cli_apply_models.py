@@ -22,7 +22,7 @@ def main():
 
     # check if output exists
     if os.path.exists(args.output) and not args.force:
-        raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory.")
+        raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
     # create output directory
     os.system('mkdir -p %s' % args.output)
 

@@ -21,7 +21,7 @@ def main():
 
     # check if output exists
     if os.path.exists(args.output) and not args.force:
-        raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory.")
+        raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
     # create output directory
     os.system('mkdir -p %s' % args.output)
 
@@ -58,7 +58,7 @@ def main():
 
         # Build models and draw parameters
         model_reader = process_user_models.ModelReader(config_values=config_values)
-        parameterized_models = model_reader.read_models()
+        parameterized_models, labels = model_reader.read_models()
 
         # validate the models
         if args.plot:
@@ -73,8 +73,8 @@ def main():
                 return
 
             # simulate data
-            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
-            arrays = data_simulator.simulate_ancestry_user()
+            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, user=True)
+            arrays = data_simulator.simulate_ancestry()
 
     
     if args.simulate:

@@ -1,0 +1,22 @@
+[Model]
+species tree file = None # Path to a species tree in nexus format.
+migration matrix = None # Path to a migration matrix
+symmetric = None # True if migration rates should always be symmetric, and only symmetric migration events should be included.
+secondary contact = None # True if you wish to consider secondary contact models.
+divergence with gene flow = None # True if you wish to consider divergence with gene flow models.
+max migration events = None # Maximum number of migration events to consider in one model.
+migration rate = None # Prior from which to draw migration rates. Only uniform priors are supported at present.
+constant Ne = None # population sizes equal across all populations
+user models = ./tutorial_3_data/models/
+
+[Other]
+seed = 1234 # Random seed.
+replicates = 1000 # Number of replicates to simulate per model.
+
+[Simulations]
+mutation rate = U(5e-9, 5e-8) # Prior from which to draw mutation rates. Only uniform priors are supported at present.
+substitution model = JC69 # Substitution model to use in simulations.
+
+[Data]
+alignments =  ./tutorial_3_data/alignments # Path to alignments
+popfile =  ./tutorial_3_data/populations.txt # Path to popfile

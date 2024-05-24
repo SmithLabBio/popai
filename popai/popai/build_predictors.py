@@ -82,18 +82,14 @@ class CnnSFS:
                 self.sfs_2d.append(thesfs)
                 self.labels.append(key)
         self.nclasses = len(set(labels))
-        #if user == False:
-        #    self.nclasses = len(labels)
-        #    self.labels = [item for sublist in labels for item in sublist]
-        #else:
-        #    try:
-        #        self.labels = [int(x.split('_')[-1]) for x in labels]
-        #        min_label = min(self.labels)
-        #        self.labels = [x-min_label for x in self.labels]
-        #    except:
-        #        raise Exception(f"Model names must end in '_x', where x is some integer.")
-        #    
-
+        if user:
+            try:
+                self.labels = [int(x.split('_')[-1]) for x in labels]
+                valid = check_valid_labels(self.labels)
+            except:
+                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+            if not valid:
+                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
         try:
             self.labels = keras.utils.to_categorical(self.labels)
         except:
@@ -202,17 +198,14 @@ class NeuralNetSFS:
                 self.labels.append(key)
         self.sfs = np.array(self.sfs)
         self.nclasses = len(set(labels))
-        #if user == False:
-        #    self.labels = [item for sublist in labels for item in sublist]
-        #    
-        #else:
-        #    try:
-        #        self.labels = [int(x.split('_')[-1]) for x in labels]
-        #        min_label = min(self.labels)
-        #        self.labels = [x-min_label for x in self.labels]
-        #    except:
-        #        raise Exception(f"Model names must end in '_x', where x is some integer.")
-        #    self.nclasses = len(set(labels))
+        if user:
+            try:
+                self.labels = [int(x.split('_')[-1]) for x in labels]
+                valid = check_valid_labels(self.labels)
+            except:
+                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+            if not valid:
+                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
         self.rng = np.random.default_rng(self.config['seed'])
         try:
             self.labels = keras.utils.to_categorical(self.labels)
@@ -277,25 +270,14 @@ class CnnNpy:
                 self.arrays.append(thearray)
                 self.labels.append(key)
         self.nclasses = len(set(labels))
-        #if user == False:
-        #    self.arrays = [value for key,value in arrays.items()]
-        #    self.arrays = [item for sublist in self.arrays for item in sublist]
-        #else: 
-        #    self.arrays = [value for key,value in arrays.items()]
-        #    self.arrays = [item for sublist in self.arrays for item in sublist]
-        #self.labels = labels
-#
-        #if user == False:
-        #    self.nclasses = len(labels)
-        #    self.labels = [item for sublist in labels for item in sublist]
-        #else:
-        #    try:
-        #        self.labels = [int(x.split('_')[-1]) for x in labels]
-        #        min_label = min(self.labels)
-        #        self.labels = [x-min_label for x in self.labels]
-        #    except:
-        #        raise Exception(f"Model names must end in '_x', where x is some integer.")
-        #    self.nclasses = len(set(labels))
+        if user:
+            try:
+                self.labels = [int(x.split('_')[-1]) for x in labels]
+                valid = check_valid_labels(self.labels)
+            except:
+                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+            if not valid:
+                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
 
         try:
             self.labels = keras.utils.to_categorical(self.labels)
@@ -320,7 +302,6 @@ class CnnNpy:
         val_indices = indices[split_idx:]
 
         # Split features and labels into training and validation sets using the indices
-        print(np.array(self.arrays).shape)
         train_features = np.array(self.arrays)[train_indices]
         val_features = np.array(self.arrays)[val_indices]
         train_features = np.expand_dims(np.array(train_features), axis=-1)
@@ -404,3 +385,11 @@ def plot_confusion_matrix(y_true, y_pred):
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
     return plt
+
+def check_valid_labels(labels):
+    unique_labels = list(set(labels))
+    unique_labels.sort()
+    for i in range(len(unique_labels)):
+        if unique_labels[i] !=i:
+            return False
+    return True
