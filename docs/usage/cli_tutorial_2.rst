@@ -21,7 +21,7 @@ Create a directory in which to run the tutorial, and copy these data to that dir
     cp -r /path/to/downloaded/data/tutorial_2_data ./
 
 ==========================================
-Step 3: Processing Empirical data
+Step 2: Processing Empirical data
 ==========================================
 
 The first step is to process the user's empirical data. This involves reading the data from fasta files (or a vcf), deciding which values to use for down-projection, and building the SFS.
@@ -77,7 +77,7 @@ Notice that this will print to the screen the number of SNPs in your empirical d
 This script will also output in the output directory the joint and multidimensional site frequency spectra for each replicate.
 
 ==========================================
-Step 4: Simulate data
+Step 3: Simulate data
 ==========================================
 
 Next, we need to simulate data under the models of interest. We will do so using the command line tool *simulate_data*. It takes the following arugments::
@@ -111,7 +111,7 @@ It is essential to use the same downsampling dictionary here that you used to pr
 In the output directory, you should see a pdf showing your models (models.pdf), a pickled object storing the simulated jSFS, and a numpy matrix storing the mSFS. 
 
 ==========================================
-Step 5: Train networks
+Step 4: Train networks
 ==========================================
 
 Now, we are ready to train the networks implemented in popai. popai includes three network architectures:
@@ -145,7 +145,7 @@ The argument *--simulations* takes as input the output directory from the previo
 This will output to the output directory the trained.model files for the FCNN and the CNN, and a pickled object storing the RF Classifier. It will also output confusion matrices showing the performance of each approach on the validation data, for which we hold out 20% of our simulated datasets. 
 
 ==========================================
-Step 6: Apply networks
+Step 5: Apply networks
 ==========================================
 
 Finally, we can apply the networks to make classifications on our empirical data using the function *apply_models*. It takes the following arguments::
