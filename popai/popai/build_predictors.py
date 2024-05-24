@@ -21,15 +21,14 @@ class RandomForestsSFS:
                 self.sfs.append(thesfs)
                 self.labels.append(key)
         self.sfs = np.array(self.sfs)
-        #if user == False:
-        #    self.labels = [item for sublist in labels for item in sublist]
-        #else:
-        #    try:
-        #        self.labels = [int(x.split('_')[-1]) for x in labels]
-        #        min_label = min(self.labels)
-        #        self.labels = [x-min_label for x in self.labels]
-        #    except:
-        #        raise Exception(f"Model names must end in '_x', where x is some integer.")
+        if user:
+            try:
+                self.labels = [int(x.split('_')[-1]) for x in labels]
+                valid = check_valid_labels(self.labels)
+            except:
+                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+            if not valid:
+                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
         self.rng = np.random.default_rng(self.config['seed'])
 
     def build_rf_sfs(self, ntrees=500):

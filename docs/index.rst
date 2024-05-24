@@ -19,6 +19,7 @@ Welcome to popai's documentation!
    usage/cli_tutorial_2.rst
    usage/cli_tutorial_3.rst
    notebooks/jupyter_tutorial_1.ipynb
+   notebooks/jupyter_tutorial_3.ipynb
 
 
 Indices and tables
