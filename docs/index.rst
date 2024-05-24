@@ -15,6 +15,9 @@ Welcome to popai's documentation!
    usage/buildingmodels.rst
    usage/usermodels.rst
    usage/cli_tutorial.rst
+   usage/cli_tutorial_1b.rst
+   usage/cli_tutorial_2.rst
+   usage/cli_tutorial_3.rst
    notebooks/popai_walkthrough.ipynb
 
 
