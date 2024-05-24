@@ -148,7 +148,7 @@ popfile = ./tests/populations.txt
         self.assertEqual(len(divergence_with_geneflow_modified[0]), 6)
 
     def test_build_models_with_mult_Trees(self):
-        """Ensure correct behavior when divergence with gene flow is True."""
+        """Ensure correct behavior when there is more than one tree."""
         # Create a modified config file
         temp_config_file_modified = os.path.join(self.temp_dir.name, 'test_config_modified.ini')
         with open(temp_config_file_modified, 'w', encoding='utf-8') as f:
@@ -194,6 +194,51 @@ popfile = ./tests/populations.txt
         self.assertEqual(len(divergence_modified[1]), 2)
         self.assertEqual(len(secondary_contact_modified[1]), 4)
         self.assertEqual(len(divergence_with_geneflow_modified[1]), 0)
+
+    def test_build_models_with_largertree(self):
+        """Ensure correct behavior when there is a larger tree."""
+        # Create a modified config file
+        temp_config_file_modified = os.path.join(self.temp_dir.name, 'test_config_modified.ini')
+        with open(temp_config_file_modified, 'w', encoding='utf-8') as f:
+            f.write("""
+[Model]
+species tree file = ./tests/species_tree_large.nex
+migration matrix = ./tests/migration_large.txt
+symmetric = True
+secondary contact = True
+divergence with gene flow = False  # Modified this line
+max migration events = 1
+migration rate = U(1e-5, 1e-4)
+constant ne = True
+
+[Other]
+output directory = ./examples/test
+seed = 1234
+replicates = 10
+
+[Simulations]
+mutation rate = U(1e-8, 1e-7)
+substitution model = JC69
+
+[Data]
+alignments = None
+popfile = ./tests/populations_large.txt
+vcf = alignment_large.vcf
+            """)
+
+        # Read modified config file
+        parser_modified = ModelConfigParser(temp_config_file_modified)
+        config_values_modified = parser_modified.parse_config()
+
+        # Build models with modified config
+        builder_modified = ModelBuilder(config_values=config_values_modified)
+        divergence_modified, secondary_contact_modified, divergence_with_geneflow_modified = \
+            builder_modified.build_models()
+
+        # Assert
+        self.assertEqual(len(divergence_modified[0]), 7)
+        self.assertEqual(len(secondary_contact_modified[0]), 2)
+        self.assertEqual(len(divergence_with_geneflow_modified[0]), 0)
 
 
 

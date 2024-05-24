@@ -14,17 +14,22 @@ class RandomForestsSFS:
 
     def __init__(self, config, sfs, labels, user=False):
         self.config = config
-        self.sfs = [item for sublist in sfs for item in sublist]
+        self.sfs = []
+        self.labels = []
+        for key,value in sfs.items():
+            for thesfs in value:
+                self.sfs.append(thesfs)
+                self.labels.append(key)
         self.sfs = np.array(self.sfs)
-        if user == False:
-            self.labels = [item for sublist in labels for item in sublist]
-        else:
-            try:
-                self.labels = [int(x.split('_')[-1]) for x in labels]
-                min_label = min(self.labels)
-                self.labels = [x-min_label for x in self.labels]
-            except:
-                raise Exception(f"Model names must end in '_x', where x is some integer.")
+        #if user == False:
+        #    self.labels = [item for sublist in labels for item in sublist]
+        #else:
+        #    try:
+        #        self.labels = [int(x.split('_')[-1]) for x in labels]
+        #        min_label = min(self.labels)
+        #        self.labels = [x-min_label for x in self.labels]
+        #    except:
+        #        raise Exception(f"Model names must end in '_x', where x is some integer.")
         self.rng = np.random.default_rng(self.config['seed'])
 
     def build_rf_sfs(self, ntrees=500):
@@ -70,18 +75,24 @@ class CnnSFS:
 
     def __init__(self, config, sfs_2d, labels, user=False):
         self.config = config
-        self.sfs_2d = [item for sublist in sfs_2d for item in sublist]
-        if user == False:
-            self.nclasses = len(labels)
-            self.labels = [item for sublist in labels for item in sublist]
-        else:
-            try:
-                self.labels = [int(x.split('_')[-1]) for x in labels]
-                min_label = min(self.labels)
-                self.labels = [x-min_label for x in self.labels]
-            except:
-                raise Exception(f"Model names must end in '_x', where x is some integer.")
-            self.nclasses = len(set(labels))
+        self.sfs_2d = []
+        self.labels = []
+        for key,value in sfs_2d.items():
+            for thesfs in value:
+                self.sfs_2d.append(thesfs)
+                self.labels.append(key)
+        self.nclasses = len(set(labels))
+        #if user == False:
+        #    self.nclasses = len(labels)
+        #    self.labels = [item for sublist in labels for item in sublist]
+        #else:
+        #    try:
+        #        self.labels = [int(x.split('_')[-1]) for x in labels]
+        #        min_label = min(self.labels)
+        #        self.labels = [x-min_label for x in self.labels]
+        #    except:
+        #        raise Exception(f"Model names must end in '_x', where x is some integer.")
+        #    
 
         try:
             self.labels = keras.utils.to_categorical(self.labels)
@@ -183,19 +194,25 @@ class NeuralNetSFS:
 
     def __init__(self, config, sfs, labels, user=False):
         self.config = config
-        self.sfs = [item for sublist in sfs for item in sublist]
+        self.sfs = []
+        self.labels = []
+        for key,value in sfs.items():
+            for thesfs in value:
+                self.sfs.append(thesfs)
+                self.labels.append(key)
         self.sfs = np.array(self.sfs)
-        if user == False:
-            self.labels = [item for sublist in labels for item in sublist]
-            self.nclasses = len(labels)
-        else:
-            try:
-                self.labels = [int(x.split('_')[-1]) for x in labels]
-                min_label = min(self.labels)
-                self.labels = [x-min_label for x in self.labels]
-            except:
-                raise Exception(f"Model names must end in '_x', where x is some integer.")
-            self.nclasses = len(set(labels))
+        self.nclasses = len(set(labels))
+        #if user == False:
+        #    self.labels = [item for sublist in labels for item in sublist]
+        #    
+        #else:
+        #    try:
+        #        self.labels = [int(x.split('_')[-1]) for x in labels]
+        #        min_label = min(self.labels)
+        #        self.labels = [x-min_label for x in self.labels]
+        #    except:
+        #        raise Exception(f"Model names must end in '_x', where x is some integer.")
+        #    self.nclasses = len(set(labels))
         self.rng = np.random.default_rng(self.config['seed'])
         try:
             self.labels = keras.utils.to_categorical(self.labels)
@@ -247,32 +264,38 @@ class NeuralNetSFS:
 
         return(tabulated)
 
-
 class CnnNpy:
 
     """Build a CNN predictor that takes the alignment as a numpy matrix as input."""
 
     def __init__(self, config, arrays, labels, user=False):
         self.config = config
-        if user == False:
-            self.arrays = [value for key,value in arrays.items()]
-            self.arrays = [item for sublist in self.arrays for item in sublist]
-        else: 
-            self.arrays = [value for key,value in arrays.items()]
-            self.arrays = [item for sublist in self.arrays for item in sublist]
-        self.labels = labels
-
-        if user == False:
-            self.nclasses = len(labels)
-            self.labels = [item for sublist in labels for item in sublist]
-        else:
-            try:
-                self.labels = [int(x.split('_')[-1]) for x in labels]
-                min_label = min(self.labels)
-                self.labels = [x-min_label for x in self.labels]
-            except:
-                raise Exception(f"Model names must end in '_x', where x is some integer.")
-            self.nclasses = len(set(labels))
+        self.arrays = []
+        self.labels = []
+        for key,value in arrays.items():
+            for thearray in value:
+                self.arrays.append(thearray)
+                self.labels.append(key)
+        self.nclasses = len(set(labels))
+        #if user == False:
+        #    self.arrays = [value for key,value in arrays.items()]
+        #    self.arrays = [item for sublist in self.arrays for item in sublist]
+        #else: 
+        #    self.arrays = [value for key,value in arrays.items()]
+        #    self.arrays = [item for sublist in self.arrays for item in sublist]
+        #self.labels = labels
+#
+        #if user == False:
+        #    self.nclasses = len(labels)
+        #    self.labels = [item for sublist in labels for item in sublist]
+        #else:
+        #    try:
+        #        self.labels = [int(x.split('_')[-1]) for x in labels]
+        #        min_label = min(self.labels)
+        #        self.labels = [x-min_label for x in self.labels]
+        #    except:
+        #        raise Exception(f"Model names must end in '_x', where x is some integer.")
+        #    self.nclasses = len(set(labels))
 
         try:
             self.labels = keras.utils.to_categorical(self.labels)

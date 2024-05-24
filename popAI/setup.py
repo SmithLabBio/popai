@@ -19,7 +19,7 @@ setup(
         'tabulate',
         'tensorflow',
         'pandas',
-        'pyslim'
+        'pyslim',
     ],
     entry_points={
         'console_scripts': [

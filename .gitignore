@@ -1,11 +1,5 @@
 private
 .vscode
-delimitpy/build/
-delimitpy/delimitpy.egg-info/
-private_cli_test
-private_cli_test/simulated
-/delimitpy/delimitpy/__pycache__
 /popai/popai/__pycache__
 /popai/popai.egg-info
-.DS_Store
 .DS_Store

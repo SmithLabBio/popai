@@ -1,0 +1,9 @@
+#NEXUS
+BEGIN TAXA;
+      Dimensions NTax=5;
+      TaxLabels A B C D E;
+END;
+
+BEGIN TREES;
+      Tree species=(((A[&ne=10000-50000],B[&ne=10000-50000])AB[&ne=10000-50000,div=1000-5000],C[&ne=10000-50000])ABC[&ne=10000-50000,div=10000-15000],(D[&ne=10000-50000],E[&ne=10000-50000])DE[&ne=10000-50000,div=1000-5000])ABCDE[&ne=10000-50000,div=100000-200000];
+END;

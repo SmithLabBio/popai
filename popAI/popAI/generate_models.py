@@ -125,7 +125,8 @@ class ModelBuilder:
                         divergence_demographies=divergence_demographies[ix])
                 these_labels = [[iy]*len(x) for iy, x in enumerate(parameterized_divergence_demographies)]
                 these_labels = [item for sublist in these_labels for item in sublist]
-                labelcount+=these_labels[-1]
+                these_labels = [x+labelcount for x in these_labels]
+                labelcount=these_labels[-1]+1
                 labels.extend(these_labels)
                 these_sp_tree = [[ix] * len(these_labels)]
                 sp_tree_index.extend(these_sp_tree)
@@ -138,8 +139,8 @@ class ModelBuilder:
                     sc_demographies=sc_demographies[ix])
                 these_labels = [[iy]*len(x) for iy, x in enumerate(parameterized_sc_demographies)]
                 these_labels = [item for sublist in these_labels for item in sublist]
-                these_labels = [x+labelcount+1 for x in these_labels]
-                labelcount+=these_labels[-1]
+                these_labels = [x+labelcount for x in these_labels]
+                labelcount=these_labels[-1]+1
                 labels.extend(these_labels)
                 these_sp_tree = [[ix] * len(these_labels)]
                 sp_tree_index.extend(these_sp_tree)
@@ -152,8 +153,8 @@ class ModelBuilder:
                     dwg_demographies=dwg_demographies[ix])
                 these_labels = [[iy]*len(x) for iy, x in enumerate(parameterized_dwg_demographies)]
                 these_labels = [item for sublist in these_labels for item in sublist]
-                these_labels = [x+labelcount+1 for x in these_labels]
-                labelcount+=these_labels[-1]
+                these_labels = [x+labelcount for x in these_labels]
+                labelcount=these_labels[-1]+1
                 labels.extend(these_labels)
                 these_sp_tree = [[ix] * len(these_labels)]
                 sp_tree_index.extend(these_sp_tree)
@@ -672,7 +673,6 @@ class ModelBuilder:
                 for modelix, model in enumerate(demographies):
                     if modelix % self.config['replicates'] == 0:
                         new_model = copy.deepcopy(model)
-                        new_model = self._nonzero(new_model)
                         graph = new_model.to_demes()
 
                         # Plot the model

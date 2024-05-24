@@ -37,12 +37,13 @@ def main():
 
     # read the data
     labels = np.load(os.path.join(args.simulations, 'labels.npy'), allow_pickle=True)
-    msfs = np.load(os.path.join(args.simulations, 'simulated_msfs.npy'), allow_pickle=True)
     
+    with open(os.path.join(args.simulations, 'simulated_msfs.pickle'), 'rb') as f:
+        msfs = pickle.load(f)
     with open(os.path.join(args.simulations, 'simulated_jsfs.pickle'), 'rb') as f:
         sfs_2d = pickle.load(f)
     with open(os.path.join(args.simulations, 'simulated_arrays.pickle'), 'rb') as f:
-        empirical_array = pickle.load(f)
+        array = pickle.load(f)
 
     if args.rf:
         # train RF and save model and confusion matrix
@@ -68,10 +69,10 @@ def main():
 
     if args.cnnnpy:
         # train CNN and save model and confusion matrix
-        cnn_2d_npy_predictor = build_predictors.Cnnnpy(config_values, array, labels, user=user)
-        cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot = cnn_2d_sfs_predictor.build_cnn_sfs()
-        cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
-        cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_confusion.png'))
+        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, array, labels, user=user)
+        cnn_2d_npy_model, cnn_2d_npy_cm, cnn_2d_npy_cm_plot = cnn_2d_npy_predictor.build_cnn_npy()
+        cnn_2d_npy_model.save(os.path.join(args.output, 'cnn_npy.keras'))
+        cnn_2d_npy_cm_plot.savefig(os.path.join(args.output, 'cnn_npy_confusion.png'))
 
 
 if __name__ == '__main__':

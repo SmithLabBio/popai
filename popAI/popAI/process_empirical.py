@@ -1,7 +1,7 @@
 """This module contains the Class for processing empirical data."""
 import logging
 import itertools
-from collections import Counter
+from collections import Counter, OrderedDict
 from itertools import product
 import copy
 import os
@@ -9,7 +9,7 @@ import io
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-
+from popai.utils import minor_encoding
 class DataProcessor:
 
     """Process empirical data."""
@@ -66,10 +66,10 @@ class DataProcessor:
         filtered_alignments = np.delete(encoded_alignments, invariant_columns, axis=1)
 
         # concert to minor allele encoding
-        encoded_array = self._minor_encoding(filtered_alignments)
+        encoded_array = minor_encoding(filtered_alignments)
 
 
-        self.logger.info("""Empirical data has %s biallelic SNPs. If this is very different than the number of SNPs in your simulated data, you may want to change some priors.""",
+        self.logger.info("""Empirical data has %s SNPs. If this is very different than the number of SNPs in your simulated data, you may want to change some priors.""",
                          encoded_array.shape[1])
 
         return encoded_array
@@ -126,25 +126,12 @@ class DataProcessor:
         invariant_columns = np.where(np.sum(frequencies == 0, axis=1) >= 3)[0]
         filtered_alignments = np.delete(encoded_alignments, invariant_columns, axis=1)
 
-        encoded_array = self._minor_encoding(filtered_alignments)
+        encoded_array = minor_encoding(filtered_alignments)
 
 
-        self.logger.info("Empirical data has %s biallelic SNPs. If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", encoded_array.shape[1])
+        self.logger.info("Empirical data has %s SNPs. If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", encoded_array.shape[1])
 
         return encoded_array
-
-    def _minor_encoding(self, arr):
-        result = arr.copy()
-        for col in range(arr.shape[1]):
-            column = arr[:, col]
-            column = column[column != -1]
-            freq = Counter(column)
-            sorted_values = [item[0] for item in freq.most_common()]
-            value_to_rank = {value: rank for rank, value in enumerate(sorted_values)}
-            for original_value, new_value in value_to_rank.items():
-                result[arr[:, col] == original_value, col] = new_value
-
-        return result
 
     def _encode_string(self, string, encoding_dict):
         encoded_string = []
@@ -312,7 +299,7 @@ class DataProcessor:
         for key, value in self.config["sampling dict"].items():
             sampling_indices[key] = [current, value + current]
             current = current+value
-        reordered_downsampling = {key: downsampling[key] for key in self.config["sampling dict"]}
+        reordered_downsampling = OrderedDict({key: downsampling[key] for key in self.config["sampling dict"]})
 
         # remove columns that do not meet thresholds
         sampled = 0
@@ -331,7 +318,7 @@ class DataProcessor:
 
             # Generate all possible combinations of counts per population
             combos = product(*(range(count + 1) for count in reordered_downsampling.values()))
-            rep_sfs_dict = {'_'.join(map(str, combo)): 0 for combo in combos}
+            rep_sfs_dict = OrderedDict({'_'.join(map(str, combo)): 0 for combo in combos})
 
             for site in range(filtered_encoded_alignment.shape[1]): # iterate over sites
                 site_data = list(filtered_encoded_alignment[:,site]) # get the data for that site
@@ -367,7 +354,7 @@ class DataProcessor:
                 for value in reordered_downsampling.values():
                     thresholds.append([int(np.floor(value/nbins*(x+1))) for x in range(nbins)])
                 threshold_combos = list(product(*thresholds))
-                binned_rep_sfs_dict = {'_'.join(map(str, combo)): 0 for combo in threshold_combos}
+                binned_rep_sfs_dict = OrderedDict({'_'.join(map(str, combo)): 0 for combo in threshold_combos})
 
                 for key, value in rep_sfs_dict.items():
                     new_string = ''
@@ -378,7 +365,7 @@ class DataProcessor:
                     new_string = new_string.strip('_')
                     binned_rep_sfs_dict[new_string] += value
                 rep_sfs_dict = binned_rep_sfs_dict
-
+            
             rep_sfs_dict = [value for value in rep_sfs_dict.values()]
 
             all_sfs.append(np.array(rep_sfs_dict))

@@ -1,5 +1,5 @@
 ##############################
-Running popai through the command line
+Tutorial 1a: Running popai through the command line
 ##############################
 
 ==========================================
@@ -14,18 +14,24 @@ Use pip to install popai::
     cd ../../
 
 ==========================================
-Step 2: Ensure you have the example input data 
+Step 2: Prepare Input
 ==========================================
 
-Example input data is available `here <https://github.com/SmithLabBio/popai/tree/main/tutorial_data>`_.
+Example input data is available `here <https://github.com/SmithLabBio/popai/tree/main/tutorial_data/tutorial_1_data>`_.
 
 You should have these in the directory you cloned when installing popai, in the subfolder tutorial_data.
+
+Create a directory in which to run the tutorial, and copy these data to that directory::
+
+    mkdir tutorial_1
+    cd tutorial_1
+    cp -r /path/to/downloaded/data/tutorial_1_data ./
 
 ==========================================
 Step 3: Processing Empirical data
 ==========================================
 
-The first step is to process the user's empirical data. This involves reading the data from fasta files, deciding which values to use for down-projection, and building the SFS.
+The first step is to process the user's empirical data. This involves reading the data from fasta files (or a vcf), deciding which values to use for down-projection, and building the SFS.
 
 For more information on input formats, please see the `input instructions <https://popai.readthedocs.io/en/latest/usage/parsinginput.html>`_.
 
@@ -59,19 +65,21 @@ Preview the SFS:
 
 .. code-block:: python
 
-    process_empirical_data --config popai/tutorial_data/config.txt --preview
+    process_empirical_data --config tutorial_1_data/config.txt --preview
 
-This will print to the screen information about how many SNPs are available at different downsampling thresholds. We want to maximize the number of individuals and SNPs we can use. In this tutorial, since the input data were simulated without missing data, we can use all individuals and still retain all the SNPs.
+This will print to the screen information about how many SNPs are available at different downsampling thresholds. We want to maximize the number of (haploid) individuals and SNPs we can use. In this tutorial, since the input data were simulated without missing data, we can use all individuals and still retain all the SNPs. 
+
+Note that this prints the thresholds as the minimum number of chromosomes. We simulate diploid individuals in msprime, so popai requires that you use even values. This is why only even-valued thresholds are printed.
 
 Now, we are ready to build our empirical SFS:
 
 .. code-block:: python
 
-    process_empirical_data --config popai/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --reps 1 --output empirical/
+    process_empirical_data --config tutorial_1_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --reps 1 --output empirical/
 
 We are only using a single replicate for this test. This makes sense because our 'empirical' data are actually simulated data, and we are not downsampling. Because of this, we do not expect much noise. For messier empirical data, use ~10 reps and ensure that results do not differ across replicates.
 
-Notice that this will print to the screen the number of sites used to build the SFS on average. Please record this, as we will use it in the next step.
+Notice that this will print to the screen the number of SNPs in your empirical data. Please record this, as we will use it in the next step.
 
 This script will also output in the output directory the joint and multidimensional site frequency spectra for each replicate.
 
@@ -105,7 +113,7 @@ It is essential to use the same downsampling dictionary here that you used to pr
 
 .. code-block:: python
 
-    simulate_data --config popai/tutorial_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1051 --plot --simulate
+    simulate_data --config tutorial_1_data/config.txt --downsampling "{'A':20, 'B':20, 'C':20}" --output simulated/ --maxsites 1608 --plot --simulate
 
 In the output directory, you should see a pdf showing your models (models.pdf), a pickled object storing the simulated jSFS, and a numpy matrix storing the mSFS. 
 
@@ -139,7 +147,7 @@ The argument *--simulations* takes as input the output directory from the previo
 
 .. code-block:: python
 
-    train_models --config popai/tutorial_data/config.txt --simulations simulated/ --output trained_models --rf --fcnn --cnn
+    train_models --config tutorial_1_data/config.txt --simulations simulated/ --output trained_models --rf --fcnn --cnn --cnnnpy
 
 This will output to the output directory the trained.model files for the FCNN and the CNN, and a pickled object storing the RF Classifier. It will also output confusion matrices showing the performance of each approach on the validation data, for which we hold out 20% of our simulated datasets. 
 
@@ -163,12 +171,13 @@ Finally, we can apply the networks to make classifications on our empirical data
       --force               Overwrite existing results.
       --rf                  Train RF classifier.
       --fcnn                Train FCNN classifier.
-      --cnn                 Train CNN classifier.
+      --cnn                 Train CNN classifier on jSFS
+      --cnnnpy              Train a CNN classifier on alignments.
 
 Provide the output paths from Step 5 and Step 3 for the --models and --empirical arguments, respectively. 
 
 .. code-block:: python
 
-    apply_models --config popai/tutorial_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --rf --fcnn --cnn
+    apply_models --config tutorial_1_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --rf --fcnn --cnn --cnnnpy
 
 This should save to the output directory tables showing the predicted probabilities for each model for each classifier.

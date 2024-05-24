@@ -27,10 +27,11 @@ def main():
         empirical_array = data_processor.fasta_to_numpy()
     else:
         empirical_array = data_processor.vcf_to_numpy()
-    
+        
     # If we are checking downsampling, print downsampling results
     if args.preview:
         empirical_2d_sfs_sampling = data_processor.find_downsampling(empirical_array)
+        print(f"Population order: {config_values['sampling dict']}")
         print(empirical_2d_sfs_sampling)
     
     else:
@@ -49,6 +50,9 @@ def main():
 
         # create output directory
         os.system('mkdir -p %s' % args.output)
+
+        # save numpy array
+        np.save(file=os.path.join(args.output, 'empirical.npy'), arr=empirical_array)
 
         # make plots of empirical sfs
         data_processor.plot_2dsfs(empirical_2d_sfs, output_directory=os.path.join(args.output))

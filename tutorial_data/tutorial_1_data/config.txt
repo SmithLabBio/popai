@@ -1,6 +1,6 @@
 [Model]
-species tree file = ./delimitpy/tutorial_data/tree.nex # Path to a species tree in nexus format.
-migration matrix = ./delimitpy/tutorial_data/migration.txt # Path to a migration matrix
+species tree file = ./tutorial_1_data/tree.nex # Path to a species tree in nexus format.
+migration matrix = ./tutorial_1_data/migration.txt # Path to a migration matrix
 symmetric = True # True if migration rates should always be symmetric, and only symmetric migration events should be included.
 secondary contact = True # True if you wish to consider secondary contact models.
 divergence with gene flow = False # True if you wish to consider divergence with gene flow models.
@@ -18,5 +18,5 @@ mutation rate = U(5e-9, 5e-8) # Prior from which to draw mutation rates. Only un
 substitution model = JC69 # Substitution model to use in simulations.
 
 [Data]
-alignments = ./delimitpy/tutorial_data/alignments # Path to alignments
-popfile = ./delimitpy/tutorial_data/populations.txt # Path to popfile
+alignments =  ./tutorial_1_data/alignments # Path to alignments
+popfile =  ./tutorial_1_data/populations.txt # Path to popfile

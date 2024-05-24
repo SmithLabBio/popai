@@ -11,7 +11,6 @@ def main():
     parser.add_argument('--plot', action='store_true', help='Plot the popai models.')
     parser.add_argument('--simulate', action='store_true', help='Simulate data under the popai models.')
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
-    #parser.add_argument('-r', '--reps', type=int, help="Number of replicate downsampled SFS to build.")
     parser.add_argument('--nbins', type=int, default=None, help='Number of bins for creating a binned SFSsimu (default: None)')
     parser.add_argument('--output', help="Path to output folder for storing SFS.")
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
@@ -36,7 +35,7 @@ def main():
         # Build models and draw parameters
         model_builder = generate_models.ModelBuilder(config_values)
         divergence_demographies, sc_demographies, dwg_demographies = model_builder.build_models()
-        parameterized_models, labels = model_builder.draw_parameters(divergence_demographies, sc_demographies, dwg_demographies)
+        parameterized_models, labels, sp_tree_index = model_builder.draw_parameters(divergence_demographies, sc_demographies, dwg_demographies)
 
         if args.plot:
 
@@ -52,14 +51,14 @@ def main():
                 return
 
             # simulate data
-            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites)
-            arrays, labels = data_simulator.simulate_ancestry()
+            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, sp_tree_index=sp_tree_index)
+            arrays = data_simulator.simulate_ancestry()
 
     else:
 
         # Build models and draw parameters
         model_reader = process_user_models.ModelReader(config_values=config_values)
-        parameterized_models, labels = model_reader.read_models()
+        parameterized_models = model_reader.read_models()
 
         # validate the models
         if args.plot:
@@ -91,7 +90,8 @@ def main():
             pickle.dump(sfs_2d, f)
         with open(os.path.join(args.output, 'simulated_arrays.pickle'), 'wb') as f:
             pickle.dump(arrays, f)
-        np.save(os.path.join(args.output, 'simulated_msfs.npy'), np.array(msfs), allow_pickle=True)
+        with open(os.path.join(args.output, 'simulated_msfs.pickle'), 'wb') as f:
+            pickle.dump(msfs, f)
         np.save(os.path.join(args.output, 'labels.npy'), np.array(labels), allow_pickle=True)
 
 if __name__ == '__main__':

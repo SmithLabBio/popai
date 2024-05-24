@@ -4,6 +4,7 @@ import configparser # ModelConfigParser
 import os
 import dendropy # ModelConfigParser
 import pandas as pd # ModelConfigParser
+from collections import OrderedDict
 
 class ModelConfigParser:
 
@@ -28,6 +29,9 @@ class ModelConfigParser:
             ValueError: If there is an issue with parsing or converting the configuration values.
         """
 
+        if not os.path.isfile(self.configfile):
+            raise FileNotFoundError(f"The configuration file {self.configfile} does not exist.")
+
         config = configparser.ConfigParser(inline_comment_prefixes="#")
         config.read(self.configfile)
         config_dict = {}
@@ -44,6 +48,8 @@ class ModelConfigParser:
             if config_dict['user models'] is None:
                 config_dict['species tree'] = dendropy.TreeList.get(
                     path=config['Model']['species tree file'], schema="nexus")
+                if len(config_dict["species tree"]) == 0:
+                    raise ValueError("Error in species tree.")
                 migration_paths = config['Model']['migration matrix'].split(";")
                 config_dict['migration df']=[pd.read_csv(x\
                     , index_col=0) for x in migration_paths]
@@ -83,7 +89,7 @@ class ModelConfigParser:
             pop_df = pd.read_csv(config_dict["popfile"], delimiter='\t')
             config_dict["original population dictionary"] = pop_df.set_index('individual')\
                 ['population'].to_dict()
-            config_dict["sampling dict"] = pop_df['population'].value_counts().to_dict()
+            config_dict["sampling dict"] = OrderedDict(pop_df['population'].value_counts().to_dict())
 
 
             if config["Data"]["alignments"] == "None":
