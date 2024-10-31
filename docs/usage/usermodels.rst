@@ -87,7 +87,8 @@ Migration
 ------------------
 The Migration section contains the migration rate to use at the beginning of the simulation (the present). 
 Each population, including ancestral populations, must be present. Rates can either be set to 0, or a uniform prior can be provided in the format [min,max].
-This migration matrix specified migration at the present. Therefore, it only makes sense to specify migration rates for populations that exist at the present.
+
+This migration matrix specifies migration at the present. Therefore, it only makes sense to specify migration rates for populations that exist at the present.
 If you specify migration rates for other populations, msprime will interpret the migration as beginning when those populations are available.
 However, models will not plot correctly, and popai will return a warning.
 
@@ -144,8 +145,11 @@ For example, to specify migration beginning between populations A and B bewteen 
 
 We could set the migration rate based on another divergence time defined earlier. For example::
     1=split	10000	50000	["A","B"]	AB	DIVAB
+
     2=split	70000	100000	["AB","C"]	ABC
+
     3=symmetric migration	DIVAB/2	DIVAB/2	["A","B"]	0
+
 In this case, migration between populations A and B stops at half of the divergence time between A and B (secondary contact model).
 
 3. asymmetric migration 
