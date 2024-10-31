@@ -11,14 +11,14 @@ Instead of using the default model set, users can generate their own models for 
 
 
     [Model]
-    species tree file = ./popai/tutorial_data/tree.nex # Path to a species tree in nexus format.
-    migration matrix = ./popai/tutorial_data/migration.txt # Path to a migration matrix
-    symmetric = True # True if migration rates should always be symmetric, and only symmetric migration events should be included.
-    secondary contact = True # True if you wish to consider secondary contact models.
-    divergence with gene flow = False # True if you wish to consider divergence with gene flow models.
-    max migration events = 1 # Maximum number of migration events to consider in one model.
-    migration rate = U(1e-5, 1e-4) # Prior from which to draw migration rates. Only uniform priors are supported at present.
-    constant Ne = True # population sizes equal across all populations
+    species tree file = None # Path to a species tree in nexus format.
+    migration matrix = None # Path to a migration matrix
+    symmetric = None # True if migration rates should always be symmetric, and only symmetric migration events should be included.
+    secondary contact = None # True if you wish to consider secondary contact models.
+    divergence with gene flow = None # True if you wish to consider divergence with gene flow models.
+    max migration events = None # Maximum number of migration events to consider in one model.
+    migration rate = None # Prior from which to draw migration rates. Only uniform priors are supported at present.
+    constant Ne = None # population sizes equal across all populations
     user models = ./model/
 
     [Other]
@@ -32,6 +32,8 @@ Instead of using the default model set, users can generate their own models for 
     [Data]
     alignments = ./popai/tutorial_data/alignments # Path to alignments
     popfile = ./popai/tutorial_data/populations.txt # Path to popfile
+
+NOTE: In this case, the species tree 
 
 ========================================
 Models Folder
@@ -85,6 +87,9 @@ Migration
 ------------------
 The Migration section contains the migration rate to use at the beginning of the simulation (the present). 
 Each population, including ancestral populations, must be present. Rates can either be set to 0, or a uniform prior can be provided in the format [min,max].
+This migration matrix specified migration at the present. Therefore, it only makes sense to specify migration rates for populations that exist at the present.
+If you specify migration rates for other populations, msprime will interpret the migration as beginning when those populations are available.
+However, models will not plot correctly, and popai will return a warning.
 
 **Entries must be separated by tabs.**
 
@@ -99,15 +104,21 @@ Example::
         AB	0	0	0	0	0
         ABC	0	0	0	0	0
 
+
 ------------------
 Events
 ------------------
 The events section is where users can specify historical events. 
 
 Event entries are formated as follows::
-    index=type	[mintime]	[maxtime]	[type specific parameters]
+    index=type	[mintime]	[maxtime]	[type specific parameters] [optional parameter name]
 
 The mintime and maxtime are the prior for a uniform distribution on the timing of the event.
+
+The optional parameter name can be used to store the timing of an event. This time can then be used in subsequent events.
+Subsequent events can use this event name along with several operations to specify a time for another event.
+Operations currently implemented include: division ("/"), multiplication (*), addition (+), subtraction (-), minimum (min), and maximum (max).
+See an example in the symmetric migration rate section below.
 
 **Entries must be separated by tabs.**
 
@@ -130,6 +141,12 @@ Rate can either be [min,max] value for a uniform prior, or a single floating poi
 
 For example, to specify migration beginning between populations A and B bewteen 1,000 and 5,000 generations ago.::
     2=symmetric migration	1000	5000	["A","B"]	[1e-5,1e-4]
+
+We could set the migration rate based on another divergence time defined earlier. For example::
+    1=split	10000	50000	["A","B"]	AB	DIVAB
+    2=split	70000	100000	["AB","C"]	ABC
+    3=symmetric migration	DIVAB/2	DIVAB/2	["A","B"]	0
+In this case, migration between populations A and B stops at half of the divergence time between A and B (secondary contact model).
 
 3. asymmetric migration 
 
