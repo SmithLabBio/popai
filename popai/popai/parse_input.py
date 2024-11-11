@@ -87,13 +87,15 @@ class ModelConfigParser:
 
             # get population sampling info
             pop_df = pd.read_csv(config_dict["popfile"], delimiter='\t')
+            if not all(col in pop_df.columns for col in ['individual', 'population']):
+                raise Exception("Error: popfile must have header row with columns: [\"individual\", \"population\"]")
             config_dict["original population dictionary"] = pop_df.set_index('individual')\
                 ['population'].to_dict()
             config_dict["sampling dict"] = OrderedDict(pop_df['population'].value_counts().to_dict())
 
-
+            data_source = ""
             if config["Data"]["alignments"] == "None":
-
+                data_source = "vcf"
                 config_dict["population dictionary"] = {}
                 for key,value in config_dict["original population dictionary"].items():
                     config_dict["population dictionary"][f"{key}_a"] = value
@@ -101,7 +103,6 @@ class ModelConfigParser:
 
                 for key,value in config_dict["sampling dict"].items():
                     config_dict["sampling dict"][key] = value*2
-
 
                 # get lengths
                 lengths = [x for x in config_dict["vcf"] if "length" in x]
@@ -112,8 +113,8 @@ class ModelConfigParser:
                 individuals = [x for x in config_dict["vcf"] if x.startswith("#CHROM")][0]
                 individuals = set([x.strip() for x in individuals.split("\t") if x not in ("#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT")])
 
-
             else:
+                data_source = "alignment"
                 config_dict["population dictionary"] = config_dict["original population dictionary"]
 
                 # get fastas and lengths
@@ -127,8 +128,19 @@ class ModelConfigParser:
                 # get number variable sites
                 individuals = self._get_individuals(config_dict['fastas'])
 
-            if set(pop_df['individual']) != individuals:
-                raise Exception("Error: The lables in your alignment do not match the labels in your population dictionary.")
+            # Assert that popfile and alignment/vcf sample ids match
+            popfile_id_set = set(pop_df["individual"])
+            alignment_id_set = set(individuals)
+
+            # Only in popfile
+            unique_popfile_ids = popfile_id_set - alignment_id_set
+            if unique_popfile_ids:
+                raise Exception(f"Error: popfile sample ids: [{','.join(unique_popfile_ids)}] not in {data_source} file.") 
+
+            # Only in alignment
+            unique_alignment_ids = alignment_id_set - popfile_id_set
+            if unique_alignment_ids:
+                raise Exception(f"Error: {data_source} sample ids: [{','.join(unique_alignment_ids)}] not in popfile.") 
 
 
         except dendropy.utility.error.DataParseError as e:
