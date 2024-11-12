@@ -93,7 +93,6 @@ class ModelConfigParser:
                 ['population'].to_dict()
             config_dict["sampling dict"] = OrderedDict(pop_df['population'].value_counts().to_dict())
 
-            data_source = ""
             if config["Data"]["alignments"] == "None":
                 data_source = "vcf"
                 config_dict["population dictionary"] = {}
