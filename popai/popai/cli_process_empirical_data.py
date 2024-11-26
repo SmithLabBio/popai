@@ -31,8 +31,12 @@ def main():
     # If we are checking downsampling, print downsampling results
     if args.preview:
         empirical_2d_sfs_sampling = data_processor.find_downsampling(empirical_array)
-        print(f"Population order: {config_values['sampling dict']}")
-        print(empirical_2d_sfs_sampling)
+        with open(os.path.join(args.output, 'preview_SFS.txt'), 'w') as f:
+            f.write(f"Population order: {config_values['sampling dict']}\n")
+            for key,value in empirical_2d_sfs_sampling.items():
+                f.write(f"{str(key)}\t{str(value)}")
+                f.write('\n')
+        print(f"Preview printed to file {os.path.join(args.output, 'preview_SFS.txt')}.")
     
     else:
         try:
