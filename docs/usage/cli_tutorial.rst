@@ -65,9 +65,9 @@ Preview the SFS:
 
 .. code-block:: python
 
-    process_empirical_data --config tutorial_1_data/config.txt --preview
+    process_empirical_data --config tutorial_1_data/config.txt --preview --output preview
 
-This will print to the screen information about how many SNPs are available at different downsampling thresholds. We want to maximize the number of (haploid) individuals and SNPs we can use. In this tutorial, since the input data were simulated without missing data, we can use all individuals and still retain all the SNPs. 
+This will create a file called 'preview_SFS.txt' in the output directory with information about how many SNPs are available at different downsampling thresholds. We want to maximize the number of (haploid) individuals and SNPs we can use. In this tutorial, since the input data were simulated without missing data, we can use all individuals and still retain all the SNPs. 
 
 Note that this prints the thresholds as the minimum number of chromosomes. We simulate diploid individuals in msprime, so popai requires that you use even values. This is why only even-valued thresholds are printed.
 

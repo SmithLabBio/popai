@@ -32,6 +32,8 @@ You will need to slighly modify the config.txt file.
     vcf = ./tutorial_1_data/alignments/alignment.vcf 
 3) Change the popfile to ./tutorial_1_data/populations_vcf.txt
 
+Note: if your VCF does not contain information on contig lengths, you must supply the expected contig length via a "length" argument in the config file's Data section.
+
 ==========================================
 Step 2: Proceed with steps 3-6 of tutorial 1A.
 ==========================================
