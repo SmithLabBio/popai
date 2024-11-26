@@ -84,7 +84,6 @@ class ModelConfigParser:
 
 
         try: # get special information
-
             # get population sampling info
             pop_df = pd.read_csv(config_dict["popfile"], delimiter='\t')
             if not all(col in pop_df.columns for col in ['individual', 'population']):
@@ -106,7 +105,18 @@ class ModelConfigParser:
                 # get lengths
                 lengths = [x for x in config_dict["vcf"] if "length" in x]
                 lengths = [int(x.split("=")[3].split(">")[0]) for x in lengths]
-                config_dict['lengths'] = lengths
+                if len(lengths) > 0:
+                    config_dict['lengths'] = lengths
+                else:
+                    contigs = [x for x in config_dict["vcf"] if not "#" in x] # strip header
+                    contigs = [x.split('\t')[0] for x in contigs]
+                    contigs = set(contigs)
+                    try:
+                        lengths = [int(config["Data"]["length"]) for x in range(len(contigs))]
+                    except KeyError as e:
+                        raise KeyError(f"Error in model config: Missing key in configuration file: {e}") from e
+
+                    # TODO: add error handling if length is not there.
 
                 # get individuals
                 individuals = [x for x in config_dict["vcf"] if x.startswith("#CHROM")][0]
