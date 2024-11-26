@@ -59,6 +59,8 @@ VCF
 
 As an alternative to a set of gene alignments, the user can provide a vcf. In the config file, set alignments = None, and add vcf = /path/to/input.vcf below.
 
+Note: if your VCF does not contain information on contig lengths, you must supply the expected contig length via a "length" argument in the config file's Data section.
+
 ------------
 Pop File
 ------------
