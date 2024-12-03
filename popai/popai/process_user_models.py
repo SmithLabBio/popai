@@ -245,7 +245,7 @@ class ModelReader:
 
        # split parameters by commas, ignoring commas inside brackets.
         
-        result = self._split_ignore_char(params, '[', ']')
+        result = self._split_ignore_char_extend(params)
         
         for item in result:
             if '[' in item.split('=')[1]:
@@ -253,7 +253,6 @@ class ModelReader:
             else:
                 value = item.split('=')[1].strip()
             split_results[item.split('=')[0].strip()] = value
-        
 
         return split_results
     
@@ -291,7 +290,34 @@ class ModelReader:
             result.append("".join(current).strip('}'))
         
         return(result)
-    
+
+    def _split_ignore_char_extend(self, string):
+        result = []
+        current = []
+        in_brackets = False
+        in_paren = False
+
+        for char in string:
+            if char == '[':
+                in_brackets = True
+            elif char == ']':
+                in_brackets = False
+            elif char == '(':
+                in_paren = True
+            elif char == ')':
+                in_paren = False
+            elif char == "," and not in_brackets and not in_paren:
+                result.append("".join(current).strip())
+                current = []
+                continue
+            current.append(char)
+
+        # Add the last parameter
+        if current:
+            result.append("".join(current).strip('}'))
+        
+        return(result)
+
     def _get_event_value(self, item_dict, event_dict, valuetype):
         
         
