@@ -149,7 +149,7 @@ Popsize events specify a change in the growth rate for a population. To specify 
     popgrowth_A = popsize{time=[mintime, maxtime], population=popname, rate=rate}
 
 
-5. bottleneck
+6. bottleneck
 
 Bottleneck events specify a population bottleneck. To specify a bottleneck event::
     bottleneck_A = bottleneck{time=[mintime, maxtime], population=popname, proportion=proportion}
@@ -158,6 +158,12 @@ Proportion is the probability of each lineage coalescing in a single ancestor.
 
 For example, to specify a bottleneck in population A between 500 and 700 generations ago::
     bottleneck_A = bottleneck{time=[500, 700], population=A, proportion=0.1}
+
+7. Pulse migration
+
+Pulse migrations are mass migration events. To specify a pulse migration::
+    pulse_AB = pulse{time=[500,700], source=A, dest=A, prop=0.1}
+    
 
 ========================================
 Models with different numbers of pouplations/species

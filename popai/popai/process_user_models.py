@@ -133,6 +133,15 @@ class ModelReader:
                         
                         event_dict[item] = event_time
 
+                    elif item_dict['event'] == 'pulse':
+
+                        event_time = self._get_event_value(item_dict, event_dict, 'time')
+                        pulse_prop = self._get_event_value(item_dict, event_dict, 'prop')
+
+                        demography.add_mass_migration(source=item_dict['source'], dest=item_dict['dest'], time=event_time, proportion=pulse_prop)
+                        
+                        event_dict[item] = event_time
+
                     else:
                         raise Exception(f"Type {item_dict['event']} is not a valid option. Valid options include split, symmetric migration, asymmetric migration, popsize, popgrowth, and bottleneck.")
 
