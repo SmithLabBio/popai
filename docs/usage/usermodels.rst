@@ -127,36 +127,37 @@ For example, to specify migration beginning between populations A and B bewteen 
 3. asymmetric migration 
 
 Asymmetric migration events specify a change in the migration rate between two populations at some time in the past. To specify an asymmetric migration::
-    mig_AB = symmetric_migration{start=[minstarttime, maxstarttime], stop=[minstoptime, maxstarstime], populations=[list of two populations], rate=[minrate,maxrate]}
+    mig_AB = aysymmetric_migration{start=[minstarttime, maxstarttime], stop=[minstoptime, maxstarstime], source=population, dest=population, rate=[minrate,maxrate]}
 
 Please remember that these models are coalescent models, so everything is backwards in time, including the direction of migration.
 
-Rate can either be [min,max] value for a uniform prior, or a single floating point value.
+For example, to specify asymigration beginning from A to B backwards in time bewteen 1,000 and 5,000 generations ago and ending at their divergence time.::
+    mig_AB = aysymmetric_migration{start=[1000, 5000], stop=div_AB, source=A, dest=B, rate=[1e-5,1e-4]}
 
-For example, to specify asymigration beginning from A to B backwards in time bewteen 1,000 and 5,000 generations ago.::
-    2=asymmetric migration	1000	5000	A	B	[1e-5,1e-4]
 
 4. popsize
 
-Popsize events specify a change in the population size and/or a change in the growth rate for a population. To specify a popsize event::
-    3=popsize	[mintime]	[maxtime]	[population]	[new size]	[growth rate]
-
-New size can either be a uniform prior specified as [min,max], or 'None' to keep the current population sized (used when changing rate only).
-
-Growth rate can either be a uniform prior specified as [min,max] or 'None' to keep the current growth rate (used when changing size only).
+Popsize events specify a change in the population size. To specify a popsize event::
+    popsize_A = popsize{time=[mintime, maxtime], population=popname, size=newsize}
 
 For example, to change the size of population A between 500 and 700 generations ago::
-    3=popsize	500	700	A	[1000,2000]	None
+    popsize_A = popsize{time=[500, 700], population=A, size=[1000,2000]}
+
+5. popgrowth
+
+Popsize events specify a change in the growth rate for a population. To specify a popgrowth event::
+    popgrowth_A = popsize{time=[mintime, maxtime], population=popname, rate=rate}
+
 
 5. bottleneck
 
 Bottleneck events specify a population bottleneck. To specify a bottleneck event::
-    4=bottleneck	[mintime]	[maxtime]	[population]	[proportion]
+    bottleneck_A = bottleneck{time=[mintime, maxtime], population=popname, proportion=proportion}
 
 Proportion is the probability of each lineage coalescing in a single ancestor.
 
 For example, to specify a bottleneck in population A between 500 and 700 generations ago::
-    4=bottleneck	500	700	A	0.1
+    bottleneck_A = bottleneck{time=[500, 700], population=A, proportion=0.1}
 
 ========================================
 Models with different numbers of pouplations/species
