@@ -27,7 +27,13 @@ def main():
         empirical_array = data_processor.fasta_to_numpy()
     else:
         empirical_array = data_processor.vcf_to_numpy()
-        
+
+    # check if output exists
+    if os.path.exists(args.output) and not args.force:
+        raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
+    # create output directory
+    os.system('mkdir -p %s' % args.output)
+       
     # If we are checking downsampling, print downsampling results
     if args.preview:
         empirical_2d_sfs_sampling = data_processor.find_downsampling(empirical_array)
@@ -47,13 +53,6 @@ def main():
     
         empirical_2d_sfs = data_processor.numpy_to_2d_sfs(empirical_array, downsampling=downsampling_dict, replicates = args.reps)
         empirical_msfs, average_snps = data_processor.numpy_to_msfs(empirical_array, downsampling=downsampling_dict, replicates = args.reps, nbins=args.nbins)
-
-        # check if output exists
-        if os.path.exists(args.output) and not args.force:
-            raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
-
-        # create output directory
-        os.system('mkdir -p %s' % args.output)
 
         # save numpy array
         np.save(file=os.path.join(args.output, 'empirical.npy'), arr=empirical_array)

@@ -5,15 +5,6 @@ C=[10000,50000]
 AB=[10000,50000]
 ABC=[10000,50000]
 
-[Migration]	# migration matrix with migration rates entered as a uniform prior [min,max] M[j,k] is the rate at which lineages move from population j to population k in the coalescent process. J is row, K is column
-matrix	=	
-        A	B	C	AB	ABC
-    A	0	0	0	0	0
-    B	0	0	0	0	0
-    C	0	0	0	0	0
-    AB	0	0	0	0	0
-    ABC	0	0	0	0	0
-
 [Events]
-1=split	0	0	["A","B"]	AB
-2=split	0	0	["AB","C"]	ABC
+div_AB = split{time=0, descendants=[A,B], ancestor=AB}
+div_ABC = split{time=0, descendants=[AB,C], ancestor=ABC}
