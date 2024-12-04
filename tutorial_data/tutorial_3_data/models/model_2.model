@@ -7,5 +7,5 @@ ABC=[10000,50000]
 
 [Events]
 div_AB = split{time=[10000,50000], descendants=[A,B], ancestor=AB}
-mig_AB = symmetric_migration{start=0, stop=div_AB, rate=[1e-5,1e-4]}
+mig_AB = symmetric_migration{start=0, stop=div_AB, populations=[A,B], rate=[1e-5,1e-4]}
 div_ABC = split{time=[500000,1000000], descendants=[AB,C], ancestor=ABC}
