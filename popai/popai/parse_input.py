@@ -105,16 +105,16 @@ class ModelConfigParser:
                 # get lengths
                 lengths = [x for x in config_dict["vcf"] if "length" in x]
                 lengths = [int(x.split("=")[3].split(">")[0]) for x in lengths]
-                if len(lengths) > 0:
-                    config_dict['lengths'] = lengths
-                else:
+                if not len(lengths) > 0:
                     contigs = [x for x in config_dict["vcf"] if not "#" in x] # strip header
                     contigs = [x.split('\t')[0] for x in contigs]
                     contigs = set(contigs)
                     try:
                         lengths = [int(config["Data"]["length"]) for x in range(len(contigs))]
+                        config_dict['lengths'] = lengths
                     except KeyError as e:
                         raise KeyError(f"Error in model config: Missing key in configuration file: {e}") from e
+                config_dict['lengths'] = lengths
 
                     # TODO: add error handling if length is not there.
 
