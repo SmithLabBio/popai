@@ -83,79 +83,51 @@ Example::
     ABC=[10000,50000]
 
 ------------------
-Migration
-------------------
-The Migration section contains the migration rate to use at the beginning of the simulation (the present). 
-Each population, including ancestral populations, must be present. Rates can either be set to 0, or a uniform prior can be provided in the format [min,max].
-
-This migration matrix specifies migration at the present. Therefore, it only makes sense to specify migration rates for populations that exist at the present.
-If you specify migration rates for other populations, msprime will interpret the migration as beginning when those populations are available.
-However, models will not plot correctly, and popai will return a warning.
-
-**Entries must be separated by tabs.**
-
-Example::
-
-    [Migration]	# migration matrix with migration rates entered as a uniform prior [min,max] M[j,k] is the rate at which lineages move from population j to population k in the coalescent process. J is row, K is column
-    matrix	=	
-            A	B	C	AB	ABC
-        A	0	[1e-5,1e-4]	0	0	0
-        B	[1e-5,1e-4]	0	0	0	0
-        C	0	0	0	0	0
-        AB	0	0	0	0	0
-        ABC	0	0	0	0	0
-
-
-------------------
 Events
 ------------------
 The events section is where users can specify historical events. 
 
 Event entries are formated as follows::
-    index=type	[mintime]	[maxtime]	[type specific parameters] [optional parameter name]
+    event_name = function{parameters}
 
-The mintime and maxtime are the prior for a uniform distribution on the timing of the event.
+The event_name is specified by the user, and can be used to refer to the event in subsequent events (e.g., to use that event time for another event).
+The function is chosen from amongst six currently available event types: split, symmetric_migration, asymmetric_migration, popsize, popgrowth, and bottleneck.
 
-The optional parameter name can be used to store the timing of an event. This time can then be used in subsequent events.
-Subsequent events can use this event name along with several operations to specify a time for another event.
+Parameters depend on the event type (see below).
+
+Parameters can be specified as integers (or floating point values), as ranges for uniform priors, or as mathematical functions that may involve previously defined events.
+Subsequent events can use the event name along with several operations to specify a time for another event.
 Operations currently implemented include: division ("/"), multiplication (*), addition (+), subtraction (-), minimum (min), and maximum (max).
-See an example in the symmetric migration rate section below.
 
-**Entries must be separated by tabs.**
-
-popai currently accepts five event types:
+popai currently accepts six event types:
 
 1. split
 
-Split events are used to specify population divergences. To specify a split::
-    1=split	[mintime]	[maxtime]	[list of derived populations]	[ancestral population]
+Split events are used to specify population divergences (mergers backwards in time). To specify a split::
+
+    div_name = split{time=[mintime, maxtime], descendants=[list of descendent populations], ancestor=name of ancestral population}
 
 For example, to specify an event in which pouplations 'A' and 'B' merge to form population 'AB' between 10,000 and 50,000 generations ago::
-    1=split	10000	50000	["A","B"]	AB
+    div_AB = split{time=[10000,50000], descendants=[A,B], ancestor=AB}
+
+Splits can also be specified using an integer as the time::
+    div_AB = split{time=25000, descendants=[A,B], ancestor=AB}
+
+Or using a function involving a previously defined event::
+    div_ABC = split{time=max(div_AB, 45000), descendants=[AB,C], ancestor=ABC}
 
 2. symmetric migration
 
 Symmetric migration events specify a change in the migration rate between two populations at some time in the past. To specify a symmetric migration::
-    2=symmetric migration	[mintime]	[maxtime]	[list of populations]	[rate]
+    mig_AB = symmetric_migration{start=[minstarttime, maxstarttime], stop=[minstoptime, maxstarstime], populations=[list of two populations], rate=[minrate,maxrate]}
 
-Rate can either be [min,max] value for a uniform prior, or a single floating point value.
-
-For example, to specify migration beginning between populations A and B bewteen 1,000 and 5,000 generations ago.::
-    2=symmetric migration	1000	5000	["A","B"]	[1e-5,1e-4]
-
-We could set the migration rate based on another divergence time defined earlier. For example::
-    1=split	10000	50000	["A","B"]	AB	DIVAB
-
-    2=split	70000	100000	["AB","C"]	ABC
-
-    3=symmetric migration	DIVAB/2	DIVAB/2	["A","B"]	0
-
-In this case, migration between populations A and B stops at half of the divergence time between A and B (secondary contact model).
+For example, to specify migration beginning between populations A and B bewteen 1,000 and 5,000 generations ago, and ending when the two populations merge (split forward in time).::
+    mig_AB = symmetric_migration{start=[1000,5000], stop=div_AB, populations=[A,B], rate=[1e-5,1e-4]}
 
 3. asymmetric migration 
 
 Asymmetric migration events specify a change in the migration rate between two populations at some time in the past. To specify an asymmetric migration::
-    2=asymmetric migration	[mintime]	[maxtime]	[source]	[dest]	[rate]
+    mig_AB = symmetric_migration{start=[minstarttime, maxstarttime], stop=[minstoptime, maxstarstime], populations=[list of two populations], rate=[minrate,maxrate]}
 
 Please remember that these models are coalescent models, so everything is backwards in time, including the direction of migration.
 
