@@ -49,9 +49,10 @@ class DataSimulator:
 
         # dictionary for storing arrays and list for storing sizes.
         all_arrays = {}
-        sizes = []
+        all_sizes = []
         
         for ix, demography in enumerate(self.models):
+            print(ix, demography)
 
             if ix % 100 == 0:
                 print(f"Beginning simulation {ix} of {len(self.models)}.")
@@ -65,6 +66,7 @@ class DataSimulator:
                 all_arrays[self.labels[ix]].append(matrix)
             else:
                 all_arrays[self.labels[ix]] = [matrix]
+            all_sizes.append(sizes)
 
         end_time = time.time()  # Record the end time
         execution_time = end_time - start_time  # Calculate the execution time
@@ -72,7 +74,7 @@ class DataSimulator:
         self.logger.info("Simulation execution time: %s seconds.", execution_time)
 
         # shorten arrays that are too short, and pad arrays that are too long.
-        median_size = int(np.ceil(np.median(sizes)))
+        median_size = int(np.ceil(np.median(all_sizes)))
 
         self.logger.info("Median simulated data has %s SNPs."\
                          " If this is very different than the number of SNPs in your empirical data, you may want to change some priors.", 
@@ -95,6 +97,8 @@ class DataSimulator:
                     all_arrays[model][i] = modified_matrix
 
         return all_arrays
+
+
 
     def mutations_to_sfs(self, numpy_array_dict, nbins=None):
 
