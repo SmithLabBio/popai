@@ -29,6 +29,10 @@ class DataSimulator:
         self.user = user
         self.sp_tree_index = sp_tree_index
 
+        # to prevent pickling issues
+        if 'fastas' in self.config:
+            del self.config['fastas']
+
         if user == False and sp_tree_index == False:
             raise ValueError("Error in simulation command. You must either provide a species tree index list (output when constructing models), or use user-specified models.")
 
@@ -103,7 +107,6 @@ class DataSimulator:
         if self.user:
             matrix, sizes = self._simulate_demography_user(demography)
         else:
-            print('doing the stuff')
             matrix, sizes = self._simulate_demography(demography, self.config['species tree'][self.sp_tree_index[ix]])
 
         return self.labels[ix], matrix, sizes
@@ -128,7 +131,6 @@ class DataSimulator:
             }
 
             # Collect results
-            print('collecting')
             for future in as_completed(futures):
                 label, matrix, sizes = future.result()
                 all_arrays[label].append(matrix)
