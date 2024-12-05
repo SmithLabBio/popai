@@ -14,6 +14,7 @@ import dendropy
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
 from popai.utils import minor_encoding
+from tqdm import tqdm
 
 class DataSimulator:
 
@@ -131,7 +132,7 @@ class DataSimulator:
             }
 
             # Collect results
-            for future in as_completed(futures):
+            for future in tqdm(as_completed(futures), total=len(self.models), desc="Processing simulations"):
                 label, matrix, sizes = future.result()
                 all_arrays[label].append(matrix)
                 all_sizes.append(sizes)
