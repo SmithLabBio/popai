@@ -52,7 +52,7 @@ def main():
 
             # simulate data
             data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, sp_tree_index=sp_tree_index)
-            arrays = data_simulator.simulate_ancestry()
+            arrays = data_simulator.simulate_ancestry_parallel()
 
     else:
 
@@ -74,7 +74,7 @@ def main():
 
             # simulate data
             data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, user=True)
-            arrays = data_simulator.simulate_ancestry()
+            arrays = data_simulator.simulate_ancestry_parallel()
 
     
     if args.simulate:
