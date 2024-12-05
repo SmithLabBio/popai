@@ -11,6 +11,8 @@ logging.getLogger('msprime').setLevel("WARNING")
 import sys
 import pyslim
 import dendropy
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections import defaultdict
 from popai.utils import minor_encoding
 
 class DataSimulator:
@@ -26,6 +28,10 @@ class DataSimulator:
         self.max_sites = max_sites
         self.user = user
         self.sp_tree_index = sp_tree_index
+
+        # to prevent pickling issues
+        if 'fastas' in self.config:
+            del self.config['fastas']
 
         if user == False and sp_tree_index == False:
             raise ValueError("Error in simulation command. You must either provide a species tree index list (output when constructing models), or use user-specified models.")
@@ -52,7 +58,6 @@ class DataSimulator:
         all_sizes = []
         
         for ix, demography in enumerate(self.models):
-            print(ix, demography)
 
             if ix % 100 == 0:
                 print(f"Beginning simulation {ix} of {len(self.models)}.")
@@ -98,6 +103,68 @@ class DataSimulator:
 
         return all_arrays
 
+    def process_demography(self, ix, demography):
+        if self.user:
+            matrix, sizes = self._simulate_demography_user(demography)
+        else:
+            matrix, sizes = self._simulate_demography(demography, self.config['species tree'][self.sp_tree_index[ix]])
+
+        return self.labels[ix], matrix, sizes
+
+    def simulate_ancestry_parallel(self):
+
+        """Perform ancestry simulations with msprime"""
+
+        start_time = time.time()  # Record the start time
+
+        # dictionary for storing arrays and list for storing sizes.
+        all_arrays = {}
+        all_sizes = []
+
+        all_arrays = defaultdict(list)
+
+        with ProcessPoolExecutor(max_workers=self.cores) as executor:
+            # Submit tasks
+            futures = {
+                executor.submit(self.process_demography, ix, demography): ix
+                for ix, demography in enumerate(self.models)
+            }
+
+            # Collect results
+            for future in as_completed(futures):
+                label, matrix, sizes = future.result()
+                all_arrays[label].append(matrix)
+                all_sizes.append(sizes)
+
+        end_time = time.time()  # Record the end time
+        execution_time = end_time - start_time  # Calculate the execution time
+
+        self.logger.info("Simulation execution time: %s seconds.", execution_time)
+
+        # shorten arrays that are too short, and pad arrays that are too long.
+        median_size = int(np.ceil(np.median(sizes)))
+
+        self.logger.info("Median simulated data has %s SNPs."\
+                         " If this is very different than the number of SNPs in your empirical data, you may want to change some priors.", 
+                         median_size)
+
+        for model, values in all_arrays.items():
+            for i, matrix in enumerate(values):
+                if len(matrix) > 0:
+                    if matrix.shape[1] > self.max_sites:
+                        all_arrays[model][i] = matrix[:, :self.max_sites]
+                    elif matrix.shape[1] < self.max_sites:
+                        num_missing_columns = self.max_sites - matrix.shape[1]
+                        missing_columns = np.full((matrix.shape[0], num_missing_columns), -1)
+                        modified_matrix = np.concatenate((matrix, missing_columns), axis=1)
+                        all_arrays[model][i] = modified_matrix
+                else:
+                    num_missing_columns = self.max_sites - 0
+                    modified_matrix = np.full((sum(self.config["sampling dict"].values()),
+                                               num_missing_columns), -1)
+                    all_arrays[model][i] = modified_matrix
+
+        return all_arrays
 
 
     def mutations_to_sfs(self, numpy_array_dict, nbins=None):
