@@ -260,7 +260,7 @@ class CnnNpy:
 
     """Build a CNN predictor that takes the alignment as a numpy matrix as input."""
 
-    def __init__(self, config, arrays, labels, user=False):
+    def __init__(self, config, arrays, labels, downsampling_dict, user=False):
         self.config = config
         self.arrays = []
         self.labels = []
@@ -282,6 +282,10 @@ class CnnNpy:
             self.labels = keras.utils.to_categorical(self.labels)
         except:
             pass
+
+        self.downsampling_dict = {}
+        for key,value in self.config['sampling dict'].items():
+            self.downsampling_dict[key] = downsampling_dict[key]
 
     def build_cnn_npy(self):
 
@@ -306,7 +310,6 @@ class CnnNpy:
         train_features = np.expand_dims(np.array(train_features), axis=-1)
         val_features = np.expand_dims(np.array(val_features), axis=-1)
 
-
         train_labels = self.labels[train_indices]
         val_labels = self.labels[val_indices]
 
@@ -315,7 +318,7 @@ class CnnNpy:
         split_train_features = []
         split_val_features = []
         start_idx = 0
-        for key, num_rows in self.config['sampling dict'].items():
+        for key, num_rows in self.downsampling_dict.items():
             end_idx = start_idx + num_rows
             split_train_features.append(train_features[:,start_idx:end_idx,:,:])
             split_val_features.append(val_features[:,start_idx:end_idx,:,:])
@@ -324,7 +327,7 @@ class CnnNpy:
         # build model
         input_layers = []
         output_layers = []
-        for key,  num_rows in self.config['sampling dict'].items():
+        for key,  num_rows in self.downsampling_dict.items():
             input_layer = keras.Input(shape=(num_rows, train_features.shape[2], 1), name=f'input_{key}')
             input_layers.append(input_layer)
             conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows,1), activation="relu", padding="valid") (input_layer)

@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--cnn', action='store_true', help='Train CNN classifier of SFS.')
     parser.add_argument('--cnnnpy', action='store_true', help='Train CNN classifier on alignments.')
     parser.add_argument('--ntrees', type=int, help='Number of trees to use in the RF classifier (default=500).', default=500)
+    parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
 
     args = parser.parse_args()
 
@@ -34,6 +35,12 @@ def main():
         user = False
     else:
         user = True
+
+    try:
+        downsampling_dict = ast.literal_eval(args.downsampling)
+    except ValueError:
+        print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
+
 
     # read the data
     labels = np.load(os.path.join(args.simulations, 'labels.npy'), allow_pickle=True)
@@ -69,7 +76,7 @@ def main():
 
     if args.cnnnpy:
         # train CNN and save model and confusion matrix
-        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, array, labels, user=user)
+        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, array, labels, downsampling_dict, user=user)
         cnn_2d_npy_model, cnn_2d_npy_cm, cnn_2d_npy_cm_plot = cnn_2d_npy_predictor.build_cnn_npy()
         cnn_2d_npy_model.save(os.path.join(args.output, 'cnn_npy.keras'))
         cnn_2d_npy_cm_plot.savefig(os.path.join(args.output, 'cnn_npy_confusion.png'))
