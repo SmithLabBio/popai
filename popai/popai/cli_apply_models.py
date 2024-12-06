@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--fcnn', action='store_true', help='Apply FCNN classifier.')
     parser.add_argument('--cnn', action='store_true', help='Apply CNN classifier on jSFS.')
     parser.add_argument('--cnnnpy', action='store_true', help='Apply CNN classifier on alignments.')
-
+    parser.add_argument('--simulations', help='Path to directory with simulated data.')
     args = parser.parse_args()
 
     # check if output exists
@@ -66,7 +66,18 @@ def main():
         jsfs.append(current_dict)
 
     empirical_array = np.load(os.path.join(args.empirical,"empirical.npy"))
-     
+
+    # read the training data
+    training_labels = np.load(os.path.join(args.simulations, 'labels.npy'), allow_pickle=True)
+    
+    with open(os.path.join(args.simulations, 'simulated_msfs.pickle'), 'rb') as f:
+        training_msfs = pickle.load(f)
+    with open(os.path.join(args.simulations, 'simulated_jsfs.pickle'), 'rb') as f:
+        training_sfs_2d = pickle.load(f)
+    with open(os.path.join(args.simulations, 'simulated_arrays.pickle'), 'rb') as f:
+        training_array = pickle.load(f)
+
+
     if args.rf:
         # apply Random Forest model
         random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, {}, {})
@@ -85,12 +96,17 @@ def main():
             f.write(results_fcnn)
 
     if args.cnn:
-        # apply FCNN model
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, {}, {})
+
+         # apply FCNN model
+        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, training_sfs_2d, training_labels)
         cnn_2d_sfs_model = models.load_model(os.path.join(args.models, 'cnn.keras'), compile=True)
+        cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_featureextractor.keras'), compile=True)
         results_cnn = cnn_2d_sfs_predictor.predict(cnn_2d_sfs_model, jsfs)
         with open(os.path.join(args.output, 'cnn_predictions.txt'), 'w') as f:
             f.write(results_cnn)
+
+        cnn_2d_sfs_predictor.check_fit(cnn_2d_sfs_featureextracter, jsfs, args.output, training_labels)
+
 
     if args.cnnnpy:
         # apply FCNN model

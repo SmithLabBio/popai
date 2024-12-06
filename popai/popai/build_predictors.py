@@ -7,6 +7,8 @@ import keras
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tabulate import tabulate
+from sklearn.decomposition import PCA
+import os
 
 class RandomForestsSFS:
 
@@ -145,13 +147,17 @@ class CnnSFS:
         model.fit(train_features, train_labels, epochs=10,
                   batch_size=10, validation_data=(val_features, val_labels))
 
+        # extract the features
+        feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
+
+
         val_pred = model.predict(val_features)
         val_predicted_labels = np.argmax(val_pred, axis=1)
         val_true_labels = np.argmax(val_labels, axis=1)
         conf_matrix = confusion_matrix(val_true_labels, val_predicted_labels)
         conf_matrix_plot = plot_confusion_matrix(val_true_labels, val_predicted_labels)
 
-        return model, conf_matrix, conf_matrix_plot
+        return model, conf_matrix, conf_matrix_plot, feature_extractor
 
     def predict(self, model, new_data):
         new_features = self._convert_2d_dictionary(new_data)
@@ -163,6 +169,39 @@ class CnnSFS:
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
 
         return(tabulated)
+
+    def check_fit(self, feature_extractor, new_data, output_directory, training_labels):
+
+        # features from empirical data
+        new_features = self._convert_2d_dictionary(new_data)
+        new_features = [np.expand_dims(np.array(x), axis=-1) for x in new_features]
+        new_extracted_features = feature_extractor.predict(new_features)
+
+        # features from training data
+        list_of_features = self._convert_2d_dictionary(self.sfs_2d)
+        train_features = [np.expand_dims(np.array(x), axis=-1) for x in list_of_features]
+        train_extracted_features = feature_extractor.predict(train_features)
+
+        # pca
+        pca = PCA(n_components=2)
+        train_pca = pca.fit_transform(train_extracted_features)
+        new_pca = pca.transform(new_extracted_features)
+
+        # plot
+        unique_labels = np.unique(training_labels)
+        for label in unique_labels:
+            indices = np.where(np.array(training_labels) == label)
+            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {label}")
+
+        plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
+
+        plt.xlabel('PCA 1')
+        plt.ylabel('PCA 2')
+        plt.legend()
+        
+        # Save the plot to the specified file
+        plt.savefig(os.path.join(output_directory, 'cnn_2dsfs_features.png'), dpi=300, bbox_inches='tight')
+        plt.close()  # Close the plot to avoid displaying it in interactive environments
 
     def _convert_2d_dictionary(self, data):
 
