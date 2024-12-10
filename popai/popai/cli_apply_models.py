@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--fcnn', action='store_true', help='Apply FCNN classifier.')
     parser.add_argument('--cnn', action='store_true', help='Apply CNN classifier on jSFS.')
     parser.add_argument('--cnnnpy', action='store_true', help='Apply CNN classifier on alignments.')
+    parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
 
     args = parser.parse_args()
 
@@ -25,6 +26,12 @@ def main():
         raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
     # create output directory
     os.system('mkdir -p %s' % args.output)
+
+    try:
+        downsampling_dict = ast.literal_eval(args.downsampling)
+    except ValueError:
+        print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
+
 
     # Parse the configuration file
     config_parser = parse_input.ModelConfigParser(args.config)
@@ -94,7 +101,7 @@ def main():
 
     if args.cnnnpy:
         # apply FCNN model
-        cnn_npy_predictor = build_predictors.CnnNpy(config_values, {}, {})
+        cnn_npy_predictor = build_predictors.CnnNpy(config_values, {}, downsampling_dict, '')
         cnn_npy_model = models.load_model(os.path.join(args.models, 'cnn_npy.keras'), compile=True)
         results_cnn_npy = cnn_npy_predictor.predict(cnn_npy_model, empirical_array)
         with open(os.path.join(args.output, 'cnn_npy_predictions.txt'), 'w') as f:

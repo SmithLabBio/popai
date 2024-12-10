@@ -15,12 +15,14 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
 from popai.utils import minor_encoding
 from tqdm import tqdm
+import pickle
+from collections import defaultdict
 
 class DataSimulator:
 
     """Simulate data under specified demographies."""
 
-    def __init__(self, models, labels, config, cores, downsampling, max_sites, user=False, sp_tree_index = False):
+    def __init__(self, models, labels, config, cores, downsampling, max_sites, output, user=False, sp_tree_index = False, checkpoint = False):
         self.models = models
         self.labels = labels
         self.config = config
@@ -29,6 +31,8 @@ class DataSimulator:
         self.max_sites = max_sites
         self.user = user
         self.sp_tree_index = sp_tree_index
+        self.output = output
+        self.checkpoint = checkpoint
 
         # to prevent pickling issues
         if 'fastas' in self.config:
@@ -110,63 +114,78 @@ class DataSimulator:
         else:
             matrix, sizes = self._simulate_demography(demography, self.config['species tree'][self.sp_tree_index[ix]])
 
-        return self.labels[ix], matrix, sizes
+        return matrix, sizes
 
     def simulate_ancestry_parallel(self):
 
         """Perform ancestry simulations with msprime"""
 
-        start_time = time.time()  # Record the start time
+        # split models by model
+        grouped_demographies = defaultdict(list)
 
-        # dictionary for storing arrays and list for storing sizes.
-        all_arrays = {}
-        all_sizes = []
+        for index, (label, demography) in enumerate(zip(self.labels, self.models)):
+            grouped_demographies[label].append((index, demography))
 
-        all_arrays = defaultdict(list)
+        # list for storing sizes
+        for key, value in grouped_demographies.items():
 
-        with ProcessPoolExecutor(max_workers=self.cores) as executor:
-            # Submit tasks
-            futures = {
-                executor.submit(self.process_demography, ix, demography): ix
-                for ix, demography in enumerate(self.models)
-            }
+            # checkpoint
+            if self.checkpoint and os.path.exists(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(key))):
+                print("Output for model %s already exists. Skipping model." % str(key))
+                continue
 
-            # Collect results
-            for future in tqdm(as_completed(futures), total=len(self.models), desc="Processing simulations"):
-                label, matrix, sizes = future.result()
-                all_arrays[label].append(matrix)
-                all_sizes.append(sizes)
+            start_time = time.time()  # Record the start time
 
-        end_time = time.time()  # Record the end time
-        execution_time = end_time - start_time  # Calculate the execution time
-
-        self.logger.info("Simulation execution time: %s seconds.", execution_time)
-
-        # shorten arrays that are too short, and pad arrays that are too long.
-        median_size = int(np.ceil(np.median(sizes)))
-
-        self.logger.info("Median simulated data has %s SNPs."\
-                         " If this is very different than the number of SNPs in your empirical data, you may want to change some priors.", 
-                         median_size)
-
-        for model, values in all_arrays.items():
-            for i, matrix in enumerate(values):
+            # dictionary for storing arrays and list for storing sizes.
+            all_arrays = []
+            all_sizes = []
+    
+            with ProcessPoolExecutor(max_workers=self.cores) as executor:
+                # Submit tasks
+                futures = {
+                    executor.submit(self.process_demography, ix, demography): ix
+                    for ix, demography in value
+                }
+    
+                # Collect results
+                for future in tqdm(as_completed(futures), total=len(value), desc="Processing simulations"):
+                    matrix, sizes = future.result()
+                    all_arrays.append(matrix)
+                    all_sizes.append(sizes)
+    
+            end_time = time.time()  # Record the end time
+            execution_time = end_time - start_time  # Calculate the execution time
+    
+            self.logger.info("Simulation execution time: %s seconds.", execution_time)
+    
+            for matrix_ix in range(len(all_arrays)):
+                matrix = all_arrays[matrix_ix]
                 if len(matrix) > 0:
                     if matrix.shape[1] > self.max_sites:
-                        all_arrays[model][i] = matrix[:, :self.max_sites]
+                        all_arrays[matrix_ix] = matrix[:, :self.max_sites]
                     elif matrix.shape[1] < self.max_sites:
                         num_missing_columns = self.max_sites - matrix.shape[1]
                         missing_columns = np.full((matrix.shape[0], num_missing_columns), -1)
                         modified_matrix = np.concatenate((matrix, missing_columns), axis=1)
-                        all_arrays[model][i] = modified_matrix
+                        all_arrays[matrix_ix]  = modified_matrix
                 else:
                     num_missing_columns = self.max_sites - 0
                     modified_matrix = np.full((sum(self.config["sampling dict"].values()),
                                                num_missing_columns), -1)
-                    all_arrays[model][i] = modified_matrix
+                    all_arrays[matrix_ix]  = modified_matrix
+            with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(key)), 'wb') as f:
+                pickle.dump(all_arrays, f)
 
-        return all_arrays
 
+            # shorten arrays that are too short, and pad arrays that are too long.
+            median_size = int(np.ceil(np.median(sizes)))
+    
+            self.logger.info("Median simulated data has %s SNPs."\
+                             " If this is very different than the number of SNPs in your empirical data, you may want to change some priors.", 
+                             median_size)
+            
+            
+            del all_arrays, all_sizes
 
     def mutations_to_sfs(self, numpy_array_dict, nbins=None):
 
@@ -174,22 +193,26 @@ class DataSimulator:
 
         all_sfs = {}
 
-        # get indices for samples
-        reordered_downsampling = OrderedDict({key: self.downsampling[key] for \
-                                  key in self.config["sampling dict"]})
+        for i in set(self.labels):
+            
+            # read in array
+            with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
+                arrays = pickle.load(f)
 
-        current = 0
-        sampling_indices = {}
-        for key, value in reordered_downsampling.items():
-            sampling_indices[key] = [current, value + current]
-            current = current+value
+            # create sfs
+            all_sfs[str(i)] = []
 
-        for modelkey, values in numpy_array_dict.items():
+            # get indices for samples
+            reordered_downsampling = {key: self.downsampling[key] \
+                                  for key in self.config["sampling dict"]}
 
-            model_replicates = []
-            all_sfs[modelkey] = []
+            current = 0
+            sampling_indices = {}
+            for key, value in reordered_downsampling.items():
+                sampling_indices[key] = [current, value + current]
+                current = current+value
 
-            for replicate in values:
+            for replicate in arrays:
 
                 # Generate all possible combinations of counts per population
                 combos = product(*(range(count + 1) for count in reordered_downsampling.values()))
@@ -233,33 +256,37 @@ class DataSimulator:
                     rep_sfs_dict = binned_rep_sfs_dict
 
                 rep_sfs_dict = [value for value in rep_sfs_dict.values()]
-                all_sfs[modelkey].append(np.array(rep_sfs_dict))
+                all_sfs[str(i)].append(np.array(rep_sfs_dict))
 
 
         return all_sfs
 
-    def mutations_to_2d_sfs(self, numpy_array_dict):
+    def mutations_to_2d_sfs(self):
         """Translate simulated mutations into 2d site frequency spectra"""
 
         all_sfs = {}
 
-        # get indices for samples
-        reordered_downsampling = {key: self.downsampling[key] \
+
+        for i in set(self.labels):
+            
+            # read in array
+            with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
+                arrays = pickle.load(f)
+
+            # create sfs
+            all_sfs[str(i)] = []
+
+            # get indices for samples
+            reordered_downsampling = {key: self.downsampling[key] \
                                   for key in self.config["sampling dict"]}
 
-        current = 0
-        sampling_indices = {}
-        for key, value in reordered_downsampling.items():
-            sampling_indices[key] = [current, value + current]
-            current = current+value
+            current = 0
+            sampling_indices = {}
+            for key, value in reordered_downsampling.items():
+                sampling_indices[key] = [current, value + current]
+                current = current+value
 
-        for modelkey, values in numpy_array_dict.items():
-
-            all_sfs[modelkey] = []
-
-            model_replicates = []
-
-            for replicate in values:
+            for replicate in arrays:
 
                 # generate the empty arrays
                 sfs_2d = self._create_numpy_2d_arrays()
@@ -274,9 +301,9 @@ class DataSimulator:
 
                             # get the site data for those two populations
                             site_data_pop1 = site_data[sampling_indices[key[0]][0]:
-                                                       sampling_indices[key[0]][1]]
+                                                   sampling_indices[key[0]][1]]
                             site_data_pop2 = site_data[sampling_indices[key[1]][0]:
-                                                       sampling_indices[key[1]][1]]
+                                                   sampling_indices[key[1]][1]]
                             all_site_data = site_data_pop1+site_data_pop2
 
                             # check that this site has two variants in these populations
@@ -296,7 +323,7 @@ class DataSimulator:
                                 # add to the sfs
                                 sfs_2d[key][pop1_count, pop2_count] += 1
 
-                all_sfs[modelkey].append(sfs_2d)
+                all_sfs[str(i)].append(sfs_2d)
 
         return all_sfs
 
