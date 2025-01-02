@@ -95,11 +95,15 @@ def main():
 
     if args.fcnn:
         # apply FCNN model
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, {}, {})
+        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, training_msfs, {})
         neural_network_sfs_model = models.load_model(os.path.join(args.models, 'fcnn.keras'), compile=True)
+        neural_network_featureextracter = models.load_model(os.path.join(args.models, 'fcnn_featureextractor.keras'), compile=True)
         results_fcnn = neural_network_sfs_predictor.predict(neural_network_sfs_model, msfs)
         with open(os.path.join(args.output, 'fcnn_predictions.txt'), 'w') as f:
             f.write(results_fcnn)
+
+        neural_network_sfs_predictor.check_fit(neural_network_featureextracter, msfs, args.output, training_labels)
+
 
     if args.cnn:
 

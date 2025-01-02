@@ -282,7 +282,10 @@ class NeuralNetSFS:
         conf_matrix = confusion_matrix(val_true_labels, val_predicted_labels)
         conf_matrix_plot = plot_confusion_matrix(val_true_labels, val_predicted_labels)
 
-        return model, conf_matrix, conf_matrix_plot
+        # extract the features
+        feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
+
+        return model, conf_matrix, conf_matrix_plot, feature_extractor
     
     def predict(self, model, new_data):
 
@@ -295,6 +298,34 @@ class NeuralNetSFS:
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
 
         return(tabulated)
+
+    def check_fit(self, feature_extractor, new_data, output_directory, training_labels):
+
+        # features from empirical data
+        new_data = np.array(new_data)
+        new_extracted_features = feature_extractor.predict(new_data)
+        train_extracted_features = feature_extractor.predict(np.array(self.sfs))
+
+        # pca
+        pca = PCA(n_components=2)
+        train_pca = pca.fit_transform(train_extracted_features)
+        new_pca = pca.transform(new_extracted_features)
+
+        # plot
+        unique_labels = np.unique(training_labels)
+        for label in unique_labels:
+            indices = np.where(np.array(training_labels) == label)
+            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {label}")
+
+        plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
+
+        plt.xlabel('PCA 1')
+        plt.ylabel('PCA 2')
+        plt.legend()
+        
+        # Save the plot to the specified file
+        plt.savefig(os.path.join(output_directory, 'fcnn_features.png'), dpi=300, bbox_inches='tight')
+        plt.close()  # Close the plot to avoid displaying it in interactive environments
 
 class CnnNpy:
 
