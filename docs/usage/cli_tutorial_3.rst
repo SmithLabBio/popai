@@ -163,6 +163,7 @@ Finally, we can apply the networks to make classifications on our empirical data
       --models MODELS       Path to directory with trained models.
       --empirical EMPIRICAL
                             Path to directory with empirical SFS.
+      --simulations         Path to simulated training data.
       --output OUTPUT       Path to output folder for storing SFS.
       --force               Overwrite existing results.
       --rf                  Train RF classifier.
@@ -174,6 +175,5 @@ Provide the output paths from Step 5 and Step 3 for the --models and --empirical
 
 .. code-block:: python
 
-    apply_models --config tutorial_3_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --rf --fcnn --cnn --cnnnpy
-
+    apply_models --config tutorial_3_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --rf --fcnn --cnn --cnnnpy --simulations simulated/
 This should save to the output directory tables showing the predicted probabilities for each model for each classifier.
