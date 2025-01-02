@@ -143,7 +143,7 @@ class DataProcessor:
         return encoded_string
 
     def find_downsampling(self, encoded_alignment):
-        """This funciton will convert an empirical alignment to a site frequency spectrum.
+        """This function will convert an empirical alignment to a site frequency spectrum.
         It needs to deal with missing data in an intelligent way (e.g., downsampling)."""
 
         sampled = 0
@@ -247,11 +247,9 @@ class DataProcessor:
                     else:
                         site_data_pop2_sampled = [site_data_pop2]*replicates
 
-
+                    
                     for k in range(replicates):
-
                         all_site_data = site_data_pop1_sampled[k]+site_data_pop2_sampled[k]
-                        #print(all_site_data)
 
                         # check that this site has two variants in these populations
                         if len(set(all_site_data)) == 2:
