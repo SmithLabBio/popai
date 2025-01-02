@@ -148,7 +148,7 @@ class DataSimulator:
                 }
     
                 # Collect results
-                for future in tqdm(as_completed(futures), total=len(value), desc="Processing simulations"):
+                for future in tqdm(as_completed(futures), total=len(value), desc=f"Processing simulations (Model {str(key)})"):
                     matrix, sizes = future.result()
                     all_arrays.append(matrix)
                     all_sizes.append(sizes)
