@@ -403,7 +403,10 @@ class CnnNpy:
         conf_matrix = confusion_matrix(val_true_labels, val_predicted_labels)
         conf_matrix_plot = plot_confusion_matrix(val_true_labels, val_predicted_labels)
 
-        return model, conf_matrix, conf_matrix_plot
+        # extract the features
+        feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
+
+        return model, conf_matrix, conf_matrix_plot, feature_extractor
 
     def predict(self, model, new_data):
  
@@ -428,6 +431,49 @@ class CnnNpy:
 
         return(tabulated)
 
+    def check_fit(self, feature_extractor, new_data, output_directory):
+
+        # features from empirical data
+        new_data = np.expand_dims(new_data, axis=-1)
+        new_data = np.expand_dims(new_data, axis=0)
+        training_data = np.array(self.arrays)
+        training_data = np.expand_dims(training_data, axis=-1)
+
+        # split by pop
+        split_features = []
+        split_train_features = []
+
+        start_idx = 0
+        for key, num_rows in self.downsampling_dict.items():
+            end_idx = start_idx + num_rows
+            split_features.append(new_data[:,start_idx:end_idx,:,:])
+            split_train_features.append(training_data[:,start_idx:end_idx,:,:])
+            start_idx = end_idx
+        new_extracted_features = feature_extractor.predict(split_features)
+        train_extracted_features = feature_extractor.predict(split_train_features)
+
+        # pca
+        pca = PCA(n_components=2)
+        train_pca = pca.fit_transform(train_extracted_features)
+        new_pca = pca.transform(new_extracted_features)
+
+        # plot
+        untransformed_labels = np.argmax(self.labels, axis=1)
+
+        unique_labels = np.unique(untransformed_labels)
+        for label in unique_labels:
+            indices = np.where(np.array(untransformed_labels) == label)
+            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {label}")
+
+        plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
+
+        plt.xlabel('PCA 1')
+        plt.ylabel('PCA 2')
+        plt.legend()
+        
+        # Save the plot to the specified file
+        plt.savefig(os.path.join(output_directory, 'cnn_npy_features.png'), dpi=300, bbox_inches='tight')
+        plt.close()  # Close the plot to avoid displaying it in interactive environments
 
 
 def plot_confusion_matrix(y_true, y_pred):

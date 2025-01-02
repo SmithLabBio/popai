@@ -116,11 +116,13 @@ def main():
 
     if args.cnnnpy:
         # apply CNN model
-        cnn_npy_predictor = build_predictors.CnnNpy(config_values, {}, downsampling_dict, '')
+        cnn_npy_predictor = build_predictors.CnnNpy(config_values, training_labels, downsampling_dict, args.simulations)
         cnn_npy_model = models.load_model(os.path.join(args.models, 'cnn_npy.keras'), compile=True)
+        cnn_npy_featureextracter = models.load_model(os.path.join(args.models, 'cnn_npy_featureextractor.keras'), compile=True)
         results_cnn_npy = cnn_npy_predictor.predict(cnn_npy_model, empirical_array)
         with open(os.path.join(args.output, 'cnn_npy_predictions.txt'), 'w') as f:
             f.write(results_cnn_npy)
+        cnn_npy_predictor.check_fit(cnn_npy_featureextracter, empirical_array, args.output)
 
 
 if __name__ == '__main__':
