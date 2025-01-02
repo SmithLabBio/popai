@@ -82,8 +82,6 @@ def main():
         training_msfs = pickle.load(f)
     with open(os.path.join(args.simulations, 'simulated_jsfs.pickle'), 'rb') as f:
         training_sfs_2d = pickle.load(f)
-    with open(os.path.join(args.simulations, 'simulated_arrays.pickle'), 'rb') as f:
-        training_array = pickle.load(f)
 
 
     if args.rf:
@@ -105,8 +103,8 @@ def main():
 
     if args.cnn:
 
-         # apply FCNN model
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, training_sfs_2d, training_labels)
+         # apply CNN model
+        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, training_sfs_2d)
         cnn_2d_sfs_model = models.load_model(os.path.join(args.models, 'cnn.keras'), compile=True)
         cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_featureextractor.keras'), compile=True)
         results_cnn = cnn_2d_sfs_predictor.predict(cnn_2d_sfs_model, jsfs)
@@ -117,7 +115,7 @@ def main():
 
 
     if args.cnnnpy:
-        # apply FCNN model
+        # apply CNN model
         cnn_npy_predictor = build_predictors.CnnNpy(config_values, {}, downsampling_dict, '')
         cnn_npy_model = models.load_model(os.path.join(args.models, 'cnn_npy.keras'), compile=True)
         results_cnn_npy = cnn_npy_predictor.predict(cnn_npy_model, empirical_array)

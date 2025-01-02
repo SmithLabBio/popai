@@ -49,8 +49,7 @@ def main():
         msfs = pickle.load(f)
     with open(os.path.join(args.simulations, 'simulated_jsfs.pickle'), 'rb') as f:
         sfs_2d = pickle.load(f)
-    #with open(os.path.join(args.simulations, 'simulated_arrays.pickle'), 'rb') as f:
-    #    array = pickle.load(f)
+
 
     if args.rf:
         # train RF and save model and confusion matrix
