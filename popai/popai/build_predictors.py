@@ -9,12 +9,13 @@ import seaborn as sns
 from tabulate import tabulate
 from sklearn.decomposition import PCA
 import os
+import pickle
 
 class RandomForestsSFS:
 
     """Build a RF predictor that takes the SFS as input."""
 
-    def __init__(self, config, sfs, labels, user=False):
+    def __init__(self, config, sfs, user=False):
         self.config = config
         self.sfs = []
         self.labels = []
@@ -25,7 +26,7 @@ class RandomForestsSFS:
         self.sfs = np.array(self.sfs)
         if user:
             try:
-                self.labels = [int(x.split('_')[-1]) for x in labels]
+                self.labels = [int(x.split('_')[-1]) for x in self.labels]
                 valid = check_valid_labels(self.labels)
             except:
                 raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
@@ -74,7 +75,7 @@ class CnnSFS:
 
     """Build a CNN predictor that takes the SFS as input."""
 
-    def __init__(self, config, sfs_2d, labels, user=False):
+    def __init__(self, config, sfs_2d, user=False):
         self.config = config
         self.sfs_2d = []
         self.labels = []
@@ -82,10 +83,10 @@ class CnnSFS:
             for thesfs in value:
                 self.sfs_2d.append(thesfs)
                 self.labels.append(key)
-        self.nclasses = len(set(labels))
+        self.nclasses = len(set(self.labels))
         if user:
             try:
-                self.labels = [int(x.split('_')[-1]) for x in labels]
+                self.labels = [int(x.split('_')[-1]) for x in self.labels]
                 valid = check_valid_labels(self.labels)
             except:
                 raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
@@ -226,7 +227,7 @@ class NeuralNetSFS:
 
     """Build a RF predictor that takes the SFS as input."""
 
-    def __init__(self, config, sfs, labels, user=False):
+    def __init__(self, config, sfs, user=False):
         self.config = config
         self.sfs = []
         self.labels = []
@@ -235,10 +236,10 @@ class NeuralNetSFS:
                 self.sfs.append(thesfs)
                 self.labels.append(key)
         self.sfs = np.array(self.sfs)
-        self.nclasses = len(set(labels))
+        self.nclasses = len(set(self.labels))
         if user:
             try:
-                self.labels = [int(x.split('_')[-1]) for x in labels]
+                self.labels = [int(x.split('_')[-1]) for x in self.labels]
                 valid = check_valid_labels(self.labels)
             except:
                 raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
@@ -299,28 +300,43 @@ class CnnNpy:
 
     """Build a CNN predictor that takes the alignment as a numpy matrix as input."""
 
-    def __init__(self, config, arrays, labels, user=False):
+    def __init__(self, config, labels, downsampling_dict, input, user=False):
         self.config = config
+        self.arraydicts = {}
         self.arrays = []
         self.labels = []
-        for key,value in arrays.items():
+        self.input = input
+        
+        for i in set(labels):
+            
+            # read in array
+            with open(os.path.join(self.input, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
+                self.arraydicts[str(i)] = pickle.load(f)
+        
+        for key,value in self.arraydicts.items():
             for thearray in value:
                 self.arrays.append(thearray)
                 self.labels.append(key)
-        self.nclasses = len(set(labels))
+        self.nclasses = len(set(self.labels))
         if user:
             try:
-                self.labels = [int(x.split('_')[-1]) for x in labels]
+                self.labels = [int(x.split('_')[-1]) for x in self.labels]
                 valid = check_valid_labels(self.labels)
             except:
                 raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
             if not valid:
                 raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+        else:
+            self.labels = [int(x) for x in self.labels]
 
         try:
             self.labels = keras.utils.to_categorical(self.labels)
         except:
             pass
+
+        self.downsampling_dict = {}
+        for key,value in self.config['sampling dict'].items():
+            self.downsampling_dict[key] = downsampling_dict[key]
 
     def build_cnn_npy(self):
 
@@ -345,7 +361,6 @@ class CnnNpy:
         train_features = np.expand_dims(np.array(train_features), axis=-1)
         val_features = np.expand_dims(np.array(val_features), axis=-1)
 
-
         train_labels = self.labels[train_indices]
         val_labels = self.labels[val_indices]
 
@@ -354,7 +369,7 @@ class CnnNpy:
         split_train_features = []
         split_val_features = []
         start_idx = 0
-        for key, num_rows in self.config['sampling dict'].items():
+        for key, num_rows in self.downsampling_dict.items():
             end_idx = start_idx + num_rows
             split_train_features.append(train_features[:,start_idx:end_idx,:,:])
             split_val_features.append(val_features[:,start_idx:end_idx,:,:])
@@ -363,7 +378,7 @@ class CnnNpy:
         # build model
         input_layers = []
         output_layers = []
-        for key,  num_rows in self.config['sampling dict'].items():
+        for key,  num_rows in self.downsampling_dict.items():
             input_layer = keras.Input(shape=(num_rows, train_features.shape[2], 1), name=f'input_{key}')
             input_layers.append(input_layer)
             conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows,1), activation="relu", padding="valid") (input_layer)
@@ -399,7 +414,7 @@ class CnnNpy:
         # split by pop
         split_features = []
         start_idx = 0
-        for key, num_rows in self.config['sampling dict'].items():
+        for key, num_rows in self.downsampling_dict.items():
             end_idx = start_idx + num_rows
             split_features.append(new_data[:,start_idx:end_idx,:,:])
             start_idx = end_idx

@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
     parser.add_argument('--maxsites', type=int, help="Max number of sites to use when building SFS from simulated")
     parser.add_argument('--cores', type=int, default=1, help="Number of cores to use when simulating data.")
+    parser.add_argument('--checkpoint', action='store_true', help='Use output already generated if it exists, and do not repeat those simulations.')
 
     args = parser.parse_args()
 
@@ -51,7 +52,7 @@ def main():
                 return
 
             # simulate data
-            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, sp_tree_index=sp_tree_index)
+            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, output=args.output, sp_tree_index=sp_tree_index, checkpoint=args.checkpoint)
             arrays = data_simulator.simulate_ancestry_parallel()
 
     else:
@@ -73,14 +74,14 @@ def main():
                 return
 
             # simulate data
-            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, user=True)
+            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, user=True, output=args.output)
             arrays = data_simulator.simulate_ancestry_parallel()
 
     
     if args.simulate:
 
         # build SFS for simulate data
-        sfs_2d = data_simulator.mutations_to_2d_sfs(arrays)
+        sfs_2d = data_simulator.mutations_to_2d_sfs()
         msfs = data_simulator.mutations_to_sfs(arrays)
 
         data_simulator.plot_2dsfs(sfs_2d,output_directory=args.output)
@@ -88,8 +89,8 @@ def main():
         # save these simulated data.
         with open(os.path.join(args.output, 'simulated_jsfs.pickle'), 'wb') as f:
             pickle.dump(sfs_2d, f)
-        with open(os.path.join(args.output, 'simulated_arrays.pickle'), 'wb') as f:
-            pickle.dump(arrays, f)
+        #with open(os.path.join(args.output, 'simulated_arrays.pickle'), 'wb') as f:
+        #    pickle.dump(arrays, f)
         with open(os.path.join(args.output, 'simulated_msfs.pickle'), 'wb') as f:
             pickle.dump(msfs, f)
         np.save(os.path.join(args.output, 'labels.npy'), np.array(labels), allow_pickle=True)
