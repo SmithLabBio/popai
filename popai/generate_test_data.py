@@ -27,6 +27,8 @@ class TestDataGenerator:
 
         # get seeds and lengths
         ancestry_seeds = self.rng.integers(2**32, size=self.fragments)
+        if self.max_length == self.min_length:
+            lengths = [self.min_length] * self.fragments
         lengths = self.rng.integers(low=self.min_length, high=self.max_length, size=self.fragments)
 
         # set up vcf header
