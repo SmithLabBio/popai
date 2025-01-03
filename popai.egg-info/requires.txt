@@ -1,0 +1,16 @@
+dendropy
+pandas
+msprime
+numpy
+demes
+demesdraw
+matplotlib
+argparse
+scikit-learn
+keras
+seaborn
+tabulate
+tensorflow
+pandas
+pyslim
+tqdm

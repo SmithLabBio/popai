@@ -1,0 +1,5 @@
+[console_scripts]
+apply_models = popai.cli_apply_models:main
+process_empirical_data = popai.cli_process_empirical_data:main
+simulate_data = popai.cli_simulate_data:main
+train_models = popai.cli_train_models:main

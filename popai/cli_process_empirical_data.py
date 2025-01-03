@@ -14,6 +14,7 @@ def main():
     parser.add_argument('--nbins', type=int, default=None, help='Number of bins for creating a binned SFS (default: None)')
     parser.add_argument('--output', help="Path to output folder for storing SFS.")
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
+    parser.add_argument('--maxsites', type=int, help="Max number of sites to use when building SFS from simulated", default = np.inf)
 
     args = parser.parse_args()
     
@@ -24,9 +25,9 @@ def main():
     # Process empirical data
     data_processor = process_empirical.DataProcessor(config=config_values)
     if "fastas" in config_values:
-        empirical_array = data_processor.fasta_to_numpy()
+        empirical_array = data_processor.fasta_to_numpy(maxsites = args.maxsites)
     else:
-        empirical_array = data_processor.vcf_to_numpy()
+        empirical_array = data_processor.vcf_to_numpy(maxsites = args.maxsites)
 
     # check if output exists
     if os.path.exists(args.output) and not args.force:

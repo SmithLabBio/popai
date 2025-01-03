@@ -24,7 +24,7 @@ class DataProcessor:
         # set seed
         self.rng = np.random.default_rng(self.config["seed"])
 
-    def fasta_to_numpy(self):
+    def fasta_to_numpy(self, maxsites):
 
         """Convert a list of fasta files into a numpy array."""
 
@@ -68,13 +68,22 @@ class DataProcessor:
         # concert to minor allele encoding
         encoded_array = minor_encoding(filtered_alignments)
 
+        if not maxsites == np.inf:
+            if encoded_array.shape[1] > maxsites:
+                filtered_array = encoded_array[:, :maxsites]
+            elif encoded_array.shape[1] < maxsites:
+                num_missing_columns = maxsites - encoded_array.shape[1]
+                missing_columns = np.full((encoded_array.shape[0], num_missing_columns), -1)
+                filtered_array = np.concatenate((encoded_array, missing_columns), axis=1)
+        else:
+            filtered_array = encoded_array
 
-        self.logger.info("""Empirical data has %s SNPs. If this is very different than the number of SNPs in your simulated data, you may want to change some priors.""",
-                         encoded_array.shape[1])
+        self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
+                         encoded_array.shape[1], filtered_array.shape[1])
 
         return encoded_array
 
-    def vcf_to_numpy(self):
+    def vcf_to_numpy(self, maxsites):
 
         """Convert VCF to numpy array."""
 
@@ -128,10 +137,20 @@ class DataProcessor:
 
         encoded_array = minor_encoding(filtered_alignments)
 
+        if not maxsites == np.inf:
+            if encoded_array.shape[1] > maxsites:
+                filtered_array = encoded_array[:, :maxsites]
+            elif encoded_array.shape[1] < maxsites:
+                num_missing_columns = maxsites - encoded_array.shape[1]
+                missing_columns = np.full((encoded_array.shape[0], num_missing_columns), -1)
+                filtered_array = np.concatenate((encoded_array, missing_columns), axis=1)
+        else:
+            filtered_array = encoded_array
 
-        self.logger.info("Empirical data has %s SNPs. If this is very different than the number of SNPs in your simulated data, you may want to change some priors.", encoded_array.shape[1])
+        self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
+                         encoded_array.shape[1], filtered_array.shape[1])
 
-        return encoded_array
+        return filtered_array
 
     def _encode_string(self, string, encoding_dict):
         encoded_string = []
