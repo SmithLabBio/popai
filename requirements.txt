@@ -5,3 +5,4 @@ numpy==1.23.5
 demes==0.2.2
 demesdraw==0.4.0
 matplotlib==3.6.2
+tqdm==4.66.2
