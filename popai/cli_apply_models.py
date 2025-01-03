@@ -110,7 +110,7 @@ def main():
          # apply CNN model
         cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, training_sfs_2d)
         cnn_2d_sfs_model = models.load_model(os.path.join(args.models, 'cnn.keras'), compile=True)
-        cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_featureextractor.keras'), compile=True)
+        cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_sfs_featureextractor.keras'), compile=True)
         results_cnn = cnn_2d_sfs_predictor.predict(cnn_2d_sfs_model, jsfs)
         with open(os.path.join(args.output, 'cnn_predictions.txt'), 'w') as f:
             f.write(results_cnn)
