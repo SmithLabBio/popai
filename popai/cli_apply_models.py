@@ -40,6 +40,7 @@ def main():
 
     if config_values['user models'] is None:
         user = False
+    else:
         user = True
 
     # read empirical data into correct format
