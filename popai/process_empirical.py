@@ -144,6 +144,8 @@ class DataProcessor:
                 num_missing_columns = maxsites - encoded_array.shape[1]
                 missing_columns = np.full((encoded_array.shape[0], num_missing_columns), -1)
                 filtered_array = np.concatenate((encoded_array, missing_columns), axis=1)
+            else:
+                filtered_array = encoded_array
         else:
             filtered_array = encoded_array
 
