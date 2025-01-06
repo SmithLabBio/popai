@@ -91,7 +91,7 @@ def main():
 
     if args.rf:
         # apply Random Forest model
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, {}, {}, user=user)
+        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, {}, user=user)
         with open(os.path.join(args.models, 'rf.model.pickle'), 'rb') as f:
             random_forest_sfs_model = pickle.load(f)
         results_rf = random_forest_sfs_predictor.predict(random_forest_sfs_model, msfs)
@@ -100,7 +100,7 @@ def main():
 
     if args.fcnn:
         # apply FCNN model
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, training_msfs, {}, user=user)
+        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, training_msfs, user=user)
         neural_network_sfs_model = models.load_model(os.path.join(args.models, 'fcnn.keras'), compile=True)
         neural_network_featureextracter = models.load_model(os.path.join(args.models, 'fcnn_featureextractor.keras'), compile=True)
         results_fcnn = neural_network_sfs_predictor.predict(neural_network_sfs_model, msfs)
