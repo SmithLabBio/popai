@@ -38,6 +38,10 @@ def main():
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
+    if config_values['user models'] is None:
+        user = False
+        user = True
+
     # read empirical data into correct format
     msfs_files = os.listdir(args.empirical)
     msfs_files = [x for x in msfs_files if x.endswith('_DSFS.obs')]
@@ -86,7 +90,7 @@ def main():
 
     if args.rf:
         # apply Random Forest model
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, {}, {})
+        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, {}, {}, user=user)
         with open(os.path.join(args.models, 'rf.model.pickle'), 'rb') as f:
             random_forest_sfs_model = pickle.load(f)
         results_rf = random_forest_sfs_predictor.predict(random_forest_sfs_model, msfs)
@@ -95,7 +99,7 @@ def main():
 
     if args.fcnn:
         # apply FCNN model
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, training_msfs, {})
+        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, training_msfs, {}, user=user)
         neural_network_sfs_model = models.load_model(os.path.join(args.models, 'fcnn.keras'), compile=True)
         neural_network_featureextracter = models.load_model(os.path.join(args.models, 'fcnn_featureextractor.keras'), compile=True)
         results_fcnn = neural_network_sfs_predictor.predict(neural_network_sfs_model, msfs)
@@ -108,7 +112,7 @@ def main():
     if args.cnn:
 
          # apply CNN model
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, training_sfs_2d)
+        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, training_sfs_2d, user=user)
         cnn_2d_sfs_model = models.load_model(os.path.join(args.models, 'cnn.keras'), compile=True)
         cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_sfs_featureextractor.keras'), compile=True)
         results_cnn = cnn_2d_sfs_predictor.predict(cnn_2d_sfs_model, jsfs)
@@ -120,7 +124,7 @@ def main():
 
     if args.cnnnpy:
         # apply CNN model
-        cnn_npy_predictor = build_predictors.CnnNpy(config_values, training_labels, downsampling_dict, args.simulations)
+        cnn_npy_predictor = build_predictors.CnnNpy(config_values, training_labels, downsampling_dict, args.simulations, user=user)
         cnn_npy_model = models.load_model(os.path.join(args.models, 'cnn_npy.keras'), compile=True)
         cnn_npy_featureextracter = models.load_model(os.path.join(args.models, 'cnn_npy_featureextractor.keras'), compile=True)
         results_cnn_npy = cnn_npy_predictor.predict(cnn_npy_model, empirical_array)
