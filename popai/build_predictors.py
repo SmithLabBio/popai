@@ -10,6 +10,7 @@ from tabulate import tabulate
 from sklearn.decomposition import PCA
 import os
 import pickle
+import tensorflow as tf
 
 class RandomForestsSFS:
 
