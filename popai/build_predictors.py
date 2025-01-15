@@ -191,7 +191,7 @@ class CnnSFS:
 
         # plot
         training_labels = tf.argmax(self.labels, axis=1)
-        unique_labels = np.unique(self.labels)
+        unique_labels = np.unique(training_labels)
         for label in unique_labels:
             indices = np.where(np.array(training_labels) == label)
             plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {label}")
