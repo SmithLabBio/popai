@@ -189,9 +189,10 @@ class CnnSFS:
         new_pca = pca.transform(new_extracted_features)
 
         # plot
+        training_labels = tf.argmax(self.labels, axis=1)
         unique_labels = np.unique(self.labels)
         for label in unique_labels:
-            indices = np.where(np.array(self.labels) == label)
+            indices = np.where(np.array(training_labels) == label)
             plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {label}")
 
         plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
