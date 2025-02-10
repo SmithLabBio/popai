@@ -257,6 +257,10 @@ class DataSimulator:
 
                 rep_sfs_dict = [value for value in rep_sfs_dict.values()]
                 all_sfs[str(i)].append(np.array(rep_sfs_dict))
+            
+            # write to file
+            with open(os.path.join(self.output, 'simulated_mSFS_%s.pickle' % str(i)), 'wb') as f:
+                pickle.dump(all_sfs[str(i)], f)
 
 
         return all_sfs
@@ -324,6 +328,10 @@ class DataSimulator:
                                 sfs_2d[key][pop1_count, pop2_count] += 1
 
                 all_sfs[str(i)].append(sfs_2d)
+            
+            # write to file
+            with open(os.path.join(self.output, 'simulated_2dSFS_%s.pickle' % str(i)), 'wb') as f:
+                pickle.dump(all_sfs[str(i)], f)
 
         return all_sfs
 

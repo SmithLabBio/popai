@@ -16,35 +16,23 @@ class RandomForestsSFS:
 
     """Build a RF predictor that takes the SFS as input."""
 
-    def __init__(self, config, sfs, user=False):
+    def __init__(self, config, simulations, subset, user=False):
+        
         self.config = config
-        self.sfs = []
-        self.labels = []
-        for key,value in sfs.items():
-            for thesfs in value:
-                self.sfs.append(thesfs)
-                self.labels.append(key)
-        self.sfs = np.array(self.sfs)
-        if user:
-            try:
-                self.labels = [int(x.split('_')[-1]) for x in self.labels]
-                valid = check_valid_labels(self.labels)
-            except:
-                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-            if not valid:
-                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+
+        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='1d')
+
         self.rng = np.random.default_rng(self.config['seed'])
 
     def build_rf_sfs(self, ntrees=500):
 
         """Build a random forest classifier that takes the
         multidimensional SFS as input."""
-        
         train_test_seed = self.rng.integers(2**32, size=1)[0]
 
 
         x_train, x_test, y_train, y_test = train_test_split(self.sfs,
-                self.labels, test_size=0.2, random_state=train_test_seed)
+                self.labels, test_size=0.2, random_state=train_test_seed, stratify=self.labels)
 
         sfs_rf = RandomForestClassifier(n_estimators=ntrees, oob_score=True)
 
@@ -52,22 +40,27 @@ class RandomForestsSFS:
         print("Out-of-Bag (OOB) Error:", 1.0 - sfs_rf.oob_score_)
 
 
-        cv_scores = cross_val_score(sfs_rf, x_test, y_test, cv=2)
-        print("Cross-validation scores:", cv_scores)
+        # Convert predictions and true labels back to original labels
+        y_test_pred = sfs_rf.predict(x_test)
+        y_test_original = [self.int_to_label[label] for label in np.argmax(y_test, axis=1)]
+        y_pred_original = [self.int_to_label[label] for label in np.argmax(y_test_pred, axis=1)]
 
-        y_pred_cv = cross_val_predict(sfs_rf, x_test, y_test, cv=2)
-        conf_matrix = confusion_matrix(y_test, y_pred_cv)
-        conf_matrix_plot = plot_confusion_matrix(y_test, y_pred_cv)
+
+        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=list(self.int_to_label.values()))
 
 
         return sfs_rf, conf_matrix, conf_matrix_plot
 
     def predict(self, model, new_data):
         new_data = np.array(new_data)
-        predicted = model.predict(new_data)
-        predicted_prob = model.predict_proba(new_data)
-        headers = ["Model {}".format(i) for i in range(predicted_prob.shape[1])]
-        replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted_prob.shape[0])]
+        predicted_prob = np.array(model.predict_proba(new_data))[:,:, 1].T
+
+        if predicted_prob.shape[1] != self.nclasses:
+            raise ValueError(f"Model has {predicted_prob.shape[1]} classes, but the provided data has {self.nclasses} classes. You probably used different subsets for training and applying.")
+        
+        headers = [f"Model {self.int_to_label[i]}" for i in range(len(model.classes_))]
+        replicate_numbers = ["Replicate {}".format(i+1) for i in range(len(predicted_prob))]
+
         table_data = np.column_stack((replicate_numbers, predicted_prob))
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
         return(tabulated)
@@ -76,27 +69,13 @@ class CnnSFS:
 
     """Build a CNN predictor that takes the SFS as input."""
 
-    def __init__(self, config, sfs_2d, user=False):
+    def __init__(self, config, simulations, subset, user=False):
         self.config = config
-        self.sfs_2d = []
-        self.labels = []
-        for key,value in sfs_2d.items():
-            for thesfs in value:
-                self.sfs_2d.append(thesfs)
-                self.labels.append(key)
-        self.nclasses = len(set(self.labels))
-        if user:
-            try:
-                self.labels = [int(x.split('_')[-1]) for x in self.labels]
-                valid = check_valid_labels(self.labels)
-            except:
-                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-            if not valid:
-                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-        try:
-            self.labels = keras.utils.to_categorical(self.labels)
-        except:
-            pass
+
+        self.arraydict, self.sfs_2d, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='2d')
+
+        self.rng = np.random.default_rng(self.config['seed'])
+
 
     def build_cnn_sfs(self):
 
@@ -105,27 +84,15 @@ class CnnSFS:
         # get features
         list_of_features = self._convert_2d_dictionary(self.sfs_2d)
 
-        # shuffle data
-        num_samples = len(self.labels)
+        # split_data
+        train_indices, test_indices, y_train, y_test = train_test_split(np.arange(len(self.labels)), self.labels, test_size=0.2, random_state=self.rng.integers(2**32, size=1)[0], stratify=self.labels)
 
-        # Create an array of indices and shuffle it
-        indices = np.arange(num_samples)
-        np.random.shuffle(indices)
-
-        # Split the shuffled indices into training and validation indices
-        split_ratio = 0.8  # 80% training, 20% validation
-        split_idx = int(num_samples * split_ratio)
-        train_indices = indices[:split_idx]
-        val_indices = indices[split_idx:]
 
         # Split features and labels into training and validation sets using the indices
         train_features = [[list_of_features[j][i] for i in train_indices]\
                           for j in range(len(list_of_features))]
-        val_features = [[list_of_features[j][i] for i in val_indices]\
+        val_features = [[list_of_features[j][i] for i in test_indices]\
                         for j in range(len(list_of_features))]
-        train_labels = self.labels[train_indices]
-        val_labels = self.labels[val_indices]
-
         # to arrays
         train_features = [np.expand_dims(np.array(x), axis=-1) for x in train_features]
         val_features = [np.expand_dims(np.array(x), axis=-1) for x in val_features]
@@ -146,33 +113,38 @@ class CnnSFS:
 
         model = keras.Model(inputs=inputs, outputs=x)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.fit(train_features, train_labels, epochs=10,
-                  batch_size=10, validation_data=(val_features, val_labels))
+        model.fit(train_features, y_train, epochs=10,
+                  batch_size=10, validation_data=(val_features, y_test))
 
         # extract the features
         feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
 
 
-        val_pred = model.predict(val_features)
-        val_predicted_labels = np.argmax(val_pred, axis=1)
-        val_true_labels = np.argmax(val_labels, axis=1)
-        conf_matrix = confusion_matrix(val_true_labels, val_predicted_labels)
-        conf_matrix_plot = plot_confusion_matrix(val_true_labels, val_predicted_labels)
+        # Convert predictions and true labels back to original labels
+        y_test_pred = model.predict(val_features)
+        y_test_original = [self.int_to_label[label] for label in np.argmax(y_test, axis=1)]
+        y_pred_original = [self.int_to_label[label] for label in np.argmax(y_test_pred, axis=1)]
 
+
+        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=list(self.int_to_label.values()))
         return model, conf_matrix, conf_matrix_plot, feature_extractor
 
     def predict(self, model, new_data):
         new_features = self._convert_2d_dictionary(new_data)
         new_features = [np.expand_dims(np.array(x), axis=-1) for x in new_features]
         predicted = model.predict(new_features)
-        headers = ["Model {}".format(i) for i in range(predicted.shape[1])]
+
+        if predicted.shape[1] != self.nclasses:
+            raise ValueError(f"Model has {predicted.shape[1]} classes, but the provided data has {self.nclasses} classes. You probably used different subsets for training and applying.")
+
+        headers = [f"Model {self.int_to_label[i]}" for i in range(self.labels.shape[1])]
         replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
         table_data = np.column_stack((replicate_numbers, predicted))
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
 
         return(tabulated)
 
-    def check_fit(self, feature_extractor, new_data, output_directory, training_labels):
+    def check_fit(self, feature_extractor, new_data, output_directory):
 
         # features from empirical data
         new_features = self._convert_2d_dictionary(new_data)
@@ -194,7 +166,7 @@ class CnnSFS:
         unique_labels = np.unique(training_labels)
         for label in unique_labels:
             indices = np.where(np.array(training_labels) == label)
-            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {label}")
+            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {self.int_to_label[label]}")
 
         plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
 
@@ -229,29 +201,13 @@ class NeuralNetSFS:
 
     """Build a RF predictor that takes the SFS as input."""
 
-    def __init__(self, config, sfs, user=False):
+    def __init__(self, config, simulations, subset, user=False):
         self.config = config
-        self.sfs = []
-        self.labels = []
-        for key,value in sfs.items():
-            for thesfs in value:
-                self.sfs.append(thesfs)
-                self.labels.append(key)
-        self.sfs = np.array(self.sfs)
-        self.nclasses = len(set(self.labels))
-        if user:
-            try:
-                self.labels = [int(x.split('_')[-1]) for x in self.labels]
-                valid = check_valid_labels(self.labels)
-            except:
-                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-            if not valid:
-                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+
+
+        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='1d')
+
         self.rng = np.random.default_rng(self.config['seed'])
-        try:
-            self.labels = keras.utils.to_categorical(self.labels)
-        except:
-            pass
 
 
     def build_neuralnet_sfs(self):
@@ -263,7 +219,7 @@ class NeuralNetSFS:
         train_test_seed = self.rng.integers(2**32, size=1)[0]
 
         x_train, x_test, y_train, y_test = train_test_split(self.sfs,
-                self.labels, test_size=0.2, random_state=train_test_seed)
+                self.labels, test_size=0.2, random_state=train_test_seed, stratify=self.labels)
 
         # build model
         network_input = keras.Input(shape=x_train.shape[1:])
@@ -278,11 +234,12 @@ class NeuralNetSFS:
                   batch_size=10, validation_data=(x_test, y_test))
 
         # evaluate model
-        val_pred = model.predict(x_test)
-        val_predicted_labels = np.argmax(val_pred, axis=1)
-        val_true_labels = np.argmax(y_test, axis=1)
-        conf_matrix = confusion_matrix(val_true_labels, val_predicted_labels)
-        conf_matrix_plot = plot_confusion_matrix(val_true_labels, val_predicted_labels)
+        y_test_pred = model.predict(x_test)
+        y_test_original = [self.int_to_label[label] for label in np.argmax(y_test, axis=1)]
+        y_pred_original = [self.int_to_label[label] for label in np.argmax(y_test_pred, axis=1)]
+
+
+        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=list(self.int_to_label.values()))
 
         # extract the features
         feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
@@ -293,15 +250,18 @@ class NeuralNetSFS:
 
         new_data = np.array(new_data)
         predicted = model.predict(new_data)
-        predicted = model.predict(new_data)
-        headers = ["Model {}".format(i) for i in range(predicted.shape[1])]
+
+        if predicted.shape[1] != self.nclasses:
+            raise ValueError(f"Model has {predicted.shape[1]} classes, but the provided data has {self.nclasses} classes. You probably used different subsets for training and applying.")
+
+        headers = [f"Model {self.int_to_label[i]}" for i in range(self.labels.shape[1])]
         replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
         table_data = np.column_stack((replicate_numbers, predicted))
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
 
         return(tabulated)
 
-    def check_fit(self, feature_extractor, new_data, output_directory, training_labels):
+    def check_fit(self, feature_extractor, new_data, output_directory):
 
         # features from empirical data
         new_data = np.array(new_data)
@@ -318,7 +278,7 @@ class NeuralNetSFS:
         unique_labels = np.unique(training_labels)
         for label in unique_labels:
             indices = np.where(np.array(training_labels) == label)
-            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {label}")
+            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {self.int_to_label[label]}")
 
         plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
 
@@ -334,39 +294,16 @@ class CnnNpy:
 
     """Build a CNN predictor that takes the alignment as a numpy matrix as input."""
 
-    def __init__(self, config, labels, downsampling_dict, input, user=False):
+    def __init__(self, config, downsampling_dict, simulations, subset, user=False):
         self.config = config
         self.arraydicts = {}
         self.arrays = []
         self.labels = []
         self.input = input
         
-        for i in set(labels):
-            
-            # read in array
-            with open(os.path.join(self.input, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
-                self.arraydicts[str(i)] = pickle.load(f)
-        
-        for key,value in self.arraydicts.items():
-            for thearray in value:
-                self.arrays.append(thearray)
-                self.labels.append(key)
-        self.nclasses = len(set(self.labels))
-        if user:
-            try:
-                self.labels = [int(x.split('_')[-1]) for x in self.labels]
-                valid = check_valid_labels(self.labels)
-            except:
-                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-            if not valid:
-                raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-        else:
-            self.labels = [int(x) for x in self.labels]
+        self.arraydict, self.arrays, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='npy')
 
-        try:
-            self.labels = keras.utils.to_categorical(self.labels)
-        except:
-            pass
+        self.rng = np.random.default_rng(self.config['seed'])
 
         self.downsampling_dict = {}
         for key,value in self.config['sampling dict'].items():
@@ -376,27 +313,13 @@ class CnnNpy:
 
         """Build a CNN that takes npy array as input."""
 
-        # shuffle data
-        num_samples = len(self.labels)
-
-        # Create an array of indices and shuffle it
-        indices = np.arange(num_samples)
-        np.random.shuffle(indices)
-
-        # Split the shuffled indices into training and validation indices
-        split_ratio = 0.8  # 80% training, 20% validation
-        split_idx = int(num_samples * split_ratio)
-        train_indices = indices[:split_idx]
-        val_indices = indices[split_idx:]
-
-        # Split features and labels into training and validation sets using the indices
-        train_features = np.array(self.arrays)[train_indices]
-        val_features = np.array(self.arrays)[val_indices]
-        train_features = np.expand_dims(np.array(train_features), axis=-1)
-        val_features = np.expand_dims(np.array(val_features), axis=-1)
-
-        train_labels = self.labels[train_indices]
-        val_labels = self.labels[val_indices]
+        # split train and test
+        train_test_seed = self.rng.integers(2**32, size=1)[0]
+        x_train, x_test, y_train, y_test = train_test_split(self.arrays,
+                self.labels, test_size=0.2, random_state=train_test_seed, stratify=self.labels)
+        
+        x_train = np.expand_dims(np.array(x_train), axis=-1)
+        x_test = np.expand_dims(np.array(x_test), axis=-1)
 
 
         # split by pop
@@ -405,15 +328,15 @@ class CnnNpy:
         start_idx = 0
         for key, num_rows in self.downsampling_dict.items():
             end_idx = start_idx + num_rows
-            split_train_features.append(train_features[:,start_idx:end_idx,:,:])
-            split_val_features.append(val_features[:,start_idx:end_idx,:,:])
+            split_train_features.append(x_train[:,start_idx:end_idx,:,:])
+            split_val_features.append(x_test[:,start_idx:end_idx,:,:])
             start_idx = end_idx
 
         # build model
         input_layers = []
         output_layers = []
         for key,  num_rows in self.downsampling_dict.items():
-            input_layer = keras.Input(shape=(num_rows, train_features.shape[2], 1), name=f'input_{key}')
+            input_layer = keras.Input(shape=(num_rows, x_train.shape[2], 1), name=f'input_{key}')
             input_layers.append(input_layer)
             conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows,1), activation="relu", padding="valid") (input_layer)
             output_layers.append(conv_layer)
@@ -428,14 +351,16 @@ class CnnNpy:
 
         model = keras.Model(inputs=input_layers, outputs=x)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.fit(split_train_features, train_labels, epochs=10,
-                  batch_size=10, validation_data=(split_val_features, val_labels))
+        model.fit(split_train_features, y_train, epochs=10,
+                  batch_size=10, validation_data=(split_val_features, y_test))
 
-        val_pred = model.predict(split_val_features)
-        val_predicted_labels = np.argmax(val_pred, axis=1)
-        val_true_labels = np.argmax(val_labels, axis=1)
-        conf_matrix = confusion_matrix(val_true_labels, val_predicted_labels)
-        conf_matrix_plot = plot_confusion_matrix(val_true_labels, val_predicted_labels)
+        # evaluate model
+        y_test_pred = model.predict(split_val_features)
+        y_test_original = [self.int_to_label[label] for label in np.argmax(y_test, axis=1)]
+        y_pred_original = [self.int_to_label[label] for label in np.argmax(y_test_pred, axis=1)]
+
+
+        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=list(self.int_to_label.values()))
 
         # extract the features
         feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
@@ -458,7 +383,9 @@ class CnnNpy:
 
 
         predicted = model.predict(split_features)
-        headers = ["Model {}".format(i) for i in range(predicted.shape[1])]
+        if predicted.shape[1] != self.nclasses:
+            raise ValueError(f"Model has {predicted.shape[1]} classes, but the provided data has {self.nclasses} classes. You probably used different subsets for training and applying.")
+        headers = [f"Model {self.int_to_label[i]}" for i in range(self.labels.shape[1])]
         replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
         table_data = np.column_stack((replicate_numbers, predicted))
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
@@ -496,7 +423,7 @@ class CnnNpy:
         unique_labels = np.unique(training_labels)
         for label in unique_labels:
             indices = np.where(np.array(training_labels) == label)
-            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {label}")
+            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {self.int_to_label[label]}")
 
         plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
 
@@ -509,14 +436,14 @@ class CnnNpy:
         plt.close()  # Close the plot to avoid displaying it in interactive environments
 
 
-def plot_confusion_matrix(y_true, y_pred):
+def plot_confusion_matrix(y_true, y_pred, labels):
     conf_matrix = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6))
-    sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues")
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
     plt.title("Confusion Matrix")
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
-    return plt
+    return conf_matrix, plt
 
 def check_valid_labels(labels):
     unique_labels = list(set(labels))
@@ -525,3 +452,70 @@ def check_valid_labels(labels):
         if unique_labels[i] !=i:
             return False
     return True
+
+def read_data(simulations, subset, user, type):
+
+    arraydict = {}
+    sfs = []
+    labels = []
+
+    # read in the data
+    if subset:
+        subset_list = []
+        with open(subset, 'r') as f:
+            for line in f:
+                subset_list.append(line.strip())
+    pickle_list = os.listdir(simulations)
+    if type=='1d':
+        pickle_list = [x for x in pickle_list if ('_mSFS' in x and x.endswith('.pickle'))]
+    elif type=='2d':
+        pickle_list = [x for x in pickle_list if ('_2dSFS' in x and x.endswith('.pickle'))]
+    elif type=='npy':
+        pickle_list = [x for x in pickle_list if ('_arrays' in x and x.endswith('.pickle'))]
+    if subset:
+        pickle_list = [x for x in pickle_list if x.split('_')[-1].split('.')[0] in subset_list]
+    pickle_list = sorted(pickle_list, key=lambda x: int(x.split('_')[-1].split('.')[0]))
+    
+    for item in pickle_list:
+        modno = item.split('_')[-1].split('.')[0]
+        if type=='1d':
+            with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
+                arraydict[str(modno)] = pickle.load(f)
+        elif type=='2d':
+            with open(os.path.join(simulations, 'simulated_2dSFS_%s.pickle' % str(modno)), 'rb') as f:
+                arraydict[str(modno)] = pickle.load(f)
+        elif type=='npy':
+            with open(os.path.join(simulations, 'simulated_arrays_%s.pickle' % str(modno)), 'rb') as f:
+                arraydict[str(modno)] = pickle.load(f)
+
+    for key,value in arraydict.items():
+        for thearray in value:
+            sfs.append(thearray)
+            labels.append(key)
+    nclasses = len(set(labels))
+    if user:
+        try:
+            labels = [int(x.split('_')[-1]) for x in labels]
+            valid = check_valid_labels(labels)
+        except:
+            raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+        if not valid:
+            raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
+    else:
+        labels = [int(x) for x in labels]
+
+    # Create a mapping from original labels to continuous integers
+    unique_labels = sorted(set(labels))
+    label_to_int = {label: i for i, label in enumerate(unique_labels)}
+    int_to_label = {i: label for label, i in label_to_int.items()}
+    
+    # Convert labels to continuous integers
+    labels = [label_to_int[label] for label in labels]
+    
+    # One-hot encode the labels
+    labels = keras.utils.to_categorical(labels)
+
+    # array
+    sfs = np.array(sfs)
+
+    return arraydict, sfs, labels, label_to_int, int_to_label, nclasses

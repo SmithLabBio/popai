@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--cnnnpy', action='store_true', help='Apply CNN classifier on alignments.')
     parser.add_argument('--simulations', help='Path to directory with simulated data.')
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
+    parser.add_argument('--subset', help="Path to a file listing the models to retain. List indices only (e.g., 0, 1, 5, 6). One integer per line", default=None)
 
     args = parser.parse_args()
 
@@ -80,18 +81,10 @@ def main():
 
     empirical_array = np.load(os.path.join(args.empirical,"empirical.npy"))
 
-    # read the training data
-    training_labels = np.load(os.path.join(args.simulations, 'labels.npy'), allow_pickle=True)
-    
-    with open(os.path.join(args.simulations, 'simulated_msfs.pickle'), 'rb') as f:
-        training_msfs = pickle.load(f)
-    with open(os.path.join(args.simulations, 'simulated_jsfs.pickle'), 'rb') as f:
-        training_sfs_2d = pickle.load(f)
-
 
     if args.rf:
         # apply Random Forest model
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, {}, user=user)
+        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, args.simulations, subset=args.subset, user=user)
         with open(os.path.join(args.models, 'rf.model.pickle'), 'rb') as f:
             random_forest_sfs_model = pickle.load(f)
         results_rf = random_forest_sfs_predictor.predict(random_forest_sfs_model, msfs)
@@ -100,32 +93,32 @@ def main():
 
     if args.fcnn:
         # apply FCNN model
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, training_msfs, user=user)
+        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, args.simulations, subset=args.subset, user=user)
         neural_network_sfs_model = models.load_model(os.path.join(args.models, 'fcnn.keras'), compile=True)
         neural_network_featureextracter = models.load_model(os.path.join(args.models, 'fcnn_featureextractor.keras'), compile=True)
         results_fcnn = neural_network_sfs_predictor.predict(neural_network_sfs_model, msfs)
         with open(os.path.join(args.output, 'fcnn_predictions.txt'), 'w') as f:
             f.write(results_fcnn)
 
-        neural_network_sfs_predictor.check_fit(neural_network_featureextracter, msfs, args.output, training_labels)
+        neural_network_sfs_predictor.check_fit(neural_network_featureextracter, msfs, args.output)
 
 
     if args.cnn:
 
          # apply CNN model
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, training_sfs_2d, user=user)
+        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, args.simulations, args.subset, user=user)
         cnn_2d_sfs_model = models.load_model(os.path.join(args.models, 'cnn.keras'), compile=True)
         cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_sfs_featureextractor.keras'), compile=True)
         results_cnn = cnn_2d_sfs_predictor.predict(cnn_2d_sfs_model, jsfs)
         with open(os.path.join(args.output, 'cnn_predictions.txt'), 'w') as f:
             f.write(results_cnn)
 
-        cnn_2d_sfs_predictor.check_fit(cnn_2d_sfs_featureextracter, jsfs, args.output, training_labels)
+        cnn_2d_sfs_predictor.check_fit(cnn_2d_sfs_featureextracter, jsfs, args.output)
 
 
     if args.cnnnpy:
         # apply CNN model
-        cnn_npy_predictor = build_predictors.CnnNpy(config_values, training_labels, downsampling_dict, args.simulations, user=user)
+        cnn_npy_predictor = build_predictors.CnnNpy(config_values, downsampling_dict, args.simulations, args.subset, user=user)
         cnn_npy_model = models.load_model(os.path.join(args.models, 'cnn_npy.keras'), compile=True)
         cnn_npy_featureextracter = models.load_model(os.path.join(args.models, 'cnn_npy_featureextractor.keras'), compile=True)
         results_cnn_npy = cnn_npy_predictor.predict(cnn_npy_model, empirical_array)

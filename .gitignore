@@ -5,3 +5,6 @@ private
 .DS_Store
 /testing
 *.pyc
+*.pyc
+*.pyc
+/popai/__pycache__

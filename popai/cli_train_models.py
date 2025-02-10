@@ -4,6 +4,7 @@ import os
 import pickle
 import numpy as np
 from popai import parse_input, build_predictors
+import gc
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
@@ -17,6 +18,7 @@ def main():
     parser.add_argument('--cnnnpy', action='store_true', help='Train CNN classifier on alignments.')
     parser.add_argument('--ntrees', type=int, help='Number of trees to use in the RF classifier (default=500).', default=500)
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
+    parser.add_argument('--subset', help="Path to a file listing the models to retain. List indices only (e.g., 0, 1, 5, 6). One integer per line", default=None)
 
     args = parser.parse_args()
 
@@ -41,19 +43,9 @@ def main():
     except ValueError:
         print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
 
-
-    # read the data
-    labels = np.load(os.path.join(args.simulations, 'labels.npy'), allow_pickle=True)
-    
-    with open(os.path.join(args.simulations, 'simulated_msfs.pickle'), 'rb') as f:
-        msfs = pickle.load(f)
-    with open(os.path.join(args.simulations, 'simulated_jsfs.pickle'), 'rb') as f:
-        sfs_2d = pickle.load(f)
-
-
     if args.rf:
         # train RF and save model and confusion matrix
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, msfs, user=user)
+        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, args.simulations, subset=args.subset, user=user)
         random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.ntrees)
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)
@@ -61,7 +53,7 @@ def main():
 
     if args.fcnn:
         # train FCNN and save model and confusion matrix
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, msfs, user = user)
+        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, args.simulations, args.subset, user = user)
         neural_network_sfs_model, neural_network_sfs_cm, neural_network_sfs_cm_plot, neural_network_featureextractor = neural_network_sfs_predictor.build_neuralnet_sfs()
         neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.keras'))
         neural_network_featureextractor.save(os.path.join(args.output, 'fcnn_featureextractor.keras'))
@@ -69,7 +61,7 @@ def main():
 
     if args.cnn:
         # train CNN and save model and confusion matrix
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, sfs_2d, user=user)
+        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, args.simulations, args.subset, user=user)
         cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = cnn_2d_sfs_predictor.build_cnn_sfs()
         cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
         cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
@@ -77,7 +69,7 @@ def main():
 
     if args.cnnnpy:
         # train CNN and save model and confusion matrix
-        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, labels, downsampling_dict, args.simulations, user=user)
+        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, downsampling_dict, args.simulations, args.subset, user=user)
         cnn_2d_npy_model, cnn_2d_npy_cm, cnn_2d_npy_cm_plot, cnn_2d_npy_featureextractor,  = cnn_2d_npy_predictor.build_cnn_npy()
         cnn_2d_npy_model.save(os.path.join(args.output, 'cnn_npy.keras'))
         cnn_2d_npy_featureextractor.save(os.path.join(args.output, 'cnn_npy_featureextractor.keras'))
