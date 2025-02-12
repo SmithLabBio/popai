@@ -94,7 +94,10 @@ class DataProcessor:
 
         # get DP index
         format_lines = [x for x in self.config['vcf'] if 'FORMAT' in x]
-        dp_index = [i for i, item in enumerate(format_lines) if 'DP' in item][0]
+        try:
+            dp_index = [i for i, item in enumerate(format_lines) if 'DP' in item][0]
+        except:
+            dp_index = None
 
         encoded_alignments = []
         for population in self.config['sampling dict'].keys():
@@ -113,7 +116,10 @@ class DataProcessor:
                 for row in info:
                     value1 = row.split("|")[0]
                     value2 = row.split("|")[1].split(":")[0]
-                    dp = row.split(":")[dp_index]
+                    if not dp_index is None:
+                        dp = row.split(":")[dp_index]
+                    else:
+                        dp =10
 
                     if (value1 != "." or value2 != ".") and dp != '0':
 
