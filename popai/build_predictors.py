@@ -3,7 +3,6 @@ from sklearn.model_selection import train_test_split, cross_val_predict, cross_v
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 import numpy as np
-import keras
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tabulate import tabulate
@@ -11,6 +10,7 @@ from sklearn.decomposition import PCA
 import os
 import pickle
 import tensorflow as tf
+from tensorflow import keras
 
 class RandomForestsSFS:
 
@@ -197,19 +197,27 @@ class CnnSFS:
 
         return list_of_features
 
+# TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO:
+# TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO:
+# TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO:
+import glob
+from .dataset import PopaiDataset
+from torch.utils.data import Subset, SubsetRandomSampler, DataLoader 
+from memory_profiler import profile
 class NeuralNetSFS:
 
     """Build a RF predictor that takes the SFS as input."""
 
+    @profile
     def __init__(self, config, simulations, subset, user=False):
         self.config = config
-
-
-        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='1d')
-
+        # self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='1d')
         self.rng = np.random.default_rng(self.config['seed'])
+        model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_mSFS_')}*.pickle")
+        self.dataset = PopaiDataset(model_paths)  
 
 
+    @profile
     def build_neuralnet_sfs(self):
 
         """Build a neural network classifier that takes the
@@ -217,78 +225,80 @@ class NeuralNetSFS:
 
         # split train and test
         train_test_seed = self.rng.integers(2**32, size=1)[0]
-
-        x_train, x_test, y_train, y_test = train_test_split(self.sfs,
-                self.labels, test_size=0.2, random_state=train_test_seed, stratify=self.labels)
+        train_ixs, test_ixs = train_test_split(np.arange(len(self.dataset)), test_size=0.2, 
+                random_state=train_test_seed, stratify=self.dataset.labels)
+        train_dataset = Subset(self.dataset, train_ixs)
+        test_dataset = Subset(self.dataset, train_ixs)
+        train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
+        val_loader = DataLoader(test_dataset, batch_size=10, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 
         # build model
-        network_input = keras.Input(shape=x_train.shape[1:])
+        network_input = keras.Input(shape=self.dataset[0][0].shape)
         x = keras.layers.Dense(100, activation='relu')(network_input)
         x = keras.layers.Dense(50, activation='relu')(x)
-        x = keras.layers.Dense(self.nclasses, activation='softmax')(x)
+        x = keras.layers.Dense(self.dataset.n_classes, activation='softmax')(x)
 
         # fit model
         model = keras.Model(inputs=network_input, outputs=x)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.fit(x_train, y_train, epochs=10,
-                  batch_size=10, validation_data=(x_test, y_test))
+        model.fit(train_loader, epochs=1, batch_size=10, validation_data=(val_loader))
 
         # evaluate model
-        y_test_pred = model.predict(x_test)
-        y_test_original = [self.int_to_label[label] for label in np.argmax(y_test, axis=1)]
-        y_pred_original = [self.int_to_label[label] for label in np.argmax(y_test_pred, axis=1)]
+        y_test_pred = model.predict(test_loader)
+        y_test_original = [self.dataset.labels[i] for i in test_dataset.indices]
+        y_pred_original = np.argmax(y_test_pred, axis=1).tolist()
 
-
-        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=list(self.int_to_label.values()))
+        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=[str(i) for i in y_test_original])
 
         # extract the features
         feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
 
         return model, conf_matrix, conf_matrix_plot, feature_extractor
     
-    def predict(self, model, new_data):
+    # def predict(self, model, new_data):
 
-        new_data = np.array(new_data)
-        predicted = model.predict(new_data)
+    #     new_data = np.array(new_data)
+    #     predicted = model.predict(new_data)
 
-        if predicted.shape[1] != self.nclasses:
-            raise ValueError(f"Model has {predicted.shape[1]} classes, but the provided data has {self.nclasses} classes. You probably used different subsets for training and applying.")
+    #     if predicted.shape[1] != self.nclasses:
+    #         raise ValueError(f"Model has {predicted.shape[1]} classes, but the provided data has {self.nclasses} classes. You probably used different subsets for training and applying.")
 
-        headers = [f"Model {self.int_to_label[i]}" for i in range(self.labels.shape[1])]
-        replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
-        table_data = np.column_stack((replicate_numbers, predicted))
-        tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
+    #     headers = [f"Model {self.int_to_label[i]}" for i in range(self.labels.shape[1])]
+    #     replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
+    #     table_data = np.column_stack((replicate_numbers, predicted))
+    #     tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
 
-        return(tabulated)
+    #     return(tabulated)
 
-    def check_fit(self, feature_extractor, new_data, output_directory):
+    # def check_fit(self, feature_extractor, new_data, output_directory):
 
-        # features from empirical data
-        new_data = np.array(new_data)
-        new_extracted_features = feature_extractor.predict(new_data)
-        train_extracted_features = feature_extractor.predict(np.array(self.sfs))
+    #     # features from empirical data
+    #     new_data = np.array(new_data)
+    #     new_extracted_features = feature_extractor.predict(new_data)
+    #     train_extracted_features = feature_extractor.predict(np.array(self.sfs))
 
-        # pca
-        pca = PCA(n_components=2)
-        train_pca = pca.fit_transform(train_extracted_features)
-        new_pca = pca.transform(new_extracted_features)
+    #     # pca
+    #     pca = PCA(n_components=2)
+    #     train_pca = pca.fit_transform(train_extracted_features)
+    #     new_pca = pca.transform(new_extracted_features)
 
-        # plot
-        training_labels = tf.argmax(self.labels, axis=1)
-        unique_labels = np.unique(training_labels)
-        for label in unique_labels:
-            indices = np.where(np.array(training_labels) == label)
-            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {self.int_to_label[label]}")
+    #     # plot
+    #     training_labels = tf.argmax(self.labels, axis=1)
+    #     unique_labels = np.unique(training_labels)
+    #     for label in unique_labels:
+    #         indices = np.where(np.array(training_labels) == label)
+    #         plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {self.int_to_label[label]}")
 
-        plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
+    #     plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
 
-        plt.xlabel('PCA 1')
-        plt.ylabel('PCA 2')
-        plt.legend()
+    #     plt.xlabel('PCA 1')
+    #     plt.ylabel('PCA 2')
+    #     plt.legend()
         
-        # Save the plot to the specified file
-        plt.savefig(os.path.join(output_directory, 'fcnn_features.png'), dpi=300, bbox_inches='tight')
-        plt.close()  # Close the plot to avoid displaying it in interactive environments
+    #     # Save the plot to the specified file
+    #     plt.savefig(os.path.join(output_directory, 'fcnn_features.png'), dpi=300, bbox_inches='tight')
+    #     plt.close()  # Close the plot to avoid displaying it in interactive environments
 
 class CnnNpy:
 
