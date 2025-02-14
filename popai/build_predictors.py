@@ -294,7 +294,7 @@ class CnnNpy:
 
     """Build a CNN predictor that takes the alignment as a numpy matrix as input."""
 
-    def __init__(self, config, downsampling_dict, simulations, subset, user=False):
+    def __init__(self, config, simulations, subset, user=False):
         self.config = config
         self.arraydicts = {}
         self.arrays = []
@@ -305,9 +305,7 @@ class CnnNpy:
 
         self.rng = np.random.default_rng(self.config['seed'])
 
-        self.downsampling_dict = {}
-        for key,value in self.config['sampling dict'].items():
-            self.downsampling_dict[key] = downsampling_dict[key]
+
 
     def build_cnn_npy(self):
 
@@ -326,7 +324,7 @@ class CnnNpy:
         split_train_features = []
         split_val_features = []
         start_idx = 0
-        for key, num_rows in self.downsampling_dict.items():
+        for key, num_rows in self.config["sampling dict"].items():
             end_idx = start_idx + num_rows
             split_train_features.append(x_train[:,start_idx:end_idx,:,:])
             split_val_features.append(x_test[:,start_idx:end_idx,:,:])
@@ -335,7 +333,7 @@ class CnnNpy:
         # build model
         input_layers = []
         output_layers = []
-        for key,  num_rows in self.downsampling_dict.items():
+        for key,  num_rows in self.config["sampling dict"].items():
             input_layer = keras.Input(shape=(num_rows, x_train.shape[2], 1), name=f'input_{key}')
             input_layers.append(input_layer)
             conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows,1), activation="relu", padding="valid") (input_layer)
@@ -376,7 +374,7 @@ class CnnNpy:
         # split by pop
         split_features = []
         start_idx = 0
-        for key, num_rows in self.downsampling_dict.items():
+        for key, num_rows in self.config['sampling dict'].items():
             end_idx = start_idx + num_rows
             split_features.append(new_data[:,start_idx:end_idx,:,:])
             start_idx = end_idx
@@ -405,7 +403,7 @@ class CnnNpy:
         split_train_features = []
 
         start_idx = 0
-        for key, num_rows in self.downsampling_dict.items():
+        for key, num_rows in self.config['sampling dict'].items():
             end_idx = start_idx + num_rows
             split_features.append(new_data[:,start_idx:end_idx,:,:])
             split_train_features.append(training_data[:,start_idx:end_idx,:,:])
@@ -475,18 +473,29 @@ def read_data(simulations, subset, user, type):
     if subset:
         pickle_list = [x for x in pickle_list if x.split('_')[-1].split('.')[0] in subset_list]
     pickle_list = sorted(pickle_list, key=lambda x: int(x.split('_')[-1].split('.')[0]))
-    
     for item in pickle_list:
         modno = item.split('_')[-1].split('.')[0]
         if type=='1d':
-            with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
-                arraydict[str(modno)] = pickle.load(f)
+            if user==True:
+                with open(os.path.join(simulations, 'simulated_mSFS_model_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
+            else:
+                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
         elif type=='2d':
-            with open(os.path.join(simulations, 'simulated_2dSFS_%s.pickle' % str(modno)), 'rb') as f:
-                arraydict[str(modno)] = pickle.load(f)
+            if user==True:
+                with open(os.path.join(simulations, 'simulated_2dSFS_model_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
+            else:
+                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
         elif type=='npy':
-            with open(os.path.join(simulations, 'simulated_arrays_%s.pickle' % str(modno)), 'rb') as f:
-                arraydict[str(modno)] = pickle.load(f)
+            if user==True:
+                with open(os.path.join(simulations, 'simulated_arrays_model_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
+            else:
+                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
 
     for key,value in arraydict.items():
         for thearray in value:
@@ -496,10 +505,7 @@ def read_data(simulations, subset, user, type):
     if user:
         try:
             labels = [int(x.split('_')[-1]) for x in labels]
-            valid = check_valid_labels(labels)
         except:
-            raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-        if not valid:
             raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
     else:
         labels = [int(x) for x in labels]
