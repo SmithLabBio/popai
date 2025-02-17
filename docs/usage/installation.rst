@@ -5,7 +5,7 @@ Installing with pip
 To install popai::
 
     git clone https://github.com/SmithLabBio/popai.git
-    cd popai/popai
+    cd popai/
     pip install .
 
 OR::
