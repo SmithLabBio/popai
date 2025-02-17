@@ -8,3 +8,4 @@ private
 *.pyc
 *.pyc
 /popai/__pycache__
+*.pyc

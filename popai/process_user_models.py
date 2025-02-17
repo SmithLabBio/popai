@@ -46,6 +46,9 @@ class ModelReader:
             # iterate over parameterizations
             for _ in range(self.config["replicates"]):
 
+                # dictionary for storing event names and times
+                event_dict = {}
+
                 # empty demography
                 demography = msprime.Demography()
 
@@ -55,9 +58,8 @@ class ModelReader:
                     initial_size = np.round(self.rng.uniform(low=size_range[0], high=size_range[1], size=1),0)[0]
                     demography.add_population(name = item, initial_size=initial_size)
                     active_populations.append(item)
+                    event_dict[f"pop_{item}"] = initial_size
 
-                # dictionary for storing event names and times
-                event_dict = {}
 
                 for item in modelinfo["Events"]:
 
@@ -111,6 +113,7 @@ class ModelReader:
                         population_size = self._get_event_value(item_dict, event_dict, 'size')
 
                         demography.add_population_parameters_change(population=item_dict['population'], time=event_time, initial_size=population_size, growth_rate=0)
+                        event_dict[item] = event_time
 
                     elif item_dict['event'] == 'popgrowth':
 
