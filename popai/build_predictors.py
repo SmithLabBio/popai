@@ -11,6 +11,10 @@ import os
 import pickle
 import tensorflow as tf
 from tensorflow import keras
+import glob
+from torch.utils.data import Subset, DataLoader 
+from memory_profiler import profile
+from .dataset import PopaiDataset
 
 class RandomForestsSFS:
 
@@ -197,13 +201,7 @@ class CnnSFS:
 
         return list_of_features
 
-# TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO:
-# TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO:
-# TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO: TODO:
-import glob
-from .dataset import PopaiDataset
-from torch.utils.data import Subset, SubsetRandomSampler, DataLoader 
-from memory_profiler import profile
+
 class NeuralNetSFS:
 
     """Build a RF predictor that takes the SFS as input."""
@@ -242,7 +240,7 @@ class NeuralNetSFS:
         # fit model
         model = keras.Model(inputs=network_input, outputs=x)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.fit(train_loader, epochs=1, batch_size=10, validation_data=(val_loader))
+        model.fit(train_loader, epochs=10, batch_size=10, validation_data=(val_loader))
 
         # evaluate model
         y_test_pred = model.predict(test_loader)
