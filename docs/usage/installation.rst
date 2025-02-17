@@ -9,6 +9,7 @@ To install popai::
     pip install .
 
 OR::
+
     pip install git+https://github.com/Smithlabbio/popai/
 
 If you have an issue due to msprime, use conda to install msprime first.
