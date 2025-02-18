@@ -1,10 +1,9 @@
 private
 .vscode
-/popai/popai/__pycache__
-/popai/popai.egg-info
+*/popai.egg-info
 .DS_Store
 /testing
 *.pyc
-*.pyc
-*.pyc
-/popai/__pycache__
+*/__pycache__
+.DS_Store
+build/
