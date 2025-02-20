@@ -14,7 +14,7 @@ from tensorflow import keras
 import glob
 from torch.utils.data import Subset, DataLoader 
 from memory_profiler import profile
-from .dataset import PopaiDataset
+from .dataset import PopaiDataset, PopaiDatasetLowMem
 
 class RandomForestsSFS:
 
@@ -203,21 +203,22 @@ class CnnSFS:
 
 
 class NeuralNetSFS:
-
-    """Build a RF predictor that takes the SFS as input."""
+    """Build a neural network predictor that takes the SFS as input."""
 
     @profile
-    def __init__(self, config, simulations, subset, user=False):
+    def __init__(self, config, simulations, subset, user=False, low_mem=False):
         self.config = config
         # self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='1d')
         self.rng = np.random.default_rng(self.config['seed'])
-        model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_mSFS_')}*.pickle")
-        self.dataset = PopaiDataset(model_paths)  
+        model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_mSFS_')}*.pickle") # TODO: Move this out of the class
+        if low_mem:
+            self.dataset = PopaiDatasetLowMem(model_paths)  
+        else:
+            self.dataset = PopaiDataset(model_paths)  
 
 
     @profile
     def build_neuralnet_sfs(self):
-
         """Build a neural network classifier that takes the
         multidimensional SFS as input."""
 
@@ -228,7 +229,6 @@ class NeuralNetSFS:
         train_dataset = Subset(self.dataset, train_ixs)
         test_dataset = Subset(self.dataset, train_ixs)
         train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
-        val_loader = DataLoader(test_dataset, batch_size=10, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 
         # build model
@@ -240,14 +240,15 @@ class NeuralNetSFS:
         # fit model
         model = keras.Model(inputs=network_input, outputs=x)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.fit(train_loader, epochs=10, batch_size=10, validation_data=(val_loader))
+        model.fit(train_loader, epochs=10, batch_size=10, validation_data=test_loader)
 
         # evaluate model
         y_test_pred = model.predict(test_loader)
         y_test_original = [self.dataset.labels[i] for i in test_dataset.indices]
         y_pred_original = np.argmax(y_test_pred, axis=1).tolist()
 
-        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=[str(i) for i in y_test_original])
+        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, 
+                labels=[str(i) for i in y_test_original])
 
         # extract the features
         feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
@@ -298,77 +299,93 @@ class NeuralNetSFS:
     #     plt.savefig(os.path.join(output_directory, 'fcnn_features.png'), dpi=300, bbox_inches='tight')
     #     plt.close()  # Close the plot to avoid displaying it in interactive environments
 
+
+class CnnNpyModel(keras.Model):
+    def __init__(self, n_sites, downsampling_dict, n_classes, name=None):
+        super().__init__(name=name)
+
+        self.input_layers = []
+        self.conv1_layers = []
+        self.rows = []
+        for key, num_rows in downsampling_dict.items():
+            self.key_row_pairs.append((key, num_rows))
+            input_layer = keras.Input(shape=(num_rows, n_sites, 1), name=f'input_{key}')
+            self.input_layers.append(input_layer)
+            conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows,1), 
+                    activation="relu", padding="valid") (input_layer)
+            self.output_layers.append(conv_layer)
+        self.conv2 = keras.layers.Conv2D(10, len(downsampling_dict))
+        self.dense1 = keras.layers.Dense(100, activation='relu')
+        self.drop = keras.layers.Dropout(0.1)
+        self.dense2 = keras.layers.Dense(50, activation='relu')
+        self.dense3 = keras.layers.Dense(n_classes, activation="softmax")
+    
+    def __call__(self, x):
+        outputs = []
+        start_ix = 0
+        for i in range(len(self.rows)):
+            num_rows = self.rows[i]
+            end_ix = start_ix + num_rows 
+            out = self.input_layers[i](x[:,start_ix:end_ix,:,:])
+            out = self.conv1_layers[i](out) 
+            outputs.append(out)
+        out = keras.layers.concatenate(outputs)
+        out = self.conv2(out)
+        out = self.dense1(out)
+        out = self.drop(out)
+        out = self.dense2(out)
+        out = self.dense3(out)
+        return out
+
 class CnnNpy:
 
     """Build a CNN predictor that takes the alignment as a numpy matrix as input."""
 
-    def __init__(self, config, downsampling_dict, simulations, subset, user=False):
+    def __init__(self, config, downsampling_dict, simulations, subset, user=False, low_mem=False):
         self.config = config
         self.arraydicts = {}
         self.arrays = []
         self.labels = []
         self.input = input
-        
-        self.arraydict, self.arrays, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='npy')
+        self.n_classes =  
+        # self.arraydict, self.arrays, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='npy')
 
         self.rng = np.random.default_rng(self.config['seed'])
 
         self.downsampling_dict = {}
         for key,value in self.config['sampling dict'].items():
             self.downsampling_dict[key] = downsampling_dict[key]
+        model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_arrays_')}*.pickle") # TODO: Move this out of the class
+        if low_mem:
+            self.dataset = PopaiDatasetLowMem(model_paths)
+        else:
+            self.dataset = PopaiDataset(model_paths)
+        
 
     def build_cnn_npy(self):
-
         """Build a CNN that takes npy array as input."""
 
-        # split train and test
         train_test_seed = self.rng.integers(2**32, size=1)[0]
-        x_train, x_test, y_train, y_test = train_test_split(self.arrays,
-                self.labels, test_size=0.2, random_state=train_test_seed, stratify=self.labels)
-        
-        x_train = np.expand_dims(np.array(x_train), axis=-1)
-        x_test = np.expand_dims(np.array(x_test), axis=-1)
+        train_ixs, test_ixs = train_test_split(np.arange(len(self.dataset)), test_size=0.2, 
+                random_state=train_test_seed, stratify=self.dataset.labels)
+        train_dataset = Subset(self.dataset, train_ixs)
+        test_dataset = Subset(self.dataset, train_ixs)
+        train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 
-
-        # split by pop
-        split_train_features = []
-        split_val_features = []
-        start_idx = 0
-        for key, num_rows in self.downsampling_dict.items():
-            end_idx = start_idx + num_rows
-            split_train_features.append(x_train[:,start_idx:end_idx,:,:])
-            split_val_features.append(x_test[:,start_idx:end_idx,:,:])
-            start_idx = end_idx
-
-        # build model
-        input_layers = []
-        output_layers = []
-        for key,  num_rows in self.downsampling_dict.items():
-            input_layer = keras.Input(shape=(num_rows, x_train.shape[2], 1), name=f'input_{key}')
-            input_layers.append(input_layer)
-            conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows,1), activation="relu", padding="valid") (input_layer)
-            output_layers.append(conv_layer)
-
-        x = keras.layers.concatenate(output_layers, axis=1)
-        x = keras.layers.Conv2D(10, (len(split_train_features),1), activation="relu", padding="valid")(x)
-        x = keras.layers.Flatten()(x)
-        x = keras.layers.Dense(100, activation='relu')(x)
-        x = keras.layers.Dropout(0.1)(x)
-        x = keras.layers.Dense(50, activation='relu')(x)
-        x = keras.layers.Dense(self.nclasses, activation='softmax')(x)
-
-        model = keras.Model(inputs=input_layers, outputs=x)
+        model = CnnNpyModel(train_dataset[0][0].shape[2], self.downsampling_dict, 
+                self.dataset.n_classes)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.fit(split_train_features, y_train, epochs=10,
-                  batch_size=10, validation_data=(split_val_features, y_test))
+        model.fit(train_loader, epochs=10, batch_size=10,) 
+                #   validation_data=test_loader) # TODO: Implement validation
 
         # evaluate model
-        y_test_pred = model.predict(split_val_features)
-        y_test_original = [self.int_to_label[label] for label in np.argmax(y_test, axis=1)]
-        y_pred_original = [self.int_to_label[label] for label in np.argmax(y_test_pred, axis=1)]
+        y_test_pred = model.predict(test_loader)
+        y_test_original = [self.dataset.labels[i] for i in test_dataset.indices]
+        y_pred_original = np.argmax(y_test_pred, axis=1).tolist()
 
-
-        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=list(self.int_to_label.values()))
+        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, 
+                labels=[str(i) for i in y_test_original])
 
         # extract the features
         feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
