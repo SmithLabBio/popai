@@ -45,7 +45,8 @@ def main():
 
     if args.rf:
         # train RF and save model and confusion matrix
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, args.simulations, subset=args.subset, user=user)
+        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, 
+                args.simulations, subset=args.subset, user=user)
         random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.ntrees)
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)
@@ -53,7 +54,8 @@ def main():
 
     if args.fcnn:
         # train FCNN and save model and confusion matrix
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, args.simulations, args.subset, user = user)
+        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, 
+                args.simulations, args.subset, user = user)
         neural_network_sfs_model, neural_network_sfs_cm, neural_network_sfs_cm_plot, neural_network_featureextractor = neural_network_sfs_predictor.build_neuralnet_sfs()
         neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.keras'))
         neural_network_featureextractor.save(os.path.join(args.output, 'fcnn_featureextractor.keras'))
@@ -61,15 +63,18 @@ def main():
 
     if args.cnn:
         # train CNN and save model and confusion matrix
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, args.simulations, args.subset, user=user)
-        cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = cnn_2d_sfs_predictor.build_cnn_sfs()
-        cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
-        cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
-        cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
+        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, 
+                args.simulations, args.subset, user=user)
+        # cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = 
+        cnn_2d_sfs_predictor.build_cnn_sfs()
+        # cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
+        # cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
+        # cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
 
     if args.cnnnpy:
         # train CNN and save model and confusion matrix
-        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, downsampling_dict, args.simulations, args.subset, user=user)
+        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, downsampling_dict, 
+                args.simulations, args.subset, user=user)
         cnn_2d_npy_model, cnn_2d_npy_cm, cnn_2d_npy_cm_plot, cnn_2d_npy_featureextractor,  = cnn_2d_npy_predictor.build_cnn_npy()
         cnn_2d_npy_model.save(os.path.join(args.output, 'cnn_npy.keras'))
         cnn_2d_npy_featureextractor.save(os.path.join(args.output, 'cnn_npy_featureextractor.keras'))

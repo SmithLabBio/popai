@@ -69,143 +69,153 @@ class RandomForestsSFS:
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
         return(tabulated)
 
-class CnnSFS:
+# class CnnSFS:
+#     """Build a CNN predictor that takes the SFS as input."""
 
-    """Build a CNN predictor that takes the SFS as input."""
+#     def __init__(self, config, simulations, subset, user=False, low_mem=False):
+#         self.config = config
+#         # self.arraydict, self.sfs_2d, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='2d')
+#         self.rng = np.random.default_rng(self.config['seed'])
+#         model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_mSFS_')}*.pickle") # TODO: Move this out of the class
+#         if low_mem:
+#             self.dataset = PopaiDatasetLowMem(model_paths)  
+#         else:
+#             self.dataset = PopaiDataset(model_paths)  
 
-    def __init__(self, config, simulations, subset, user=False):
-        self.config = config
-
-        self.arraydict, self.sfs_2d, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='2d')
-
-        self.rng = np.random.default_rng(self.config['seed'])
-
-
-    def build_cnn_sfs(self):
-
-        """Build a CNN that takes 2D SFS as input."""
-
-        # get features
-        list_of_features = self._convert_2d_dictionary(self.sfs_2d)
-
-        # split_data
-        train_indices, test_indices, y_train, y_test = train_test_split(np.arange(len(self.labels)), self.labels, test_size=0.2, random_state=self.rng.integers(2**32, size=1)[0], stratify=self.labels)
-
-
-        # Split features and labels into training and validation sets using the indices
-        train_features = [[list_of_features[j][i] for i in train_indices]\
-                          for j in range(len(list_of_features))]
-        val_features = [[list_of_features[j][i] for i in test_indices]\
-                        for j in range(len(list_of_features))]
-        # to arrays
-        train_features = [np.expand_dims(np.array(x), axis=-1) for x in train_features]
-        val_features = [np.expand_dims(np.array(x), axis=-1) for x in val_features]
-
-        # build model
-        my_layers = []
-        inputs = []
-        for item in train_features:
-            this_input = keras.Input(shape=item.shape[1:])
-            x =  keras.layers.Conv2D(10, (3,3), activation="relu")(this_input)
-            x = keras.layers.Flatten()(x)
-            my_layers.append(x)
-            inputs.append(this_input)
-
-        concatenated = keras.layers.Concatenate()(my_layers)
-        x = keras.layers.Dense(64, activation='relu')(concatenated)
-        x = keras.layers.Dense(self.nclasses, activation='softmax')(x)
-
-        model = keras.Model(inputs=inputs, outputs=x)
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.fit(train_features, y_train, epochs=10,
-                  batch_size=10, validation_data=(val_features, y_test))
-
-        # extract the features
-        feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
-
-
-        # Convert predictions and true labels back to original labels
-        y_test_pred = model.predict(val_features)
-        y_test_original = [self.int_to_label[label] for label in np.argmax(y_test, axis=1)]
-        y_pred_original = [self.int_to_label[label] for label in np.argmax(y_test_pred, axis=1)]
-
-
-        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=list(self.int_to_label.values()))
-        return model, conf_matrix, conf_matrix_plot, feature_extractor
-
-    def predict(self, model, new_data):
-        new_features = self._convert_2d_dictionary(new_data)
-        new_features = [np.expand_dims(np.array(x), axis=-1) for x in new_features]
-        predicted = model.predict(new_features)
-
-        if predicted.shape[1] != self.nclasses:
-            raise ValueError(f"Model has {predicted.shape[1]} classes, but the provided data has {self.nclasses} classes. You probably used different subsets for training and applying.")
-
-        headers = [f"Model {self.int_to_label[i]}" for i in range(self.labels.shape[1])]
-        replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
-        table_data = np.column_stack((replicate_numbers, predicted))
-        tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
-
-        return(tabulated)
-
-    def check_fit(self, feature_extractor, new_data, output_directory):
-
-        # features from empirical data
-        new_features = self._convert_2d_dictionary(new_data)
-        new_features = [np.expand_dims(np.array(x), axis=-1) for x in new_features]
-        new_extracted_features = feature_extractor.predict(new_features)
-
-        # features from training data
-        list_of_features = self._convert_2d_dictionary(self.sfs_2d)
-        train_features = [np.expand_dims(np.array(x), axis=-1) for x in list_of_features]
-        train_extracted_features = feature_extractor.predict(train_features)
-
-        # pca
-        pca = PCA(n_components=2)
-        train_pca = pca.fit_transform(train_extracted_features)
-        new_pca = pca.transform(new_extracted_features)
-
-        # plot
-        training_labels = tf.argmax(self.labels, axis=1)
-        unique_labels = np.unique(training_labels)
-        for label in unique_labels:
-            indices = np.where(np.array(training_labels) == label)
-            plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {self.int_to_label[label]}")
-
-        plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
-
-        plt.xlabel('PCA 1')
-        plt.ylabel('PCA 2')
-        plt.legend()
+#     def build_cnn_sfs(self):
+#         """Build a CNN that takes 2D SFS as input."""
         
-        # Save the plot to the specified file
-        plt.savefig(os.path.join(output_directory, 'cnn_2dsfs_features.png'), dpi=300, bbox_inches='tight')
-        plt.close()  # Close the plot to avoid displaying it in interactive environments
+#         # split train and test
+#         train_test_seed = self.rng.integers(2**32, size=1)[0]
+#         train_ixs, test_ixs = train_test_split(np.arange(len(self.dataset)), test_size=0.2, 
+#                 random_state=train_test_seed, stratify=self.dataset.labels)
+#         train_dataset = Subset(self.dataset, train_ixs)
+#         test_dataset = Subset(self.dataset, train_ixs)
+#         train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
+#         test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 
-    def _convert_2d_dictionary(self, data):
+#         print(self.dataset[0][0].shape)
 
-        list_of_features = []
+#         # get features
+#         # list_of_features = self._convert_2d_dictionary(self.sfs_2d)
 
-        for data_dict in data:
+#         # # split_data
+#         # train_indices, test_indices, y_train, y_test = train_test_split(np.arange(len(self.labels)), self.labels, test_size=0.2, random_state=self.rng.integers(2**32, size=1)[0], stratify=self.labels)
 
-            count = 0
+#         # # Split features and labels into training and validation sets using the indices
+#         # train_features = [[list_of_features[j][i] for i in train_indices]\
+#         #                   for j in range(len(list_of_features))]
+#         # val_features = [[list_of_features[j][i] for i in test_indices]\
+#         #                 for j in range(len(list_of_features))]
+#         # # to arrays
+#         # train_features = [np.expand_dims(np.array(x), axis=-1) for x in train_features]
+#         # val_features = [np.expand_dims(np.array(x), axis=-1) for x in val_features]
 
-            for value in data_dict.values():
+#         # # build model
+#         # my_layers = []
+#         # inputs = []
+#         # for item in train_features:
+#         #     this_input = keras.Input(shape=item.shape[1:])
+#         #     x =  keras.layers.Conv2D(10, (3,3), activation="relu")(this_input)
+#         #     x = keras.layers.Flatten()(x)
+#         #     my_layers.append(x)
+#         #     inputs.append(this_input)
 
-                if len(list_of_features) >= count+1:
-                    list_of_features[count].append(np.array(value))
-                else:
-                    list_of_features.append([np.array(value)])
+#         # concatenated = keras.layers.Concatenate()(my_layers)
+#         # x = keras.layers.Dense(64, activation='relu')(concatenated)
+#         # x = keras.layers.Dense(self.nclasses, activation='softmax')(x)
 
-                count+=1
+#         # model = keras.Model(inputs=inputs, outputs=x)
+#         # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+#         # model.fit(train_features, y_train, epochs=10,
+#         #           batch_size=10, validation_data=(val_features, y_test))
 
-        return list_of_features
+#         # # extract the features
+#         # feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
+
+#         # # Convert predictions and true labels back to original labels
+#         # y_test_pred = model.predict(val_features)
+#         # y_test_original = [self.int_to_label[label] for label in np.argmax(y_test, axis=1)]
+#         # y_pred_original = [self.int_to_label[label] for label in np.argmax(y_test_pred, axis=1)]
+
+
+#         # conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, labels=list(self.int_to_label.values()))
+#         # return model, conf_matrix, conf_matrix_plot, feature_extractor
+
+#     # def predict(self, model, new_data):
+#     #     new_features = self._convert_2d_dictionary(new_data)
+#     #     new_features = [np.expand_dims(np.array(x), axis=-1) for x in new_features]
+#     #     predicted = model.predict(new_features)
+
+#     #     if predicted.shape[1] != self.nclasses:
+#     #         raise ValueError(f"Model has {predicted.shape[1]} classes, but the provided data has {self.nclasses} classes. You probably used different subsets for training and applying.")
+
+#     #     headers = [f"Model {self.int_to_label[i]}" for i in range(self.labels.shape[1])]
+#     #     replicate_numbers = ["Replicate {}".format(i+1) for i in range(predicted.shape[0])]
+#     #     table_data = np.column_stack((replicate_numbers, predicted))
+#     #     tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
+
+#     #     return(tabulated)
+
+#     # def check_fit(self, feature_extractor, new_data, output_directory):
+
+#     #     # features from empirical data
+#     #     new_features = self._convert_2d_dictionary(new_data)
+#     #     new_features = [np.expand_dims(np.array(x), axis=-1) for x in new_features]
+#     #     new_extracted_features = feature_extractor.predict(new_features)
+
+#     #     # features from training data
+#     #     list_of_features = self._convert_2d_dictionary(self.sfs_2d)
+#     #     train_features = [np.expand_dims(np.array(x), axis=-1) for x in list_of_features]
+#     #     train_extracted_features = feature_extractor.predict(train_features)
+
+#     #     # pca
+#     #     pca = PCA(n_components=2)
+#     #     train_pca = pca.fit_transform(train_extracted_features)
+#     #     new_pca = pca.transform(new_extracted_features)
+
+#     #     # plot
+#     #     training_labels = tf.argmax(self.labels, axis=1)
+#     #     unique_labels = np.unique(training_labels)
+#     #     for label in unique_labels:
+#     #         indices = np.where(np.array(training_labels) == label)
+#     #         plt.scatter(train_pca[indices, 0], train_pca[indices, 1], label=f"Train: {self.int_to_label[label]}")
+
+#     #     plt.scatter(new_pca[:, 0], new_pca[:, 1], color='black', label='New Data', marker='x')
+
+#     #     plt.xlabel('PCA 1')
+#     #     plt.ylabel('PCA 2')
+#     #     plt.legend()
+        
+#     #     # Save the plot to the specified file
+#     #     plt.savefig(os.path.join(output_directory, 'cnn_2dsfs_features.png'), dpi=300, bbox_inches='tight')
+#     #     plt.close()  # Close the plot to avoid displaying it in interactive environments
+
+#     def _convert_2d_dictionary(self, data):
+#         list_of_features = []
+#         for data_dict in data:
+#             count = 0
+#             for value in data_dict.values():
+#                 if len(list_of_features) >= count+1:
+#                     list_of_features[count].append(np.array(value))
+#                 else:
+#                     list_of_features.append([np.array(value)])
+#                 count+=1
+#         return list_of_features
+
+
+
+
+
+
+
+
+
 
 
 class NeuralNetSFS:
     """Build a neural network predictor that takes the SFS as input."""
 
-    @profile
     def __init__(self, config, simulations, subset, user=False, low_mem=False):
         self.config = config
         # self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='1d')
@@ -217,7 +227,6 @@ class NeuralNetSFS:
             self.dataset = PopaiDataset(model_paths)  
 
 
-    @profile
     def build_neuralnet_sfs(self):
         """Build a neural network classifier that takes the
         multidimensional SFS as input."""
@@ -304,34 +313,32 @@ class NeuralNetSFS:
 class CnnNpyModel(keras.Model):
     def __init__(self, n_sites, downsampling_dict, n_classes, name=None):
         super().__init__(name=name)
-
-        self.input_layers = []
         self.conv1_layers = []
         self.rows = []
         for key, num_rows in downsampling_dict.items():
-            self.key_row_pairs.append((key, num_rows))
-            input_layer = keras.Input(shape=(num_rows, n_sites, 1), name=f'input_{key}')
-            self.input_layers.append(input_layer)
-            conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows,1), 
-                    activation="relu", padding="valid") (input_layer)
-            self.output_layers.append(conv_layer)
-        self.conv2 = keras.layers.Conv2D(10, len(downsampling_dict))
+            self.rows.append(num_rows)
+            conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows, 1), 
+                    activation="relu", padding="valid") #(input_layer)
+            self.conv1_layers.append(conv_layer)
+        self.conv2 = keras.layers.Conv2D(10, (len(downsampling_dict), 1), activation="relu", padding="valid")
+        self.flat = keras.layers.Flatten()
         self.dense1 = keras.layers.Dense(100, activation='relu')
         self.drop = keras.layers.Dropout(0.1)
         self.dense2 = keras.layers.Dense(50, activation='relu')
         self.dense3 = keras.layers.Dense(n_classes, activation="softmax")
     
-    def __call__(self, x):
+    def call(self, x):
+        x = tf.cast(tf.expand_dims(x, axis=-1), dtype=tf.float64) # Reshape input and cast to float
         outputs = []
         start_ix = 0
         for i in range(len(self.rows)):
             num_rows = self.rows[i]
             end_ix = start_ix + num_rows 
-            out = self.input_layers[i](x[:,start_ix:end_ix,:,:])
-            out = self.conv1_layers[i](out) 
+            out = self.conv1_layers[i](x[:,start_ix:end_ix,:,:]) 
             outputs.append(out)
-        out = keras.layers.concatenate(outputs)
+        out = keras.layers.concatenate(outputs, axis=1)
         out = self.conv2(out)
+        out = self.flat(out)
         out = self.dense1(out)
         out = self.drop(out)
         out = self.dense2(out)
@@ -339,7 +346,6 @@ class CnnNpyModel(keras.Model):
         return out
 
 class CnnNpy:
-
     """Build a CNN predictor that takes the alignment as a numpy matrix as input."""
 
     def __init__(self, config, downsampling_dict, simulations, subset, user=False, low_mem=False):
@@ -349,9 +355,7 @@ class CnnNpy:
         self.labels = []
         self.input = input
         # self.arraydict, self.arrays, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='npy')
-
         self.rng = np.random.default_rng(self.config['seed'])
-
         self.downsampling_dict = {}
         for key,value in self.config['sampling dict'].items():
             self.downsampling_dict[key] = downsampling_dict[key]
@@ -361,7 +365,6 @@ class CnnNpy:
         else:
             self.dataset = PopaiDataset(model_paths)
         
-
     def build_cnn_npy(self):
         """Build a CNN that takes npy array as input."""
 
@@ -373,7 +376,7 @@ class CnnNpy:
         train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
 
-        model = CnnNpyModel(train_dataset[0][0].shape[2], self.downsampling_dict, 
+        model = CnnNpyModel(train_dataset[0][0].shape[1], self.downsampling_dict, 
                 self.dataset.n_classes)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         model.fit(train_loader, epochs=10, batch_size=10,) 
