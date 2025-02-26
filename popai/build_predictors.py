@@ -95,15 +95,13 @@ class CnnSFSModel(keras.Model):
 class CnnSFS:
     """Build a CNN predictor that takes the 2D SFS as input."""
 
-    def __init__(self, config, simulations, subset, user=False, low_mem=True):
+    def __init__(self, config, simulations, low_mem=True):
         self.config = config
-        # self.arraydict, self.sfs_2d, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='2d')
         self.rng = np.random.default_rng(self.config['seed'])
-        model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_2dSFS_')}*.pickle") # TODO: Move this out of the class
         if low_mem:
-            self.dataset = PopaiDatasetLowMem(model_paths)  
+            self.dataset = PopaiDatasetLowMem(simulations)  
         else:
-            self.dataset = PopaiDataset(model_paths)  
+            self.dataset = PopaiDataset(simulations)  
     
 
     def build_cnn_sfs(self):
@@ -120,23 +118,21 @@ class CnnSFS:
 
         # Define and train model
         pop_pairs = list(self.dataset[0][0].keys())
-        model = CnnSFSModel(pop_pairs, self.dataset.n_classes)
-        model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-        model.fit(train_loader, epochs=10, batch_size=10,)
-                #   validation_data=test_loader) # TODO: Implement validation
+        self.model = CnnSFSModel(pop_pairs, self.dataset.n_classes)
+        self.model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+        self.model.fit(train_loader, epochs=10, batch_size=10, validation_data=test_loader) 
 
         # evaluate model
-        y_test_pred = model.predict(test_loader)
+        y_test_pred = self.model.predict(test_loader)
         y_test_original = [self.dataset.labels[i] for i in test_dataset.indices]
         y_pred_original = np.argmax(y_test_pred, axis=1).tolist()
 
-        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, 
+        self.conf_matrix, self.conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, 
                 labels=[str(i) for i in y_test_original])
         
         # extract the features
-        feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
+        self.feature_extractor = keras.Model(inputs=self.model.input, outputs=self.model.layers[-2].output)
 
-        return model, conf_matrix, conf_matrix_plot, feature_extractor
 
     # def predict(self, model, new_data):
     #     new_features = self._convert_2d_dictionary(new_data)
@@ -194,16 +190,13 @@ class CnnSFS:
 class NeuralNetSFS:
     """Build a neural network predictor that takes the SFS as input."""
 
-    def __init__(self, config, simulations, subset, user=False, low_mem=True):
+    def __init__(self, config, simulations, low_mem=True):
         self.config = config
-        # self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='1d')
         self.rng = np.random.default_rng(self.config['seed'])
-        model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_mSFS_')}*.pickle") # TODO: Move this out of the class
         if low_mem:
-            self.dataset = PopaiDatasetLowMem(model_paths)  
+            self.dataset = PopaiDatasetLowMem(simulations)  
         else:
-            self.dataset = PopaiDataset(model_paths)  
-
+            self.dataset = PopaiDataset(simulations)  
 
     def build_neuralnet_sfs(self):
         """Build a neural network classifier that takes the

@@ -4,7 +4,31 @@ import os
 import pickle
 import numpy as np
 from popai import parse_input, build_predictors
+from popai.build_predictors import RandomForestsSFS, NeuralNetSFS, CnnSFS, CnnNpy 
 import gc
+import glob
+import re
+
+
+def human_sort_key(s):
+    """
+    Key function for human sorting.
+    Splits the string into parts and converts numeric parts to integers.
+    """
+    return [int(part) if part.isdigit() else part for part in re.split('([0-9]+)', s)]
+
+def train(meth, config, args, pattern):
+    # TODO: Do something here to allow subset of models
+    sim_data_paths = glob.glob(os.path.join(args.simulations, pattern))
+    sorted_sim_data_paths = sorted(sim_data_paths, key=human_sort_key)
+    predictor = meth(config, sorted_sim_data_paths, low_mem=args.low_mem)
+        # cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = 
+    predictor.build_cnn_sfs()
+    predictor.model.save(os.path.join(args.output, 'cnn.keras'))
+        # cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
+        # cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
+
+
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
@@ -19,6 +43,7 @@ def main():
     parser.add_argument('--ntrees', type=int, help='Number of trees to use in the RF classifier (default=500).', default=500)
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
     parser.add_argument('--subset', help="Path to a file listing the models to retain. List indices only (e.g., 0, 1, 5, 6). One integer per line", default=None)
+    parser.add_argument('--low-memory', help="Reads training datasets into memory as needed during training rather than all at once. Slows training due to increased file reads.", default=False)
 
     args = parser.parse_args()
 
@@ -32,11 +57,11 @@ def main():
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
-    # set whether user
-    if config_values['user models'] is None:
-        user = False
-    else:
-        user = True
+    # # set whether user
+    # if config_values['user models'] is None:
+    #     user = False
+    # else:
+    #     user = True
 
     try:
         downsampling_dict = ast.literal_eval(args.downsampling)
@@ -45,8 +70,8 @@ def main():
 
     if args.rf:
         # train RF and save model and confusion matrix
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, 
-                args.simulations, subset=args.subset, user=user)
+        random_forest_sfs_predictor = RandomForestsSFS(config_values, args.simulations, 
+                                                       subset=args.subset, user=user)
         random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.ntrees)
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)
@@ -54,26 +79,27 @@ def main():
 
     if args.fcnn:
         # train FCNN and save model and confusion matrix
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, 
-                args.simulations, args.subset, user = user)
+        neural_network_sfs_predictor = NeuralNetSFS(config_values, args.simulations, args.subset, 
+                                                    user=user, low_mem=args.low_mem)
         neural_network_sfs_model, neural_network_sfs_cm, neural_network_sfs_cm_plot, neural_network_featureextractor = neural_network_sfs_predictor.build_neuralnet_sfs()
         neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.keras'))
         neural_network_featureextractor.save(os.path.join(args.output, 'fcnn_featureextractor.keras'))
         neural_network_sfs_cm_plot.savefig(os.path.join(args.output, 'fcnn_confusion.png'))
 
     if args.cnn:
+        train(CnnSFS, config_values, args, "simulated_arrays_*.pickle")
         # train CNN and save model and confusion matrix
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, 
-                args.simulations, args.subset, user=user)
-        cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = cnn_2d_sfs_predictor.build_cnn_sfs()
-        cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
-        cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
-        cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
+        # cnn_2d_sfs_predictor = CnnSFS(config_values, args.simulations, args.subset, 
+        #                               user=user, low_mem=args.low_mem)
+        # cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = cnn_2d_sfs_predictor.build_cnn_sfs()
+        # cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
+        # cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
+        # cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
 
     if args.cnnnpy:
         # train CNN and save model and confusion matrix
-        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, downsampling_dict, 
-                args.simulations, args.subset, user=user)
+        cnn_2d_npy_predictor = CnnNpy(config_values, downsampling_dict, args.simulations, 
+                                      args.subset, user=user, low_mem=args.low_mem)
         cnn_2d_npy_model, cnn_2d_npy_cm, cnn_2d_npy_cm_plot, cnn_2d_npy_featureextractor,  = cnn_2d_npy_predictor.build_cnn_npy()
         cnn_2d_npy_model.save(os.path.join(args.output, 'cnn_npy.keras'))
         cnn_2d_npy_featureextractor.save(os.path.join(args.output, 'cnn_npy_featureextractor.keras'))
