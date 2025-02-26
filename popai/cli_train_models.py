@@ -4,7 +4,11 @@ import os
 import pickle
 import numpy as np
 from popai import parse_input, build_predictors
+from popai.dataset import PopaiDataset
+from popai.build_predictors import CnnSFSModel, train_keras
+from torch.utils.data import Subset, DataLoader
 import gc
+import glob
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
@@ -43,41 +47,48 @@ def main():
     except ValueError:
         print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
 
-    if args.rf:
-        # train RF and save model and confusion matrix
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, 
-                args.simulations, subset=args.subset, user=user)
-        random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.ntrees)
-        with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
-            pickle.dump(random_forest_sfs_model, f)
-        random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))
+    # if args.rf:
+    #     # train RF and save model and confusion matrix
+    #     random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, 
+    #             args.simulations, subset=args.subset, user=user)
+    #     random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.ntrees)
+    #     with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
+    #         pickle.dump(random_forest_sfs_model, f)
+    #     random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))
 
-    if args.fcnn:
-        # train FCNN and save model and confusion matrix
-        neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, 
-                args.simulations, args.subset, user = user)
-        neural_network_sfs_model, neural_network_sfs_cm, neural_network_sfs_cm_plot, neural_network_featureextractor = neural_network_sfs_predictor.build_neuralnet_sfs()
-        neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.keras'))
-        neural_network_featureextractor.save(os.path.join(args.output, 'fcnn_featureextractor.keras'))
-        neural_network_sfs_cm_plot.savefig(os.path.join(args.output, 'fcnn_confusion.png'))
+    # if args.fcnn:
+    #     # train FCNN and save model and confusion matrix
+    #     neural_network_sfs_predictor = build_predictors.NeuralNetSFS(config_values, 
+    #             args.simulations, args.subset, user = user)
+    #     neural_network_sfs_model, neural_network_sfs_cm, neural_network_sfs_cm_plot, neural_network_featureextractor = neural_network_sfs_predictor.build_neuralnet_sfs()
+    #     neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.keras'))
+    #     neural_network_featureextractor.save(os.path.join(args.output, 'fcnn_featureextractor.keras'))
+    #     neural_network_sfs_cm_plot.savefig(os.path.join(args.output, 'fcnn_confusion.png'))
 
     if args.cnn:
+        model_paths = glob.glob(f"{os.path.join(args.simulations, 'simulated_2dSFS_')}*.pickle")
+        dataset = PopaiDataset(model_paths)  
+        pop_pairs = list(dataset[0][0].keys())
+        model = CnnSFSModel(pop_pairs, dataset.n_classes)
+        loader = DataLoader(dataset)
+        train_keras(model, loader)
         # train CNN and save model and confusion matrix
-        cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, 
-                args.simulations, args.subset, user=user)
-        cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = cnn_2d_sfs_predictor.build_cnn_sfs()
-        cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
-        cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
-        cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
-
-    if args.cnnnpy:
-        # train CNN and save model and confusion matrix
-        cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, downsampling_dict, 
-                args.simulations, args.subset, user=user)
-        cnn_2d_npy_model, cnn_2d_npy_cm, cnn_2d_npy_cm_plot, cnn_2d_npy_featureextractor,  = cnn_2d_npy_predictor.build_cnn_npy()
-        cnn_2d_npy_model.save(os.path.join(args.output, 'cnn_npy.keras'))
-        cnn_2d_npy_featureextractor.save(os.path.join(args.output, 'cnn_npy_featureextractor.keras'))
-        cnn_2d_npy_cm_plot.savefig(os.path.join(args.output, 'cnn_npy_confusion.png'))
+        # cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, 
+                # args.simulations, args.subset, user=user)
+        # cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = 
+        # cnn_2d_sfs_predictor.build_cnn_sfs(model, loader)
+        # cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
+        # cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
+        # cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
+# 
+    # if args.cnnnpy:
+    #     # train CNN and save model and confusion matrix
+    #     cnn_2d_npy_predictor = build_predictors.CnnNpy(config_values, downsampling_dict, 
+    #             args.simulations, args.subset, user=user)
+    #     cnn_2d_npy_model, cnn_2d_npy_cm, cnn_2d_npy_cm_plot, cnn_2d_npy_featureextractor,  = cnn_2d_npy_predictor.build_cnn_npy()
+    #     cnn_2d_npy_model.save(os.path.join(args.output, 'cnn_npy.keras'))
+    #     cnn_2d_npy_featureextractor.save(os.path.join(args.output, 'cnn_npy_featureextractor.keras'))
+    #     cnn_2d_npy_cm_plot.savefig(os.path.join(args.output, 'cnn_npy_confusion.png'))
 
 
 if __name__ == '__main__':

@@ -92,51 +92,67 @@ class CnnSFSModel(keras.Model):
         out = self.dense2(out)
         return out
 
-class CnnSFS:
-    """Build a CNN predictor that takes the 2D SFS as input."""
 
-    def __init__(self, config, simulations, subset, user=False, low_mem=True):
-        self.config = config
-        # self.arraydict, self.sfs_2d, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='2d')
-        self.rng = np.random.default_rng(self.config['seed'])
-        model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_2dSFS_')}*.pickle") # TODO: Move this out of the class
-        if low_mem:
-            self.dataset = PopaiDatasetLowMem(model_paths)  
-        else:
-            self.dataset = PopaiDataset(model_paths)  
+def train_keras(model, loader):
+    model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+    model.fit(loader, epochs=10, batch_size=10,)
+    # validation_data=test_loader) # TODO: Implement validation
+
+    # y_test_pred = model.predict(test_loader)
+    # y_test_original = [self.dataset.labels[i] for i in test_dataset.indices]
+    # y_pred_original = np.argmax(y_test_pred, axis=1).tolist()
+    # conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, 
+    #         labels=[str(i) for i in y_test_original])
     
+    # # extract the features
+    # feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
 
-    def build_cnn_sfs(self):
-        """Build a CNN that takes 2D SFS as input."""
+
+# class CnnSFS:
+#     """Build a CNN predictor that takes the 2D SFS as input."""
+
+#     def __init__(self, config, simulations, subset, user=False, low_mem=True):
+#         self.config = config
+#         # self.arraydict, self.sfs_2d, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='2d')
+#         self.rng = np.random.default_rng(self.config['seed'])
+#         model_paths = glob.glob(f"{os.path.join(simulations, 'simulated_2dSFS_')}*.pickle") # TODO: Move this out of the class
+#         if low_mem:
+#             self.dataset = PopaiDatasetLowMem(model_paths)  
+#         else:
+#             self.dataset = PopaiDataset(model_paths)   
+
+#     def build_cnn_sfs(self, model, train_loader):
+#         """Build a CNN that takes 2D SFS as input."""
         
-        # split train and test
-        train_test_seed = self.rng.integers(2**32, size=1)[0]
-        train_ixs, test_ixs = train_test_split(np.arange(len(self.dataset)), test_size=0.2, 
-                random_state=train_test_seed, stratify=self.dataset.labels)
-        train_dataset = Subset(self.dataset, train_ixs)
-        test_dataset = Subset(self.dataset, train_ixs)
-        train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
-        test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
+#         # split train and test
+#         # train_test_seed = self.rng.integers(2**32, size=1)[0]
+#         # train_ixs, test_ixs = train_test_split(np.arange(len(self.dataset)), test_size=0.2, 
+#         #         random_state=train_test_seed, stratify=self.dataset.labels)
+#         # train_dataset = Subset(self.dataset, train_ixs)
+#         # test_dataset = Subset(self.dataset, train_ixs)
+#         # train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
+#         # test_loader = DataLoader(test_dataset, batch_size=10, shuffle=False)
+#         # train_loader = DataLoader(dataset)
 
-        # Define and train model
-        pop_pairs = list(self.dataset[0][0].keys())
-        model = CnnSFSModel(pop_pairs, self.dataset.n_classes)
-        model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-        model.fit(train_loader, epochs=10, batch_size=10,)
-                #   validation_data=test_loader) # TODO: Implement validation
+#         # Define and train model
+#         # pop_pairs = list(self.dataset[0][0].keys())
+#         # model = CnnSFSModel(pop_pairs, self.dataset.n_classes)
+#         model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+#         model.fit(train_loader, epochs=10, batch_size=10,)
+#                 #   validation_data=test_loader) # TODO: Implement validation
 
-        # evaluate model
-        y_test_pred = model.predict(test_loader)
-        y_test_original = [self.dataset.labels[i] for i in test_dataset.indices]
-        y_pred_original = np.argmax(y_test_pred, axis=1).tolist()
+        # # evaluate model
+        # y_test_pred = model.predict(test_loader)
+        # y_test_original = [self.dataset.labels[i] for i in test_dataset.indices]
+        # y_pred_original = np.argmax(y_test_pred, axis=1).tolist()
 
-        conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, 
-                labels=[str(i) for i in y_test_original])
+        # conf_matrix, conf_matrix_plot = plot_confusion_matrix(y_test_original, y_pred_original, 
+        #         labels=[str(i) for i in y_test_original])
         
-        # extract the features
-        feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
+        # # extract the features
+        # feature_extractor = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
 
-        return model, conf_matrix, conf_matrix_plot, feature_extractor
+        # return model, conf_matrix, conf_matrix_plot, feature_extractor
 
     # def predict(self, model, new_data):
     #     new_features = self._convert_2d_dictionary(new_data)
