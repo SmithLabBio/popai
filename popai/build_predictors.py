@@ -11,10 +11,8 @@ import os
 import pickle
 import tensorflow as tf
 from tensorflow import keras
-import glob
-from torch.utils.data import Subset, DataLoader 
 from memory_profiler import profile
-from .dataset import PopaiDataset, PopaiDatasetLowMem
+
 
 class RandomForestsSFS:
     """Build a RF predictor that takes the SFS as input."""
@@ -133,10 +131,13 @@ class NeuralNetSFS(keras.Model):
         return out
 
 
-def train_keras(model, data, outdir, label):
+def train_model(model, data, outdir, label):
     model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-    model.fit(data.train_loader, epochs=10, batch_size=10, validation_data=data.test_loader)
-    model.save(os.path.join(outdir, f"{label}.keras"))
+    model.fit(data.train_loader, epochs=1, batch_size=10, validation_data=data.test_loader)
+    # model.save(os.path.join(outdir, f"{label}.keras"))
+    model.save_weights(os.path.join(outdir, f"{label}.weights.h5"))
+
+def test_model(model, data, outdir, label):
     y = [data.dataset.labels[i] for i in data.test_dataset.indices]
     y_hat = model.predict(data.test_loader)
     y_pred = np.argmax(y_hat, axis=1).tolist()
@@ -144,8 +145,8 @@ def train_keras(model, data, outdir, label):
     cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
     
     # extract the features
-    features = keras.Model(inputs=model.input, outputs=model.layers[-2].output) #TODO: Couldn't this just be taken from the model we already specified?
-    features.save(os.path.join(outdir, f"{label}_featureextractor.keras"))
+    # features = keras.Model(inputs=model.input, outputs=model.layers[-2].output) #TODO: Couldn't this just be taken from the model we already specified?
+    # features.save(os.path.join(outdir, f"{label}_featureextractor.keras"))
 
 
 

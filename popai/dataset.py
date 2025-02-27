@@ -74,21 +74,21 @@ class PopaiTrainingData:
     def __init__(self, dir, pattern, seed, low_mem=False):
         pattern_path = os.path.join(dir, pattern)
         paths = glob.glob(pattern_path)
-        sorted_paths = sorted(paths, key=human_sort_key)
+        sorted_paths = sorted(paths, key=human_sort_key)[0:2]
         if len(sorted_paths) == 0:
             raise FileNotFoundError(f"No files found matching pattern: {pattern_path}") 
         if low_mem:
-            self.dataset = PopaiDatasetLowMem(paths)  
+            self.dataset = PopaiDatasetLowMem(sorted_paths)  
         else:
-            self.dataset = PopaiDataset(paths)  
+            self.dataset = PopaiDataset(sorted_paths)  
         rng = np.random.default_rng(seed)
         train_test_seed = rng.integers(2**32, size=1)[0]
         train_ixs, test_ixs = train_test_split(np.arange(len(self.dataset)), test_size=0.2, 
                 random_state=train_test_seed, stratify=self.dataset.labels)
         self.train_dataset = Subset(self.dataset, train_ixs)
-        self.test_dataset = Subset(self.dataset, train_ixs)
+        self.test_dataset =  Subset(self.dataset, test_ixs)
         self.train_loader = DataLoader(self.train_dataset, batch_size=10, shuffle=True)
-        self.test_loader = DataLoader(self.test_dataset, batch_size=10, shuffle=False)
+        self.test_loader =  DataLoader(self.test_dataset,  batch_size=10, shuffle=False)
     
     def n_classes(self):
         return self.dataset.n_classes
