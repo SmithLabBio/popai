@@ -6,6 +6,7 @@ import numpy as np
 from popai import parse_input, build_predictors
 from popai.dataset import PopaiTrainingData
 from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, train_model, test_model
+import json
 
 
 
@@ -57,30 +58,29 @@ def main():
             pickle.dump(random_forest_sfs_model, f)
         random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))
 
-    # if args.fcnn:
-    #     data = PopaiTrainingData(args.simulations, "simulated_mSFS_*.pickle", 
-    #             config_values["seed"], args.low_memory)
-    #     model = NeuralNetSFS(data.dataset.n_classes)
-    #     train_model(model, data, args.output, "fcnn")        
-    #     test_model(model, data, args.output, "fcnn")        
-
-    if args.cnn:
-        data = PopaiTrainingData(args.simulations, "simulated_2dSFS_*.pickle", 
+    if args.fcnn:
+        data = PopaiTrainingData(args.simulations, "simulated_mSFS_*.pickle",
                 config_values["seed"], args.low_memory)
-        pop_pairs = list(data.dataset[0][0].keys())
-        model = CnnSFS(pop_pairs, data.dataset.n_classes)
-        train_model(model, data, args.output, "cnn")
+        model = NeuralNetSFS(data.dataset.n_classes)
+        train_model(model, data, args.output, "fcnn")
+        test_model(model, data, args.output, "fcnn")
+
+    # if args.cnn:
+    #     data = PopaiTrainingData(args.simulations, "simulated_2dSFS_*.pickle",
+    #             config_values["seed"], args.low_memory)
+    #     # pop_pairs = [list(i) for i in list(data.dataset[0][0].keys())]
+    #     n_pairs = len(data.dataset[0][0].keys())
+    #     model = CnnSFS(n_pairs, data.dataset.n_classes)
+    #     train_model(model, data, args.output, "cnn")
     #     test_model(model, data, args.output, "cnn")
 
-    # if args.cnnnpy:
-    #     data = PopaiTrainingData(args.simulations, "simulated_arrays_*.pickle", 
-    #             config_values["seed"], args.low_memory)
-    #     n_sites = data.dataset[0][0].shape[1]
-    #     model = CnnNpy(n_sites, downsampling_dict, data.dataset.n_classes)
-    #     train_model(model, data, args.output, "cnn_npy")
-    #     # test_model(model, data, args.output, "cnn_npy")
-
-
+    if args.cnnnpy:
+        data = PopaiTrainingData(args.simulations, "simulated_arrays_*.pickle",
+                config_values["seed"], args.low_memory)
+        n_sites = data.dataset[0][0].shape[1]
+        model = CnnNpy(n_sites, downsampling_dict, data.dataset.n_classes)
+        train_model(model, data, args.output, "cnn_npy")
+        test_model(model, data, args.output, "cnn_npy")
 
 if __name__ == '__main__':
     main()

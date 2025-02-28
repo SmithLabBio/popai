@@ -59,31 +59,49 @@ class RandomForestsSFS:
 
 
 class CnnSFS(keras.Model):
-    def __init__(self, pop_pairs, n_classes, name=None):
-        super().__init__(name=name)
-        self.pop_pairs = pop_pairs
+    def __init__(self, n_pairs, n_classes, name=None, **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.n_pairs = n_pairs
+        self.n_classes = n_classes
         self.conv1_layers = [] 
-        for i in pop_pairs:
+        for i in range(n_pairs):
             conv_layer = keras.layers.Conv2D(10, (3,3), activation="relu")
             self.conv1_layers.append(conv_layer)
+        self.flat = keras.layers.Flatten()
         self.dense1 = keras.layers.Dense(64, activation="relu")
         self.dense2 = keras.layers.Dense(n_classes, activation="softmax")
 
     def call(self, x):
+        keys = list(x.keys())
         outputs = []
-        for pair, conv in zip(self.pop_pairs, self.conv1_layers):
-            out = conv(tf.expand_dims(x[pair], axis=-1))
-            out = keras.layers.Flatten()(out)
+        for i in range(len(keys)):
+            out = self.conv1_layers[i](tf.expand_dims(x[keys[i]], axis=-1))
+            out = self.flat(out)
             outputs.append(out)
         out = keras.layers.concatenate(outputs)
         out = self.dense1(out)
         out = self.dense2(out)
         return out
+    
+    def get_config(self):
+        config = super().get_config()
+        config.update(dict(
+            n_pairs=self.n_pairs,
+            n_classes=self.n_classes))
+        return config
 
+    @classmethod
+    def from_config(cls, config):
+        n_pairs = config.pop("n_pairs")
+        n_classes = config.pop("n_classes")
+        return (cls(n_pairs, n_classes, **config))
 
 class CnnNpy(keras.Model):
-    def __init__(self, n_sites, downsampling_dict, n_classes, name=None):
-        super().__init__(name=name)
+    def __init__(self, n_sites, downsampling_dict, n_classes, name=None, **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.n_sites = n_sites
+        self.downsampling_dict = downsampling_dict
+        self.n_classes = n_classes
         self.conv1_layers = []
         self.rows = []
         for key, num_rows in downsampling_dict.items():
@@ -99,6 +117,7 @@ class CnnNpy(keras.Model):
         self.dense3 = keras.layers.Dense(n_classes, activation="softmax")
     
     def call(self, x):
+        print(x.shape)
         x = tf.cast(tf.expand_dims(x, axis=-1), dtype=tf.float64) # Reshape input and cast to float dtype
         outputs = []
         start_ix = 0
@@ -116,10 +135,25 @@ class CnnNpy(keras.Model):
         out = self.dense3(out)
         return out
 
+    def get_config(self):
+        config = super().get_config()
+        config.update(dict(
+            n_sites=self.n_sites, 
+            downsampling_dict=self.downsampling_dict,
+            n_classes=self.n_classes))
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        n_sites = config.pop("n_sites")
+        downsampling_dict = config.pop("downsampling_dict")
+        n_classes = config.pop("n_classes")
+        return (cls(n_sites, downsampling_dict, n_classes, **config))
 
 class NeuralNetSFS(keras.Model):
-    def __init__(self, n_classes, name=None):
-        super().__init__(name=name)
+    def __init__(self, n_classes, name=None, **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.n_classes = n_classes
         self.fc1 = keras.layers.Dense(100, activation="relu")
         self.fc2 = keras.layers.Dense(50, activation="relu")
         self.fc3 = keras.layers.Dense(n_classes, activation="softmax")
@@ -129,31 +163,42 @@ class NeuralNetSFS(keras.Model):
         out = self.fc2(out)
         out = self.fc3(out)
         return out
+    
+    def get_config(self):
+        config = super().get_config()
+        config.update(dict(n_classes=self.n_classes))
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        n_classes = config.pop("n_classes")
+        return (cls(n_classes, **config))
+
 
 
 def train_model(model, data, outdir, label):
     model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-    model.fit(data.train_loader, epochs=1, batch_size=10, validation_data=data.test_loader)
-    # model.save(os.path.join(outdir, f"{label}.keras"))
-    model.save_weights(os.path.join(outdir, f"{label}.weights.h5"))
+    model.fit(data.train_loader, epochs=1, batch_size=10)#, validation_data=data.test_loader)
+    model.save(os.path.join(outdir, f"{label}.keras"))
 
-def test_model(model, data, outdir, label):
-    y = [data.dataset.labels[i] for i in data.test_dataset.indices]
-    y_hat = model.predict(data.test_loader)
-    y_pred = np.argmax(y_hat, axis=1).tolist()
-    cm, cm_plot = plot_confusion_matrix(y, y_pred, labels=[str(i) for i in y])
-    cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
-    
     # extract the features
-    # features = keras.Model(inputs=model.input, outputs=model.layers[-2].output) #TODO: Couldn't this just be taken from the model we already specified?
+    # features = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
     # features.save(os.path.join(outdir, f"{label}_featureextractor.keras"))
 
-
+def test_model(model, data, outdir, label):
+    model = keras.models.load_model(os.path.join(outdir, f"{label}.keras")) # TODO: Delete. Just here to test
+    y_true = [data.dataset.labels[i] for i in data.test_dataset.indices]
+    y_hat = model.predict(data.test_loader)
+    y_pred = np.argmax(y_hat, axis=1).tolist()
+    cm, cm_plot = plot_confusion_matrix(y_true, y_pred, labels=[str(i) for i in y_true]) 
+    cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
+    
 
 def plot_confusion_matrix(y_true, y_pred, labels):
     conf_matrix = confusion_matrix(y_true, y_pred)
+    print(conf_matrix)
     plt.figure(figsize=(8, 6))
-    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')#, xticklabels=labels, yticklabels=labels)
     plt.title("Confusion Matrix")
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
