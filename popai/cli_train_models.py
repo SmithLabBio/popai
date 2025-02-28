@@ -4,29 +4,9 @@ import os
 import pickle
 import numpy as np
 from popai import parse_input, build_predictors
-from popai.build_predictors import RandomForestsSFS, NeuralNetSFS, CnnSFS, CnnNpy 
-import gc
-import glob
-import re
-
-
-def human_sort_key(s):
-    """
-    Key function for human sorting.
-    Splits the string into parts and converts numeric parts to integers.
-    """
-    return [int(part) if part.isdigit() else part for part in re.split('([0-9]+)', s)]
-
-def train(meth, config, args, pattern):
-    # TODO: Do something here to allow subset of models
-    sim_data_paths = glob.glob(os.path.join(args.simulations, pattern))
-    sorted_sim_data_paths = sorted(sim_data_paths, key=human_sort_key)
-    predictor = meth(config, sorted_sim_data_paths, low_mem=args.low_mem)
-        # cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = 
-    predictor.build_cnn_sfs()
-    predictor.model.save(os.path.join(args.output, 'cnn.keras'))
-        # cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
-        # cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
+from popai.dataset import PopaiTrainingData
+from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, train_model, test_model
+import json
 
 
 
@@ -40,10 +20,11 @@ def main():
     parser.add_argument('--fcnn', action='store_true', help='Train FCNN classifier.')
     parser.add_argument('--cnn', action='store_true', help='Train CNN classifier of SFS.')
     parser.add_argument('--cnnnpy', action='store_true', help='Train CNN classifier on alignments.')
-    parser.add_argument('--ntrees', type=int, help='Number of trees to use in the RF classifier (default=500).', default=500)
+    parser.add_argument('--ntrees', type=int, default=500, help='Number of trees to use in the RF classifier (default=500).')
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
-    parser.add_argument('--subset', help="Path to a file listing the models to retain. List indices only (e.g., 0, 1, 5, 6). One integer per line", default=None)
-    parser.add_argument('--low-memory', help="Reads training datasets into memory as needed during training rather than all at once. Slows training due to increased file reads.", default=False)
+    parser.add_argument('--subset', default=None, help="Path to a file listing the models to retain. List indices only (e.g., 0, 1, 5, 6). One integer per line")
+    parser.add_argument('--low-memory', action='store_true', default=False, 
+            help="Reads training datasets into memory as needed during training rather than all at once. Slows training due to increased file reads.")
 
     args = parser.parse_args()
 
@@ -78,33 +59,28 @@ def main():
         random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))
 
     if args.fcnn:
-        # train FCNN and save model and confusion matrix
-        neural_network_sfs_predictor = NeuralNetSFS(config_values, args.simulations, args.subset, 
-                                                    user=user, low_mem=args.low_mem)
-        neural_network_sfs_model, neural_network_sfs_cm, neural_network_sfs_cm_plot, neural_network_featureextractor = neural_network_sfs_predictor.build_neuralnet_sfs()
-        neural_network_sfs_model.save(os.path.join(args.output, 'fcnn.keras'))
-        neural_network_featureextractor.save(os.path.join(args.output, 'fcnn_featureextractor.keras'))
-        neural_network_sfs_cm_plot.savefig(os.path.join(args.output, 'fcnn_confusion.png'))
+        data = PopaiTrainingData(args.simulations, "simulated_mSFS_*.pickle",
+                config_values["seed"], args.low_memory)
+        model = NeuralNetSFS(data.dataset.n_classes)
+        train_model(model, data, args.output, "fcnn")
+        test_model(model, data, args.output, "fcnn")
 
-    if args.cnn:
-        train(CnnSFS, config_values, args, "simulated_arrays_*.pickle")
-        # train CNN and save model and confusion matrix
-        # cnn_2d_sfs_predictor = CnnSFS(config_values, args.simulations, args.subset, 
-        #                               user=user, low_mem=args.low_mem)
-        # cnn_2d_sfs_model, cnn_2d_sfs_cm, cnn_2d_sfs_cm_plot, cnn_2d_sfs_featureextracter = cnn_2d_sfs_predictor.build_cnn_sfs()
-        # cnn_2d_sfs_model.save(os.path.join(args.output, 'cnn.keras'))
-        # cnn_2d_sfs_featureextracter.save(os.path.join(args.output, 'cnn_sfs_featureextractor.keras'))
-        # cnn_2d_sfs_cm_plot.savefig(os.path.join(args.output, 'cnn_sfs_confusion.png'))
+    # if args.cnn:
+    #     data = PopaiTrainingData(args.simulations, "simulated_2dSFS_*.pickle",
+    #             config_values["seed"], args.low_memory)
+    #     # pop_pairs = [list(i) for i in list(data.dataset[0][0].keys())]
+    #     n_pairs = len(data.dataset[0][0].keys())
+    #     model = CnnSFS(n_pairs, data.dataset.n_classes)
+    #     train_model(model, data, args.output, "cnn")
+    #     test_model(model, data, args.output, "cnn")
 
     if args.cnnnpy:
-        # train CNN and save model and confusion matrix
-        cnn_2d_npy_predictor = CnnNpy(config_values, downsampling_dict, args.simulations, 
-                                      args.subset, user=user, low_mem=args.low_mem)
-        cnn_2d_npy_model, cnn_2d_npy_cm, cnn_2d_npy_cm_plot, cnn_2d_npy_featureextractor,  = cnn_2d_npy_predictor.build_cnn_npy()
-        cnn_2d_npy_model.save(os.path.join(args.output, 'cnn_npy.keras'))
-        cnn_2d_npy_featureextractor.save(os.path.join(args.output, 'cnn_npy_featureextractor.keras'))
-        cnn_2d_npy_cm_plot.savefig(os.path.join(args.output, 'cnn_npy_confusion.png'))
-
+        data = PopaiTrainingData(args.simulations, "simulated_arrays_*.pickle",
+                config_values["seed"], args.low_memory)
+        n_sites = data.dataset[0][0].shape[1]
+        model = CnnNpy(n_sites, downsampling_dict, data.dataset.n_classes)
+        train_model(model, data, args.output, "cnn_npy")
+        test_model(model, data, args.output, "cnn_npy")
 
 if __name__ == '__main__':
     main()
