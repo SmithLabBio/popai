@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+from popai.build_predictors import predict
 
 
 from popai import parse_input, build_predictors
@@ -95,21 +96,15 @@ def main():
             f.write(results_rf)
 
     if args.fcnn:
-        model = keras.models.load_model(os.path.join(args.models, "fcnn.keras"))
-        pred = model.predict(np.array(msfs))
-        with open(os.path.join(args.output, "fcnn_predictions.txt"), 'w') as fh:
-            fh.write(pred)
+        predict(args.models, "fcnn.keras", np.array(msfs), args.output, "fcnn")
 
         # neural_network_featureextracter = models.load_model(os.path.join(args.models, 'fcnn_featureextractor.keras'), compile=True)
         # results_fcnn = neural_network_sfs_predictor.predict(neural_network_sfs_model, msfs)
         # neural_network_sfs_predictor.check_fit(neural_network_featureextracter, msfs, args.output)
 
 
-    if args.cnn:
-        model = keras.models.load_model(os.path.join(args.models, "cnn.keras"))  
-        pred = model.predict()
-        with open(os.path.join(args.output, "cnn_predictions.txt"), 'w') as fh:
-            fh.write(pred)
+    # if args.cnn:
+        # predict(args.models, "cnn.keras", jsfs, args.output, "cnn")
 
         # cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, args.simulations, args.subset, user=user)
         # cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_sfs_featureextractor.keras'), compile=True)
@@ -117,11 +112,8 @@ def main():
 
     if args.cnnnpy:
         empirical_array = empirical_array[:, 0:100] # TODO: Remove, tmp for testing
-        model = keras.models.load_model(os.path.join(args.models, "cnn_npy.keras"))
-        pred = model.predict(np.expand_dims(empirical_array, axis=0))
-        print(pred)
-        with open(os.path.join(args.output, "cnn_npy_predictions.txt"), 'w') as fh:
-            fh.write(pred)
+        empirical_array = np.expand_dims(empirical_array, axis=0)
+        predict(args.models, "cnn_npy.keras", empirical_array, args.output, "cnn_npy")
 
         # cnn_npy_featureextracter = models.load_model(os.path.join(args.models, 'cnn_npy_featureextractor.keras'), compile=True)
         # results_cnn_npy = cnn_npy_predictor.predict(cnn_npy_model, empirical_array)
