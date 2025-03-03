@@ -327,7 +327,13 @@ class DataSimulator:
                                 # add to the sfs
                                 sfs_2d[key][pop1_count, pop2_count] += 1
 
-                all_sfs[str(i)].append(sfs_2d)
+                # Convert keys from tuple of strings to single string
+                sfs_2d_str_keys = {}
+                for key, value in  sfs_2d.items(): 
+                    new_key = f"{key[0]} {key[1]}"
+                    sfs_2d_str_keys[new_key] = value
+
+                all_sfs[str(i)].append(sfs_2d_str_keys)
             
             # write to file
             with open(os.path.join(self.output, 'simulated_2dSFS_%s.pickle' % str(i)), 'wb') as f:
