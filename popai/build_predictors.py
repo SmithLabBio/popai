@@ -12,6 +12,8 @@ import pickle
 import tensorflow as tf
 from tensorflow import keras
 from memory_profiler import profile
+from popai.dataset import PopaiTrainingData
+from typing import Dict
 
 
 class RandomForestsSFS:
@@ -59,7 +61,11 @@ class RandomForestsSFS:
 
 
 class CnnSFS(keras.Model):
-    def __init__(self, n_pairs, n_classes, name=None, **kwargs):
+    """
+    CNN taking two dimensional site frequency spectra for each population pair as input.
+    """
+    # TODO: Currently unable to save this model
+    def __init__(self, n_pairs: int, n_classes: int, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
         self.n_pairs = n_pairs
         self.n_classes = n_classes
@@ -84,6 +90,7 @@ class CnnSFS(keras.Model):
         return out
     
     def get_config(self):
+        # For saving model
         config = super().get_config()
         config.update(dict(
             n_pairs=self.n_pairs,
@@ -92,12 +99,17 @@ class CnnSFS(keras.Model):
 
     @classmethod
     def from_config(cls, config):
+        # For reading model from file
         n_pairs = config.pop("n_pairs")
         n_classes = config.pop("n_classes")
         return (cls(n_pairs, n_classes, **config))
 
 class CnnNpy(keras.Model):
-    def __init__(self, n_sites, downsampling_dict, n_classes, name=None, **kwargs):
+    """
+    CNN taking raw alignment as input.
+    """
+    def __init__(self, n_sites: int, downsampling_dict: Dict[str,int], n_classes: int, name=None, 
+                 **kwargs):
         super().__init__(name=name, **kwargs)
         self.n_sites = n_sites
         self.downsampling_dict = downsampling_dict
@@ -109,7 +121,8 @@ class CnnNpy(keras.Model):
             conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows, 1), 
                     activation="relu", padding="valid")
             self.conv1_layers.append(conv_layer)
-        self.conv2 = keras.layers.Conv2D(10, (len(downsampling_dict), 1), activation="relu", padding="valid")
+        self.conv2 = keras.layers.Conv2D(10, (len(downsampling_dict), 1), activation="relu", 
+                                         padding="valid")
         self.flat = keras.layers.Flatten()
         self.dense1 = keras.layers.Dense(100, activation='relu')
         self.drop = keras.layers.Dropout(0.1)
@@ -117,7 +130,6 @@ class CnnNpy(keras.Model):
         self.dense3 = keras.layers.Dense(n_classes, activation="softmax")
     
     def call(self, x):
-        print(x.shape)
         x = tf.cast(tf.expand_dims(x, axis=-1), dtype=tf.float64) # Reshape input and cast to float dtype
         outputs = []
         start_ix = 0
@@ -136,6 +148,7 @@ class CnnNpy(keras.Model):
         return out
 
     def get_config(self):
+        # For saving model
         config = super().get_config()
         config.update(dict(
             n_sites=self.n_sites, 
@@ -145,13 +158,18 @@ class CnnNpy(keras.Model):
 
     @classmethod
     def from_config(cls, config):
+        # For reading model from file
         n_sites = config.pop("n_sites")
         downsampling_dict = config.pop("downsampling_dict")
         n_classes = config.pop("n_classes")
         return (cls(n_sites, downsampling_dict, n_classes, **config))
 
+
 class NeuralNetSFS(keras.Model):
-    def __init__(self, n_classes, name=None, **kwargs):
+    """
+    Fully connected neural network taking multidimensional site frequency spectrum as input.
+    """
+    def __init__(self, n_classes: int, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
         self.n_classes = n_classes
         self.fc1 = keras.layers.Dense(100, activation="relu")
@@ -165,18 +183,26 @@ class NeuralNetSFS(keras.Model):
         return out
     
     def get_config(self):
+        # For saving model
         config = super().get_config()
         config.update(dict(n_classes=self.n_classes))
         return config
 
     @classmethod
+    # For reading model from file
     def from_config(cls, config):
         n_classes = config.pop("n_classes")
         return (cls(n_classes, **config))
 
 
-
-def train_model(model, data, outdir, label):
+def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str):
+    """
+    Run model training.
+    model: Keras model
+    data: PopaiTrainingData 
+    outdir: Path to output directory
+    label: label to prepend to output file
+    """
     model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
     model.fit(data.train_loader, epochs=1, batch_size=10)#, validation_data=data.test_loader)
     model.save(os.path.join(outdir, f"{label}.keras"))
@@ -185,18 +211,38 @@ def train_model(model, data, outdir, label):
     # features = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
     # features.save(os.path.join(outdir, f"{label}_featureextractor.keras"))
 
-def test_model(model, data, outdir, label):
+def test_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str):
+    """
+    Run model training.
+    model: Keras model
+    data: PopaiTrainingData 
+    outdir: Path to output directory
+    label: label to prepend to output file
+    """
     model = keras.models.load_model(os.path.join(outdir, f"{label}.keras")) # TODO: Delete. Just here to test
     y_true = [data.dataset.labels[i] for i in data.test_dataset.indices]
     y_hat = model.predict(data.test_loader)
     y_pred = np.argmax(y_hat, axis=1).tolist()
     cm, cm_plot = plot_confusion_matrix(y_true, y_pred, labels=[str(i) for i in y_true]) 
     cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
+
+def predict(model_dir:keras.Model, model_file:str, data:np.ndarray, out_dir:str, label:str):
+    """
+    Run model prediction with empirical data.
+    model: Keras model
+    model_file: Path to stored Keras model file
+    data: PopaiTrainingData 
+    outdir: Path to output directory
+    label: label to prepend to output file
+    """
+    model = keras.models.load_model(os.path.join(model_dir, model_file))
+    pred = model.predict(data)
+    with open(os.path.join(out_dir, f"{label}_predictions.txt"), 'w') as fh:
+        fh.write(str(pred))
     
 
 def plot_confusion_matrix(y_true, y_pred, labels):
     conf_matrix = confusion_matrix(y_true, y_pred)
-    print(conf_matrix)
     plt.figure(figsize=(8, 6))
     sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')#, xticklabels=labels, yticklabels=labels)
     plt.title("Confusion Matrix")

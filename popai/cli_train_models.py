@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 from popai import parse_input, build_predictors
 from popai.dataset import PopaiTrainingData
-from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, train_model, test_model
+from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, RandomForestsSFS, train_model, test_model
 import json
 
 
@@ -38,11 +38,11 @@ def main():
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
-    # # set whether user
-    # if config_values['user models'] is None:
-    #     user = False
-    # else:
-    #     user = True
+    # set whether user
+    if config_values['user models'] is None:
+        user = False
+    else:
+        user = True
 
     try:
         downsampling_dict = ast.literal_eval(args.downsampling)
@@ -65,14 +65,14 @@ def main():
         train_model(model, data, args.output, "fcnn")
         test_model(model, data, args.output, "fcnn")
 
-    # if args.cnn:
-    #     data = PopaiTrainingData(args.simulations, "simulated_2dSFS_*.pickle",
-    #             config_values["seed"], args.low_memory)
-    #     # pop_pairs = [list(i) for i in list(data.dataset[0][0].keys())]
-    #     n_pairs = len(data.dataset[0][0].keys())
-    #     model = CnnSFS(n_pairs, data.dataset.n_classes)
-    #     train_model(model, data, args.output, "cnn")
-    #     test_model(model, data, args.output, "cnn")
+    if args.cnn: # TODO: Not currently working
+        data = PopaiTrainingData(args.simulations, "simulated_2dSFS_*.pickle",
+                config_values["seed"], args.low_memory)
+        print(data.dataset[0][0])
+        # n_pairs = len(data.dataset[0][0].keys())
+        # model = CnnSFS(n_pairs, data.dataset.n_classes)
+        # train_model(model, data, args.output, "cnn")
+        # test_model(model, data, args.output, "cnn")
 
     if args.cnnnpy:
         data = PopaiTrainingData(args.simulations, "simulated_arrays_*.pickle",
