@@ -64,8 +64,7 @@ class CnnSFS(keras.Model):
     """
     CNN taking two dimensional site frequency spectra for each population pair as input.
     """
-    # TODO: Currently unable to save this model
-    def __init__(self, n_pairs: int, n_classes: int, name=None, **kwargs):
+    def __init__(self, n_pairs:int, n_classes:int, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
         self.n_pairs = n_pairs
         self.n_classes = n_classes
@@ -78,10 +77,9 @@ class CnnSFS(keras.Model):
         self.dense2 = keras.layers.Dense(n_classes, activation="softmax")
 
     def call(self, x):
-        keys = list(x.keys())
         outputs = []
-        for i in range(len(keys)):
-            out = self.conv1_layers[i](tf.expand_dims(x[keys[i]], axis=-1))
+        for i in range(self.n_pairs):
+            out = self.conv1_layers[i](tf.expand_dims(x[:,i], axis=-1)) # Get each population pair, (batch, pair)
             out = self.flat(out)
             outputs.append(out)
         out = keras.layers.concatenate(outputs)
@@ -182,6 +180,9 @@ class NeuralNetSFS(keras.Model):
         out = self.fc3(out)
         return out
     
+    # def get_features_extractor(self):
+
+    
     def get_config(self):
         # For saving model
         config = super().get_config()
@@ -206,7 +207,7 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
     model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
     model.fit(data.train_loader, epochs=1, batch_size=10)#, validation_data=data.test_loader)
     model.save(os.path.join(outdir, f"{label}.keras"))
-
+    # print(model.layers)
     # extract the features
     # features = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
     # features.save(os.path.join(outdir, f"{label}_featureextractor.keras"))
@@ -219,14 +220,13 @@ def test_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str)
     outdir: Path to output directory
     label: label to prepend to output file
     """
-    model = keras.models.load_model(os.path.join(outdir, f"{label}.keras")) # TODO: Delete. Just here to test
     y_true = [data.dataset.labels[i] for i in data.test_dataset.indices]
     y_hat = model.predict(data.test_loader)
     y_pred = np.argmax(y_hat, axis=1).tolist()
     cm, cm_plot = plot_confusion_matrix(y_true, y_pred, labels=[str(i) for i in y_true]) 
     cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
 
-def predict(model_dir:keras.Model, model_file:str, data:np.ndarray, out_dir:str, label:str):
+def predict(model_dir:keras.Model, model_file:str, data, out_dir:str, label:str):
     """
     Run model prediction with empirical data.
     model: Keras model
@@ -240,11 +240,12 @@ def predict(model_dir:keras.Model, model_file:str, data:np.ndarray, out_dir:str,
     with open(os.path.join(out_dir, f"{label}_predictions.txt"), 'w') as fh:
         fh.write(str(pred))
     
+    
 
 def plot_confusion_matrix(y_true, y_pred, labels):
     conf_matrix = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(8, 6))
-    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')#, xticklabels=labels, yticklabels=labels)
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')#, xticklabels=labels, yticklabels=labels) # TODO: Fix this. 
     plt.title("Confusion Matrix")
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")

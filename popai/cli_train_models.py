@@ -9,7 +9,6 @@ from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, RandomForestsSF
 import json
 
 
-
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
     parser.add_argument('--config', help='Path to config file.')
@@ -67,7 +66,7 @@ def main():
     if args.cnn: # CNN with 2D SFS
         data = PopaiTrainingData(args.simulations, "simulated_2dSFS_*.pickle",
                 config_values["seed"], args.low_memory)
-        n_pairs = len(data.dataset[0][0].keys())
+        n_pairs = data.dataset[0][0].shape[0]
         model = CnnSFS(n_pairs, data.dataset.n_classes)
         train_model(model, data, args.output, "cnn")
         test_model(model, data, args.output, "cnn")

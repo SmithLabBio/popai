@@ -272,13 +272,13 @@ class DataSimulator:
 
 
         for i in set(self.labels):
-            
             # read in array
             with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
                 arrays = pickle.load(f)
 
             # create sfs
             all_sfs[str(i)] = []
+            all_arrays = [] 
 
             # get indices for samples
             reordered_downsampling = {key: self.downsampling[key] \
@@ -327,17 +327,19 @@ class DataSimulator:
                                 # add to the sfs
                                 sfs_2d[key][pop1_count, pop2_count] += 1
 
-                # Convert keys from tuple of strings to single string
-                sfs_2d_str_keys = {}
-                for key, value in  sfs_2d.items(): 
-                    new_key = f"{key[0]} {key[1]}"
-                    sfs_2d_str_keys[new_key] = value
+                all_sfs[str(i)].append(sfs_2d)
 
-                all_sfs[str(i)].append(sfs_2d_str_keys)
+                # Convert dictionary to array for storage
+                arrays = []
+                for sfs in sfs_2d.values(): 
+                    arrays.append(sfs)
+                all_arrays.append(np.array(arrays))
+
             
             # write to file
             with open(os.path.join(self.output, 'simulated_2dSFS_%s.pickle' % str(i)), 'wb') as f:
-                pickle.dump(all_sfs[str(i)], f)
+                # pickle.dump(all_sfs[str(i)], f)
+                pickle.dump(all_arrays, f)
 
         return all_sfs
 

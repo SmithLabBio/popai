@@ -66,7 +66,7 @@ def main():
     populations = list(config_values["sampling dict"].keys())
 
     for i in range(len(msfs)):
-        current_dict = {}
+        current_dict = []
         current_files = [x for x in jsfs_files if f"rep{i}" in x]
         for i, pop1 in enumerate(populations):
             for j, pop2 in enumerate(populations):
@@ -80,9 +80,8 @@ def main():
                             values = line.strip().split()[1:]
                             data.append([float(value) for value in values])
                         array = np.array(data)
-                    current_dict[(pop1,pop2)] = array
-        jsfs.append(current_dict)
-
+                    current_dict.append(array)
+        jsfs.append(np.array(current_dict))
     empirical_array = np.load(os.path.join(args.empirical,"empirical.npy"))
 
 
@@ -97,15 +96,12 @@ def main():
 
     if args.fcnn:
         predict(args.models, "fcnn.keras", np.array(msfs), args.output, "fcnn")
-
         # neural_network_featureextracter = models.load_model(os.path.join(args.models, 'fcnn_featureextractor.keras'), compile=True)
         # results_fcnn = neural_network_sfs_predictor.predict(neural_network_sfs_model, msfs)
         # neural_network_sfs_predictor.check_fit(neural_network_featureextracter, msfs, args.output)
 
-
-    # if args.cnn:
-        # predict(args.models, "cnn.keras", jsfs, args.output, "cnn")
-
+    if args.cnn:
+        predict(args.models, "cnn.keras", np.array(jsfs), args.output, "cnn")
         # cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, args.simulations, args.subset, user=user)
         # cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_sfs_featureextractor.keras'), compile=True)
         # cnn_2d_sfs_predictor.check_fit(cnn_2d_sfs_featureextracter, jsfs, args.output)
@@ -114,7 +110,6 @@ def main():
         empirical_array = empirical_array[:, 0:100] # TODO: Remove, tmp for testing
         empirical_array = np.expand_dims(empirical_array, axis=0)
         predict(args.models, "cnn_npy.keras", empirical_array, args.output, "cnn_npy")
-
         # cnn_npy_featureextracter = models.load_model(os.path.join(args.models, 'cnn_npy_featureextractor.keras'), compile=True)
         # results_cnn_npy = cnn_npy_predictor.predict(cnn_npy_model, empirical_array)
         # cnn_npy_predictor.check_fit(cnn_npy_featureextracter, empirical_array, args.output)
