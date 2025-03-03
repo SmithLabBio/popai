@@ -22,7 +22,6 @@ def main():
     parser.add_argument('--cnn', action='store_true', help='Apply CNN classifier on jSFS.')
     parser.add_argument('--cnnnpy', action='store_true', help='Apply CNN classifier on alignments.')
     parser.add_argument('--simulations', help='Path to directory with simulated data.')
-    parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
     parser.add_argument('--subset', help="Path to a file listing the models to retain. List indices only (e.g., 0, 1, 5, 6). One integer per line", default=None)
 
     args = parser.parse_args()
@@ -33,10 +32,7 @@ def main():
     # create output directory
     os.system('mkdir -p %s' % args.output)
 
-    try:
-        downsampling_dict = ast.literal_eval(args.downsampling)
-    except ValueError:
-        print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
+
 
 
     # Parse the configuration file

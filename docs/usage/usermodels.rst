@@ -143,23 +143,21 @@ Popsize events specify a change in the population size. To specify a popsize eve
 For example, to change the size of population A between 500 and 700 generations ago::
     popsize_A = popsize{time=[500, 700], population=A, size=[1000,2000]}
 
+To specify a population bottleneck, users can use the following approach::
+    popsize_C = popsize{time=[10000, 50000], population=C, size=0.01*pop_C}
+    popsize_C2 = popsize{time=popsize_C+1000, population=C, size=pop_C}
+
+Here, at a time drawn from 10,000 to 50000, population C reduces to 0.01 * it's present-day size.
+1000 generations later, it returns to it's initial size.
+
+
 5. popgrowth
 
 Popsize events specify a change in the growth rate for a population. To specify a popgrowth event::
     popgrowth_A = popsize{time=[mintime, maxtime], population=popname, rate=rate}
 
 
-6. bottleneck
-
-Bottleneck events specify a population bottleneck. To specify a bottleneck event::
-    bottleneck_A = bottleneck{time=[mintime, maxtime], population=popname, proportion=proportion}
-
-Proportion is the probability of each lineage coalescing in a single ancestor.
-
-For example, to specify a bottleneck in population A between 500 and 700 generations ago::
-    bottleneck_A = bottleneck{time=[500, 700], population=A, proportion=0.1}
-
-7. Pulse migration
+6. Pulse migration
 
 Pulse migrations are mass migration events. To specify a pulse migration::
     pulse_AB = pulse{time=[500,700], source=A, dest=A, prop=0.1}

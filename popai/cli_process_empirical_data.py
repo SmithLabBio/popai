@@ -22,6 +22,12 @@ def main():
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
+    # check if output exists
+    if os.path.exists(args.output) and not args.force:
+        raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
+    # create output directory
+    os.system('mkdir -p %s' % args.output)
+
     # Process empirical data
     data_processor = process_empirical.DataProcessor(config=config_values)
     if "fastas" in config_values:
@@ -29,12 +35,7 @@ def main():
     else:
         empirical_array = data_processor.vcf_to_numpy(maxsites = args.maxsites)
 
-    # check if output exists
-    if os.path.exists(args.output) and not args.force:
-        raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
-    # create output directory
-    os.system('mkdir -p %s' % args.output)
-       
+
     # If we are checking downsampling, print downsampling results
     if args.preview:
         empirical_2d_sfs_sampling = data_processor.find_downsampling(empirical_array)

@@ -207,20 +207,35 @@ class DataSimulator:
                                   for key in self.config["sampling dict"]}
 
             current = 0
-            sampling_indices = {}
+            ds_sampling_indices = {}
             for key, value in reordered_downsampling.items():
+                ds_sampling_indices[key] = [current, value + current]
+                current = current+value
+            current = 0
+            sampling_indices = {}
+            for key, value in self.config["sampling dict"].items():
                 sampling_indices[key] = [current, value + current]
                 current = current+value
 
+
+
             for replicate in arrays:
+
+                # sample from arrays
+                population_arrays = []
+                for key, value in self.config["sampling dict"].items():
+                    current_array = replicate[sampling_indices[key][0]:sampling_indices[key][1]]
+                    subsampled_array =  current_array[self.rng.choice(current_array.shape[0], ds_sampling_indices[key][1] - ds_sampling_indices[key][0], replace=False)]
+                    population_arrays.append(subsampled_array)
+                downsampled_array = np.vstack(population_arrays)
 
                 # Generate all possible combinations of counts per population
                 combos = product(*(range(count + 1) for count in reordered_downsampling.values()))
                 rep_sfs_dict = OrderedDict({'_'.join(map(str, combo)): 0 for combo in combos})
 
-                for site in range(replicate.shape[1]):
+                for site in range(downsampled_array.shape[1]):
 
-                    site_data = list(replicate[:,site])
+                    site_data = list(downsampled_array[:,site])
 
                     if len(set(site_data)) == 2:
 
@@ -229,8 +244,8 @@ class DataSimulator:
                         # find poulation counts
                         counts_per_population = {}
                         for population in self.config['sampling dict'].keys():
-                            site_data_pop = site_data[sampling_indices[population][0]:
-                                                      sampling_indices[population][1]]
+                            site_data_pop = site_data[ds_sampling_indices[population][0]:
+                                                      ds_sampling_indices[population][1]]
                             counts_per_population[population] = Counter(site_data_pop)[minor_allele]
                         string_for_count = [str(x) for x in list(counts_per_population.values())]
                         combo_key = '_'.join(string_for_count)
@@ -285,29 +300,44 @@ class DataSimulator:
                                   for key in self.config["sampling dict"]}
 
             current = 0
-            sampling_indices = {}
+            ds_sampling_indices = {}
             for key, value in reordered_downsampling.items():
+                ds_sampling_indices[key] = [current, value + current]
+                current = current+value
+
+            current = 0
+            sampling_indices = {}
+            for key, value in self.config["sampling dict"].items():
                 sampling_indices[key] = [current, value + current]
                 current = current+value
 
             for replicate in arrays:
 
+                # sample from arrays
+                population_arrays = []
+                for key, value in self.config["sampling dict"].items():
+                    current_array = replicate[sampling_indices[key][0]:sampling_indices[key][1]]
+                    subsampled_array =  current_array[self.rng.choice(current_array.shape[0], ds_sampling_indices[key][1] - ds_sampling_indices[key][0], replace=False)]
+                    population_arrays.append(subsampled_array)
+                downsampled_array = np.vstack(population_arrays)
+
+
                 # generate the empty arrays
                 sfs_2d = self._create_numpy_2d_arrays()
 
-                for site in range(replicate.shape[1]): # iterate over sites
+                for site in range(downsampled_array.shape[1]): # iterate over sites
 
-                    site_data = list(replicate[:,site]) # get the data for that site
+                    site_data = list(downsampled_array[:,site]) # get the data for that site
 
                     if len(set(site_data)) > 1: # if it is > 1, keep going
 
                         for key, value in sfs_2d.items(): # iterate over population pairs
 
                             # get the site data for those two populations
-                            site_data_pop1 = site_data[sampling_indices[key[0]][0]:
-                                                   sampling_indices[key[0]][1]]
-                            site_data_pop2 = site_data[sampling_indices[key[1]][0]:
-                                                   sampling_indices[key[1]][1]]
+                            site_data_pop1 = site_data[ds_sampling_indices[key[0]][0]:
+                                                   ds_sampling_indices[key[0]][1]]
+                            site_data_pop2 = site_data[ds_sampling_indices[key[1]][0]:
+                                                   ds_sampling_indices[key[1]][1]]
                             all_site_data = site_data_pop1+site_data_pop2
 
                             # check that this site has two variants in these populations
@@ -376,7 +406,7 @@ class DataSimulator:
             for model, comparisons in average_sfs.items():
                 for comparison, avg_sfs in comparisons.items():
                     outfile  = os.path.join(output_directory, \
-                                            f"2D_SFS_{comparison}_model_{model}.png")
+                                            f"2D_SFS_{comparison}_{model}.png")
                     plt.imshow(avg_sfs, cmap='viridis', origin="lower")
                     plt.colorbar()
                     plt.title(f'{model} - {comparison}')
@@ -402,7 +432,7 @@ class DataSimulator:
 
         return sfs_2d
 
-    def _organize_matrix(self, array_dict, simulating_dict, downsampling, sp_tree):
+    def _organize_matrix(self, array_dict, simulating_dict, sp_tree):
 
         ordered_array_dict = OrderedDict()
         for key,value in self.config["sampling dict"].items():
@@ -424,8 +454,8 @@ class DataSimulator:
                         if spname == searchvalue:
                             parent = node.parent_node.label
                             if parent in array_dict.keys():
-                                ordered_array_dict[key] = array_dict[parent][0:downsampling[key],:]
-                                array_dict[parent] =  array_dict[parent][downsampling[key]:,:]
+                                ordered_array_dict[key] = array_dict[parent][0:self.config['sampling dict'][key],:]
+                                array_dict[parent] =  array_dict[parent][self.config['sampling dict'][key]:,:]
                                 found = True
                             else:
                                 searchvalue=parent
@@ -438,7 +468,7 @@ class DataSimulator:
         array = np.vstack(array_list)
         return(array)
 
-    def _organize_matrix_user(self, array_dict, simulating_dict, downsampling, demography):
+    def _organize_matrix_user(self, array_dict, simulating_dict, demography):
 
 
         ordered_array_dict = OrderedDict()
@@ -459,8 +489,8 @@ class DataSimulator:
                             if searchvalue in event.derived:
                                 parent = event.ancestral
                                 if parent in array_dict.keys():
-                                    ordered_array_dict[key] = array_dict[parent][0:downsampling[key],:]
-                                    array_dict[parent] =  array_dict[parent][downsampling[key]:,:]
+                                    ordered_array_dict[key] = array_dict[parent][0:self.config['sampling dict'][key],:]
+                                    array_dict[parent] =  array_dict[parent][self.config['sampling dict'][key]:,:]
                                     found = True
                                 else:
                                     searchvalue=parent
@@ -541,7 +571,7 @@ class DataSimulator:
                 array_dict[key] = mts.genotype_matrix(samples=mts.samples(id_map[key])).transpose()
 
             # organize matrix
-            array = self._organize_matrix(array_dict, simulating_dict, downsampling=self.downsampling, sp_tree=tree)
+            array = self._organize_matrix(array_dict, simulating_dict, sp_tree=tree)
             array = minor_encoding(array)
 
             parameter_arrays.append(array)
@@ -591,7 +621,7 @@ class DataSimulator:
                 array_dict[key] = mts.genotype_matrix(samples=mts.samples(id_map[key])).transpose()
 
             ## organize matrix
-            array = self._organize_matrix_user(array_dict, simulating_dict, self.downsampling, demography)
+            array = self._organize_matrix_user(array_dict, simulating_dict, demography)
             array = minor_encoding(array)
 
 
@@ -644,7 +674,7 @@ class DataSimulator:
             if this_ancestor == population or this_ancestor not in sampled_inactive:
                 this_sampling_dict[population] = 0
                 for item in relevant_descendants:         
-                    this_sampling_dict[population] += self.downsampling[item]
+                    this_sampling_dict[population] += self.config['sampling dict'][item]
                 all_relevant_descendents.extend(relevant_descendants)
         
 
@@ -653,7 +683,7 @@ class DataSimulator:
         initially_active = [x for x in initially_active if not x in all_relevant_descendents]
 
         for population in initially_active:
-            this_sampling_dict[population] = self.downsampling[population]
+            this_sampling_dict[population] = self.config['sampling dict'][population]
 
         for key,value in this_sampling_dict.items():
             if key not in all_descendents:
@@ -677,12 +707,12 @@ class DataSimulator:
                 while search:
                     if searchnode.parent_node.label in populations:
                         simulating_dict[searchnode.parent_node.label] += \
-                            self.downsampling[species.taxon.label] / 2
+                            self.config['sampling dict'][species.taxon.label] / 2
                         search = False
                     else:
                         searchnode = searchnode.parent_node
             else:
                 simulating_dict[species.taxon.label] += \
-                    self.downsampling[species.taxon.label]/2
+                    self.config['sampling dict'][species.taxon.label]/2
         simulating_dict = OrderedDict({key: value for key, value in simulating_dict.items() if value != 0})
         return(simulating_dict)

@@ -4,6 +4,13 @@ popai.egg-info/
 .DS_Store
 /testing
 *.pyc
+<<<<<<< HEAD
 __pycache__
 .DS_Store
 build/
+=======
+*.pyc
+*.pyc
+/popai/__pycache__
+*.pyc
+>>>>>>> main

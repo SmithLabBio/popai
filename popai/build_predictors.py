@@ -281,18 +281,29 @@ def read_data(simulations, subset, user, type):
     if subset:
         pickle_list = [x for x in pickle_list if x.split('_')[-1].split('.')[0] in subset_list]
     pickle_list = sorted(pickle_list, key=lambda x: int(x.split('_')[-1].split('.')[0]))
-    
     for item in pickle_list:
         modno = item.split('_')[-1].split('.')[0]
         if type=='1d':
-            with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
-                arraydict[str(modno)] = pickle.load(f)
+            if user==True:
+                with open(os.path.join(simulations, 'simulated_mSFS_model_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
+            else:
+                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
         elif type=='2d':
-            with open(os.path.join(simulations, 'simulated_2dSFS_%s.pickle' % str(modno)), 'rb') as f:
-                arraydict[str(modno)] = pickle.load(f)
+            if user==True:
+                with open(os.path.join(simulations, 'simulated_2dSFS_model_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
+            else:
+                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
         elif type=='npy':
-            with open(os.path.join(simulations, 'simulated_arrays_%s.pickle' % str(modno)), 'rb') as f:
-                arraydict[str(modno)] = pickle.load(f)
+            if user==True:
+                with open(os.path.join(simulations, 'simulated_arrays_model_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
+            else:
+                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
+                    arraydict[str(modno)] = pickle.load(f)
 
     for key,value in arraydict.items():
         for thearray in value:
@@ -302,10 +313,7 @@ def read_data(simulations, subset, user, type):
     if user:
         try:
             labels = [int(x.split('_')[-1]) for x in labels]
-            valid = check_valid_labels(labels)
         except:
-            raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-        if not valid:
             raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
     else:
         labels = [int(x) for x in labels]
