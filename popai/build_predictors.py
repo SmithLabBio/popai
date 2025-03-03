@@ -106,7 +106,7 @@ class CnnSFS(keras.Model):
 
 class CnnNpy(keras.Model):
     """
-    CNN taking raw alignment as input.
+    CNN taking SNP alignment as input.
     """
     def __init__(self, n_sites: int, downsampling_dict: Dict[str,int], n_classes: int, name=None, 
                  **kwargs):

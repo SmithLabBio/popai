@@ -49,8 +49,7 @@ def main():
     except ValueError:
         print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
 
-    if args.rf:
-        # train RF and save model and confusion matrix
+    if args.rf: # Random Forest
         random_forest_sfs_predictor = RandomForestsSFS(config_values, args.simulations, 
                                                        subset=args.subset, user=user)
         random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.ntrees)
@@ -58,23 +57,22 @@ def main():
             pickle.dump(random_forest_sfs_model, f)
         random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))
 
-    if args.fcnn:
+    if args.fcnn: # Fully conncted neural network with multidimensional SFS 
         data = PopaiTrainingData(args.simulations, "simulated_mSFS_*.pickle",
                 config_values["seed"], args.low_memory)
         model = NeuralNetSFS(data.dataset.n_classes)
         train_model(model, data, args.output, "fcnn")
         test_model(model, data, args.output, "fcnn")
 
-    if args.cnn: # TODO: Not currently working
+    if args.cnn: # CNN with 2D SFS
         data = PopaiTrainingData(args.simulations, "simulated_2dSFS_*.pickle",
                 config_values["seed"], args.low_memory)
-        print(data.dataset[0][0])
-        # n_pairs = len(data.dataset[0][0].keys())
-        # model = CnnSFS(n_pairs, data.dataset.n_classes)
-        # train_model(model, data, args.output, "cnn")
-        # test_model(model, data, args.output, "cnn")
+        n_pairs = len(data.dataset[0][0].keys())
+        model = CnnSFS(n_pairs, data.dataset.n_classes)
+        train_model(model, data, args.output, "cnn")
+        test_model(model, data, args.output, "cnn")
 
-    if args.cnnnpy:
+    if args.cnnnpy: # CNN with SNP alignment
         data = PopaiTrainingData(args.simulations, "simulated_arrays_*.pickle",
                 config_values["seed"], args.low_memory)
         n_sites = data.dataset[0][0].shape[1]
