@@ -20,7 +20,6 @@ def main():
     parser.add_argument('--cnn', action='store_true', help='Train CNN classifier of SFS.')
     parser.add_argument('--cnnnpy', action='store_true', help='Train CNN classifier on alignments.')
     parser.add_argument('--ntrees', type=int, default=500, help='Number of trees to use in the RF classifier (default=500).')
-    parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
     parser.add_argument('--subset', default=None, help="Path to a file listing the models to retain. List indices only (e.g., 0, 1, 5, 6). One integer per line")
     parser.add_argument('--low-memory', action='store_true', default=False, 
             help="Reads training datasets into memory as needed during training rather than all at once. Slows training due to increased file reads.")
@@ -42,11 +41,6 @@ def main():
         user = False
     else:
         user = True
-
-    try:
-        downsampling_dict = ast.literal_eval(args.downsampling)
-    except ValueError:
-        print('Error: Invalid downsampling dictionary. Please provide a valid dictionary string.')
 
     if args.rf: # Random Forest
         random_forest_sfs_predictor = RandomForestsSFS(config_values, args.simulations, 
@@ -75,7 +69,7 @@ def main():
         data = PopaiTrainingData(args.simulations, "simulated_arrays_*.pickle",
                 config_values["seed"], args.low_memory)
         n_sites = data.dataset[0][0].shape[1]
-        model = CnnNpy(n_sites, downsampling_dict, data.dataset.n_classes)
+        model = CnnNpy(n_sites, config_values["sampling dict"], data.dataset.n_classes)
         train_model(model, data, args.output, "cnn_npy")
         test_model(model, data, args.output, "cnn_npy")
 

@@ -103,7 +103,6 @@ def main():
         # cnn_2d_sfs_predictor.check_fit(cnn_2d_sfs_featureextracter, jsfs, args.output)
 
     if args.cnnnpy:
-        empirical_array = empirical_array[:, 0:100] # TODO: Remove, tmp for testing
         empirical_array = np.expand_dims(empirical_array, axis=0)
         predict(args.models, "cnn_npy.keras", empirical_array, args.output, "cnn_npy")
         # cnn_npy_featureextracter = models.load_model(os.path.join(args.models, 'cnn_npy_featureextractor.keras'), compile=True)

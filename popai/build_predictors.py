@@ -87,6 +87,9 @@ class CnnSFS(keras.Model):
         out = self.dense2(out)
         return out
     
+    # def get_feature_extractor(self):
+
+    
     def get_config(self):
         # For saving model
         config = super().get_config()
@@ -106,20 +109,20 @@ class CnnNpy(keras.Model):
     """
     CNN taking SNP alignment as input.
     """
-    def __init__(self, n_sites: int, downsampling_dict: Dict[str,int], n_classes: int, name=None, 
+    def __init__(self, n_sites: int, sampling_dict: Dict[str,int], n_classes: int, name=None, 
                  **kwargs):
         super().__init__(name=name, **kwargs)
         self.n_sites = n_sites
-        self.downsampling_dict = downsampling_dict
+        self.sampling_dict = sampling_dict
         self.n_classes = n_classes
         self.conv1_layers = []
         self.rows = []
-        for key, num_rows in downsampling_dict.items():
+        for key, num_rows in sampling_dict.items():
             self.rows.append(num_rows)
             conv_layer = keras.layers.Conv2D(10, (num_rows, 1), strides=(num_rows, 1), 
                     activation="relu", padding="valid")
             self.conv1_layers.append(conv_layer)
-        self.conv2 = keras.layers.Conv2D(10, (len(downsampling_dict), 1), activation="relu", 
+        self.conv2 = keras.layers.Conv2D(10, (len(sampling_dict), 1), activation="relu", 
                                          padding="valid")
         self.flat = keras.layers.Flatten()
         self.dense1 = keras.layers.Dense(100, activation='relu')
@@ -158,9 +161,9 @@ class CnnNpy(keras.Model):
     def from_config(cls, config):
         # For reading model from file
         n_sites = config.pop("n_sites")
-        downsampling_dict = config.pop("downsampling_dict")
+        sampling_dict = config.pop("sampling_dict")
         n_classes = config.pop("n_classes")
-        return (cls(n_sites, downsampling_dict, n_classes, **config))
+        return (cls(n_sites, sampling_dict, n_classes, **config))
 
 
 class NeuralNetSFS(keras.Model):
@@ -207,7 +210,10 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
     model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
     model.fit(data.train_loader, epochs=1, batch_size=10)#, validation_data=data.test_loader)
     model.save(os.path.join(outdir, f"{label}.keras"))
-    # print(model.layers)
+    print(model.summary())
+    print(model.layers)
+    print(model.get_layer("conv2d"))
+    # model = keras.Model(model.get_layers[0], model.layers[-2])
     # extract the features
     # features = keras.Model(inputs=model.input, outputs=model.layers[-2].output)
     # features.save(os.path.join(outdir, f"{label}_featureextractor.keras"))

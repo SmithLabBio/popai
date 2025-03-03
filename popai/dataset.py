@@ -71,6 +71,9 @@ def human_sort_key(s):
     return [int(part) if part.isdigit() else part for part in re.split('([0-9]+)', s)]
 
 class PopaiTrainingData:
+    """
+    Container for training datasets and data loaders. 
+    """
     def __init__(self, dir:str, pattern:str, seed:int, low_mem:bool=False):
         pattern_path = os.path.join(dir, pattern)
         paths = glob.glob(pattern_path)
