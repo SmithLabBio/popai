@@ -1,17 +1,17 @@
 
-from torch.utils.data import Dataset
 from tensorflow.keras.utils import to_categorical
 import pickle
-from torch.utils.data import Subset, DataLoader
+from torch.utils.data import Dataset, Subset, DataLoader
 from sklearn.model_selection import train_test_split
 import numpy as np
 import glob
 import re
 import os
+from typing import List
 
 
 class PopaiDataset(Dataset):
-    def __init__(self, paths):
+    def __init__(self, paths:List[str]):
         self.paths = paths
         self.path_ixs = [] # Lookup for path index for __getitem__ index
         self.sim_ixs = [] # Lookup for simulation index for __getitem__ index
@@ -37,7 +37,7 @@ class PopaiDataset(Dataset):
         return data[self.sim_ixs[ix]], self.encoded_labels[ix] 
 
 class PopaiDatasetLowMem(Dataset):
-    def __init__(self, paths):
+    def __init__(self, paths:List[str]):
         self.paths = paths
         self.path_ixs = [] # Lookup for path index for __getitem__ index
         self.sim_ixs = [] # Lookup for simulation index for __getitem__ index
@@ -71,7 +71,7 @@ def human_sort_key(s):
     return [int(part) if part.isdigit() else part for part in re.split('([0-9]+)', s)]
 
 class PopaiTrainingData:
-    def __init__(self, dir, pattern, seed, low_mem=False):
+    def __init__(self, dir:str, pattern:str, seed:int, low_mem:bool=False):
         pattern_path = os.path.join(dir, pattern)
         paths = glob.glob(pattern_path)
         sorted_paths = sorted(paths, key=human_sort_key)
