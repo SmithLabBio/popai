@@ -77,7 +77,7 @@ def main():
                             data.append([float(value) for value in values])
                         array = np.array(data)
                     current_dict.append(array)
-        jsfs.append(np.array(current_dict))
+        jsfs.append(current_dict)
     empirical_array = np.load(os.path.join(args.empirical,"empirical.npy"))
 
 
@@ -97,7 +97,7 @@ def main():
         # neural_network_sfs_predictor.check_fit(neural_network_featureextracter, msfs, args.output)
 
     if args.cnn:
-        predict(args.models, "cnn.keras", np.array(jsfs), args.output, "cnn", args.simulations, "simulated_2dSFS_*.pickle", 'cnn_features.npy', 'cnn_labels.npy')
+        predict(args.models, "cnn.keras", jsfs, args.output, "cnn", args.simulations, "simulated_2dSFS_*.pickle", 'cnn_features.npy', 'cnn_labels.npy')
         # cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, args.simulations, args.subset, user=user)
         # cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_sfs_featureextractor.keras'), compile=True)
         # cnn_2d_sfs_predictor.check_fit(cnn_2d_sfs_featureextracter, jsfs, args.output)

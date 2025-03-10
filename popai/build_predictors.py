@@ -80,7 +80,7 @@ class CnnSFS(keras.Model):
     def call(self, x, return_intermediate=False):
         outputs = []
         for i in range(self.n_pairs):
-            out = self.conv1_layers[i](tf.expand_dims(x[:,i], axis=-1)) # Get each population pair, (batch, pair)
+            out = self.conv1_layers[i](tf.expand_dims(x[i], axis=-1)) # Get each population pair, (batch, pair)
             out = self.flat(out)
             outputs.append(out)
         out = keras.layers.concatenate(outputs)
@@ -89,6 +89,8 @@ class CnnSFS(keras.Model):
             return out  # Return feature map before further processing
         out = self.dense2(out)
         return out
+
+
 
     def get_config(self):
         # For saving model
@@ -202,7 +204,7 @@ class NeuralNetSFS(keras.Model):
         n_classes = config.pop("n_classes")
         return (cls(n_classes, **config))
 
-def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str):
+def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str, epochs:int=10, batch_size:int=10):
     """
     Run model training.
     model: Keras model
@@ -211,13 +213,32 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
     label: label to prepend to output file
     """
 
-    model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-    model.fit(data.train_loader, epochs=10, batch_size=10, validation_data=data.test_loader)
-    model.save(os.path.join(outdir, f"{label}.keras"))
+
+
+    if label=="cnn":
+        model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+
+        for epoch in range(epochs):
+            for batch_data, batch_labels in batch_generator(data.train_loader):
+                inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
+                labels = tf.convert_to_tensor(batch_labels, dtype=tf.float32)
+
+                model.train_on_batch(inputs, labels)
+
+            for val_batch_data, val_batch_labels in batch_generator(data.test_loader):
+                val_inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in val_batch_data]
+                val_labels = tf.convert_to_tensor(val_batch_labels, dtype=tf.float32)
+                model.test_on_batch(val_inputs, val_labels)
+        model.save(os.path.join(outdir, f"{label}.keras"))
+
+    else:
+        model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+        model.fit(data.train_loader, epochs=epochs, batch_size=batch_size, validation_data=data.test_loader)
+        model.save(os.path.join(outdir, f"{label}.keras"))
 
 
     # extract and save features
-    extracted_features, all_labels = extract_features(model, data.train_loader)
+    extracted_features, all_labels = extract_features(model, data.train_loader, label)
     features_path = os.path.join(outdir, f"{label}_features.npy")
     labels_path = os.path.join(outdir, f"{label}_labels.npy")
     np.save(features_path, extracted_features)
@@ -232,12 +253,20 @@ def test_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str)
     label: label to prepend to output file
     """
     y_true = [data.dataset.labels[i] for i in data.test_dataset.indices]
-    y_hat = model.predict(data.test_loader)
-    y_pred = np.argmax(y_hat, axis=1).tolist()
+    if label=="cnn":
+        y_pred = []
+        for batch_data, _ in data.test_loader:
+            inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]  # Convert the population pair batch data
+            y_hat = model.predict(inputs)  # Predict for the batch
+            y_pred_batch = np.argmax(y_hat, axis=1).tolist()  # Convert to predicted labels
+            y_pred.extend(y_pred_batch)
+    else:
+        y_hat = model.predict(data.test_loader)
+        y_pred = np.argmax(y_hat, axis=1).tolist()
     cm, cm_plot = plot_confusion_matrix(y_true, y_pred, labels=[str(i) for i in y_true]) 
     cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
 
-def extract_features(model, dataset):
+def extract_features(model, dataset, label):
     """
     Extract features from a dataset using the trained model.
 
@@ -252,16 +281,29 @@ def extract_features(model, dataset):
         extracted_features = []
         all_labels = []
 
-        for x_batch, y_batch in dataset:
-            features = model(x_batch, return_intermediate=True)
-            extracted_features.append(features.numpy())
-            all_labels.append(y_batch.numpy())
+        if label=="cnn": # TODO: FIX THIS
+            for x_batch, y_batch in dataset:
+                features = model(x_batch, return_intermediate=True)
+                extracted_features.append(features.numpy())
+                all_labels.append(y_batch)
+        else:
+            for x_batch, y_batch in dataset:
+                features = model(x_batch, return_intermediate=True)
+                extracted_features.append(features.numpy())
+                all_labels.append(y_batch)
         extracted_features = np.concatenate(extracted_features, axis=0)
         all_labels = np.concatenate(all_labels, axis=0)
 
         return extracted_features, all_labels
     else:
-        extracted_features = model(dataset, return_intermediate=True)
+        if label=="cnn":
+            for batch_data in dataset:
+                inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
+                inputs = [tf.expand_dims(pair, axis=0) for pair in inputs]
+            extracted_features = model(inputs, return_intermediate=True)
+        
+        else:
+            extracted_features = model(dataset, return_intermediate=True)
         return extracted_features.numpy()
 
 def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir:str, path:str, train_features:str, train_labels:str):
@@ -279,11 +321,27 @@ def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir
     train_features_path = os.path.join(model_dir, train_features)
     train_labels_path = os.path.join(model_dir, train_labels)
 
+
     model = keras.models.load_model(os.path.join(model_dir, model_file))
-    pred = model.predict(data)
+
+    if label=="cnn":
+
+        pred = []
+        for batch_data in data:
+            inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
+            inputs = [tf.expand_dims(pair, axis=0) for pair in inputs]
+            pred.extend(model.predict(inputs))
+        replicate_numbers = ["Replicate {}".format(i+1) for i in range(len(pred))]
+
+
+
+    else:
+        pred = model.predict(data)
+        replicate_numbers = ["Replicate {}".format(i+1) for i in range(pred.shape[0])]
+
+
     labels = get_labels(sim_dir, path)
     headers = [f"Model {i}" for i in labels]
-    replicate_numbers = ["Replicate {}".format(i+1) for i in range(pred.shape[0])]
     table_data = np.column_stack((replicate_numbers, pred))
     tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
 
@@ -291,7 +349,7 @@ def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir
         fh.write(tabulated)
 
     # feature extraction
-    new_features= extract_features(model, data)
+    new_features= extract_features(model, data, label)
     new_features_path = os.path.join(out_dir, f"{label}_empirical_features.npy")
     np.save(new_features_path, new_features)
 
@@ -443,6 +501,12 @@ def plot_pca(train_features, train_labels, new_features, pcafile):
 
     # Save the plot to the specified file
     plt.savefig(pcafile)
+
+def batch_generator(loader):
+    for batch_data, batch_labels in loader:
+        yield (batch_data, batch_labels)
+
+
 
 def human_sort_key(s):
     """

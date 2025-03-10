@@ -363,7 +363,7 @@ class DataSimulator:
                 arrays = []
                 for sfs in sfs_2d.values(): 
                     arrays.append(sfs)
-                all_arrays.append(np.array(arrays))
+                all_arrays.append(np.array(arrays, dtype=object))
 
             
             # write to file

@@ -1,5 +1,6 @@
 
 from tensorflow.keras.utils import to_categorical
+from tensorflow import convert_to_tensor, float32
 import pickle
 from torch.utils.data import Dataset, Subset, DataLoader
 from sklearn.model_selection import train_test_split
@@ -8,6 +9,7 @@ import glob
 import re
 import os
 from typing import List
+import torch
 
 
 class PopaiDataset(Dataset):
@@ -74,7 +76,7 @@ class PopaiTrainingData:
     """
     Container for training datasets and data loaders. 
     """
-    def __init__(self, dir:str, pattern:str, seed:int, low_mem:bool=False):
+    def __init__(self, dir:str, pattern:str, seed:int, low_mem:bool=False, batch_size:int=10, method:str="notcnn"):
         pattern_path = os.path.join(dir, pattern)
         paths = glob.glob(pattern_path)
         sorted_paths = sorted(paths, key=human_sort_key)
@@ -90,5 +92,36 @@ class PopaiTrainingData:
                 random_state=train_test_seed, stratify=self.dataset.labels)
         self.train_dataset = Subset(self.dataset, train_ixs)
         self.test_dataset =  Subset(self.dataset, test_ixs)
-        self.train_loader = DataLoader(self.train_dataset, batch_size=10, shuffle=True)
-        self.test_loader =  DataLoader(self.test_dataset,  batch_size=10, shuffle=False)
+        if method == "cnn":
+            self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
+            self.test_loader =  DataLoader(self.test_dataset,  batch_size=batch_size, shuffle=False, collate_fn=custom_collate_fn)
+        else:
+            self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True)
+            self.test_loader =  DataLoader(self.test_dataset,  batch_size=batch_size, shuffle=False)
+
+
+def custom_collate_fn(batch):
+    """
+    Custom collate function that processes each population pair separately,
+    returning a list of tensors, one for each population pair.
+    """
+    data, labels = zip(*batch)  # Unzip data and labels
+    
+    # Initialize lists to hold the data for each population pair
+    data_batch_population_pairs = [[] for _ in range(3)]  # Assuming 3 population pairs per item
+
+    # Process each item in the batch
+    for item in data:
+        for i in range(3):  # Assuming each item has 3 sub-items (one for each population pair)
+            # Convert the sub-item (numpy array) to a tensor
+            data_batch_population_pairs[i].append(convert_to_tensor(item[i], dtype=float32))
+
+    # Convert labels to tensors
+    labels_batch = [convert_to_tensor(label, dtype=float32) for label in labels]
+
+    # Return the batch as three separate data instances
+    return data_batch_population_pairs, labels_batch
+
+
+
+
