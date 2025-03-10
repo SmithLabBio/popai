@@ -72,6 +72,7 @@ class DataProcessor:
             if encoded_array.shape[1] > maxsites:
                 filtered_array = encoded_array[:, :maxsites]
             elif encoded_array.shape[1] < maxsites:
+                print('doing this')
                 num_missing_columns = maxsites - encoded_array.shape[1]
                 missing_columns = np.full((encoded_array.shape[0], num_missing_columns), -1)
                 filtered_array = np.concatenate((encoded_array, missing_columns), axis=1)
@@ -81,7 +82,7 @@ class DataProcessor:
         self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
                          encoded_array.shape[1], filtered_array.shape[1])
 
-        return encoded_array
+        return filtered_array
 
     def vcf_to_numpy(self, maxsites):
 
