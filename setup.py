@@ -20,7 +20,8 @@ setup(
         'tensorflow',
         'pandas',
         'pyslim',
-        'tqdm'
+        'tqdm',
+        'torch'
     ],
     entry_points={
         'console_scripts': [

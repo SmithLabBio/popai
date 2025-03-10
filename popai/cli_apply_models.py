@@ -91,20 +91,20 @@ def main():
             f.write(results_rf)
 
     if args.fcnn:
-        predict(args.models, "fcnn.keras", np.array(msfs), args.output, "fcnn")
+        predict(args.models, "fcnn.keras", np.array(msfs), args.output, "fcnn", args.simulations, "simulated_mSFS_*.pickle", 'fcnn_features.npy', 'fcnn_labels.npy')
         # neural_network_featureextracter = models.load_model(os.path.join(args.models, 'fcnn_featureextractor.keras'), compile=True)
         # results_fcnn = neural_network_sfs_predictor.predict(neural_network_sfs_model, msfs)
         # neural_network_sfs_predictor.check_fit(neural_network_featureextracter, msfs, args.output)
 
     if args.cnn:
-        predict(args.models, "cnn.keras", np.array(jsfs), args.output, "cnn")
+        predict(args.models, "cnn.keras", np.array(jsfs), args.output, "cnn", args.simulations, "simulated_2dSFS_*.pickle", 'cnn_features.npy', 'cnn_labels.npy')
         # cnn_2d_sfs_predictor = build_predictors.CnnSFS(config_values, args.simulations, args.subset, user=user)
         # cnn_2d_sfs_featureextracter = models.load_model(os.path.join(args.models, 'cnn_sfs_featureextractor.keras'), compile=True)
         # cnn_2d_sfs_predictor.check_fit(cnn_2d_sfs_featureextracter, jsfs, args.output)
 
     if args.cnnnpy:
         empirical_array = np.expand_dims(empirical_array, axis=0)
-        predict(args.models, "cnn_npy.keras", empirical_array, args.output, "cnn_npy")
+        predict(args.models, "cnn_npy.keras", empirical_array, args.output, "cnn_npy", args.simulations, "simulated_arrays_*.pickle", 'cnn_npy_features.npy', 'cnn_npy_labels.npy')
         # cnn_npy_featureextracter = models.load_model(os.path.join(args.models, 'cnn_npy_featureextractor.keras'), compile=True)
         # results_cnn_npy = cnn_npy_predictor.predict(cnn_npy_model, empirical_array)
         # cnn_npy_predictor.check_fit(cnn_npy_featureextracter, empirical_array, args.output)
