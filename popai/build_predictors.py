@@ -21,9 +21,9 @@ from torch.utils.data import DataLoader
 class RandomForestsSFS:
     """Build a RF predictor that takes the SFS as input."""
 
-    def __init__(self, config, simulations, subset, user=False):
+    def __init__(self, config, simulations, user=False):
         self.config = config
-        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, subset, user, type='1d')
+        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, user, type='1d')
         self.rng = np.random.default_rng(self.config['seed'])
 
     def build_rf_sfs(self, ntrees=500):
@@ -378,18 +378,13 @@ def check_valid_labels(labels):
             return False
     return True
 
-def read_data(simulations, subset, user, type):
+def read_data(simulations, user, type):
 
     arraydict = {}
     sfs = []
     labels = []
 
     # read in the data
-    if subset:
-        subset_list = []
-        with open(subset, 'r') as f:
-            for line in f:
-                subset_list.append(line.strip())
     pickle_list = os.listdir(simulations)
     if type=='1d':
         pickle_list = [x for x in pickle_list if ('_mSFS' in x and x.endswith('.pickle'))]
@@ -397,8 +392,6 @@ def read_data(simulations, subset, user, type):
         pickle_list = [x for x in pickle_list if ('_2dSFS' in x and x.endswith('.pickle'))]
     elif type=='npy':
         pickle_list = [x for x in pickle_list if ('_arrays' in x and x.endswith('.pickle'))]
-    if subset:
-        pickle_list = [x for x in pickle_list if x.split('_')[-1].split('.')[0] in subset_list]
     pickle_list = sorted(pickle_list, key=lambda x: int(x.split('_')[-1].split('.')[0]))
     for item in pickle_list:
         modno = item.split('_')[-1].split('.')[0]

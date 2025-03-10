@@ -54,7 +54,6 @@ def main():
     parser.add_argument('--simulations', help='Path to directory with simulated data.')
     parser.add_argument('--output', help="Path to output folder for storing SFS.")
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
-    parser.add_argument('--subset', default=None, help="Path to a file listing the models to retain. List indices only (e.g., 0, 1, 5, 6). One integer per line")
     parser.add_argument('--low-memory', action='store_true', default=False, 
             help="Reads training datasets into memory as needed during training rather than all at once. Slows training due to increased file reads.")
 
@@ -83,8 +82,7 @@ def main():
         user = True
 
     if args.rf: # Random Forest
-        random_forest_sfs_predictor = RandomForestsSFS(config_values, args.simulations, 
-                                                       subset=args.subset, user=user)
+        random_forest_sfs_predictor = RandomForestsSFS(config_values, args.simulations, user=user)
         random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.rf['ntrees'])
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)
