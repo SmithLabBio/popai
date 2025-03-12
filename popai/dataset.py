@@ -108,18 +108,17 @@ def custom_collate_fn(batch):
     data, labels = zip(*batch)  # Unzip data and labels
     
     # Initialize lists to hold the data for each population pair
-    data_batch_population_pairs = [[] for _ in range(len(data[0]))]  # Assuming 3 population pairs per item
+    data_batch_population_pairs = [[] for _ in range(len(data[0]))] 
 
     # Process each item in the batch
     for item in data:
-        for i in range(len(data[0])):  # Assuming each item has 3 sub-items (one for each population pair)
+        for i in range(len(data[0])):  
             # Convert the sub-item (numpy array) to a tensor
             data_batch_population_pairs[i].append(convert_to_tensor(item[i], dtype=float32))
 
     # Convert labels to tensors
     labels_batch = [convert_to_tensor(label, dtype=float32) for label in labels]
 
-    # Return the batch as three separate data instances
     return data_batch_population_pairs, labels_batch
 
 
