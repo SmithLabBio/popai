@@ -320,7 +320,6 @@ class DataSimulator:
                     subsampled_array =  current_array[self.rng.choice(current_array.shape[0], ds_sampling_indices[key][1] - ds_sampling_indices[key][0], replace=False)]
                     population_arrays.append(subsampled_array)
                 downsampled_array = np.vstack(population_arrays)
-                print(downsampled_array.shape)
 
 
                 # generate the empty arrays
