@@ -70,7 +70,9 @@ class DataProcessor:
 
         if not maxsites == np.inf:
             if encoded_array.shape[1] > maxsites:
-                filtered_array = encoded_array[:, :maxsites]
+                sampled_indices = np.random.choice(encoded_array.shape[1], size=maxsites, replace=False)
+                sampled_indices.sort()
+                filtered_array = encoded_array[:, sampled_indices]
             elif encoded_array.shape[1] < maxsites:
                 print('doing this')
                 num_missing_columns = maxsites - encoded_array.shape[1]

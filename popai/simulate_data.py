@@ -94,7 +94,9 @@ class DataSimulator:
             for i, matrix in enumerate(values):
                 if len(matrix) > 0:
                     if matrix.shape[1] > self.max_sites:
-                        all_arrays[model][i] = matrix[:, :self.max_sites]
+                        sampled_indices = np.random.choice(matrix.shape[1], size=self.max_sites, replace=False)
+                        sampled_indices.sort()
+                        all_arrays[model][i] = matrix[:, sampled_indices]
                     elif matrix.shape[1] < self.max_sites:
                         num_missing_columns = self.max_sites - matrix.shape[1]
                         missing_columns = np.full((matrix.shape[0], num_missing_columns), -1)
