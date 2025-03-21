@@ -17,6 +17,7 @@ from typing import Dict
 import glob
 import re
 from torch.utils.data import DataLoader
+from tensorflow.keras.optimizers import Adam
 
 class RandomForestsSFS:
     """Build a RF predictor that takes the SFS as input."""
@@ -204,7 +205,7 @@ class NeuralNetSFS(keras.Model):
         n_classes = config.pop("n_classes")
         return (cls(n_classes, **config))
 
-def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str, epochs:int=10, batch_size:int=10):
+def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str, epochs:int=10, batch_size:int=10, learning_rate:float=0.001):
     """
     Run model training.
     model: Keras model
@@ -215,8 +216,10 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
 
 
 
+    optimizer = Adam((learning_rate = learning_rate))
+
     if label=="cnn":
-        model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+        model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
 
         for epoch in range(epochs):
             for batch_data, batch_labels in batch_generator(data.train_loader):
@@ -232,7 +235,7 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
         model.save(os.path.join(outdir, f"{label}.keras"))
 
     else:
-        model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+        model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
         model.fit(data.train_loader, epochs=epochs, batch_size=batch_size, validation_data=data.test_loader)
         model.save(os.path.join(outdir, f"{label}.keras"))
 

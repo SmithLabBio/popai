@@ -16,6 +16,7 @@ class ParseEpochsBatchSize(argparse.Action):
         # Default epochs and batch_size
         epochs = 10
         batch_size = 10
+        learning_rate = 0.001
         
         if values:
             try:
@@ -23,11 +24,12 @@ class ParseEpochsBatchSize(argparse.Action):
                 params = dict(param.split('=') for param in values.split(':'))
                 epochs = int(params.get('epochs', epochs))
                 batch_size = int(params.get('batch_size', batch_size))
+                learning_rate = float(parameters.get('learning_rate', learning_rate))
             except ValueError:
                 raise argparse.ArgumentTypeError(f"Invalid format for {option_string}. Expected 'epochs=XX:batch_size=YY'.")
         
         # Set the parsed values
-        setattr(namespace, self.dest, {'epochs': epochs, 'batch_size': batch_size})
+        setattr(namespace, self.dest, {'epochs': epochs, 'batch_size': batch_size, 'learning_rate': learning_rate})
 
 class ParseTrees(argparse.Action):
     def __init__(self, option_strings, dest, nargs=None, **kwargs):
@@ -58,9 +60,9 @@ def main():
             help="Reads training datasets into memory as needed during training rather than all at once. Slows training due to increased file reads.")
 
 
-    parser.add_argument('--cnn', action=ParseEpochsBatchSize, nargs="?", help='Train CNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY".')
-    parser.add_argument('--fcnn', action=ParseEpochsBatchSize, nargs="?", help='Train FCNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY".')
-    parser.add_argument('--cnnnpy', action=ParseEpochsBatchSize, nargs="?", help='Train CNN classifier of alignments. Optionally specify "epochs=XX:batch_size=YY".')
+    parser.add_argument('--cnn', action=ParseEpochsBatchSize, nargs="?", help='Train CNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
+    parser.add_argument('--fcnn', action=ParseEpochsBatchSize, nargs="?", help='Train FCNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
+    parser.add_argument('--cnnnpy', action=ParseEpochsBatchSize, nargs="?", help='Train CNN classifier of alignments. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
     parser.add_argument('--rf', action=ParseTrees, nargs="?", help='Train RF classifier of SFS. Optionally specify "ntrees=XX".')
 
     args = parser.parse_args()
@@ -92,7 +94,7 @@ def main():
         data = PopaiTrainingData(args.simulations, "simulated_mSFS_*.pickle",
                 config_values["seed"], args.low_memory, batch_size=args.fcnn['batch_size'])
         model = NeuralNetSFS(data.dataset.n_classes)
-        train_model(model, data, args.output, "fcnn", epochs=args.fcnn['epochs'], batch_size=args.fcnn['batch_size'])
+        train_model(model, data, args.output, "fcnn", epochs=args.fcnn['epochs'], batch_size=args.fcnn['batch_size'], learning_rate = args.fcnn['learning_rate'])
         test_model(model, data, args.output, "fcnn")
 
     if args.cnn: # CNN with 2D SFS
@@ -100,7 +102,7 @@ def main():
                 config_values["seed"], args.low_memory, batch_size=args.cnn['batch_size'], method='cnn')
         n_pairs = data.dataset[0][0].shape[0]
         model = CnnSFS(n_pairs, data.dataset.n_classes)
-        train_model(model, data, args.output, "cnn", epochs=args.cnn['epochs'], batch_size=args.cnn['batch_size'])
+        train_model(model, data, args.output, "cnn", epochs=args.cnn['epochs'], batch_size=args.cnn['batch_size'], learning_rate = args.cnn['learning_rate'])
         test_model(model, data, args.output, "cnn")
 
     if args.cnnnpy: # CNN with SNP alignment
@@ -108,7 +110,7 @@ def main():
                 config_values["seed"], args.low_memory, batch_size=args.cnnnpy['batch_size'])
         n_sites = data.dataset[0][0].shape[1]
         model = CnnNpy(n_sites, config_values["sampling dict"], data.dataset.n_classes)
-        train_model(model, data, args.output, "cnn_npy", epochs=args.cnnnpy['epochs'], batch_size=args.cnnnpy['batch_size'])
+        train_model(model, data, args.output, "cnn_npy", epochs=args.cnnnpy['epochs'], batch_size=args.cnnnpy['batch_size'], learning_rate = args.cnnnpy['learning_rate'])
         test_model(model, data, args.output, "cnn_npy")
 
 if __name__ == '__main__':
