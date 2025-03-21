@@ -216,7 +216,7 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
 
 
 
-    optimizer = Adam((learning_rate = learning_rate))
+    optimizer = Adam(learning_rate = learning_rate)
 
     if label=="cnn":
         model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
