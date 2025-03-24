@@ -24,7 +24,7 @@ class ParseEpochsBatchSize(argparse.Action):
                 params = dict(param.split('=') for param in values.split(':'))
                 epochs = int(params.get('epochs', epochs))
                 batch_size = int(params.get('batch_size', batch_size))
-                learning_rate = float(parameters.get('learning_rate', learning_rate))
+                learning_rate = float(params.get('learning_rate', learning_rate))
             except ValueError:
                 raise argparse.ArgumentTypeError(f"Invalid format for {option_string}. Expected 'epochs=XX:batch_size=YY'.")
         
