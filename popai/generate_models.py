@@ -273,10 +273,14 @@ class ModelBuilder:
 
                     # if symmetric true, then add symmetric migration and add ceasing of migration
                     if self.config['symmetric']:
-                        migration_demography.set_symmetric_migration_rate(
-                            populationpair, migrateholder)
-                        migration_demography.add_symmetric_migration_rate_change(
-                            migtimeholder, populationpair, 0)
+                        migration_demography.set_migration_rate(
+                            source=populationpair[0], dest=populationpair[1], rate=migrateholder)
+                        migration_demography.add_migration_rate_change(time=migtimeholder, \
+                            source=populationpair[0], dest=populationpair[1], rate=0)
+                        migration_demography.set_migration_rate(
+                            source=populationpair[1], dest=populationpair[0], rate=migrateholder)
+                        migration_demography.add_migration_rate_change(time=migtimeholder, \
+                            source=populationpair[1], dest=populationpair[0], rate=0)
 
                     # if not symmetric then do asymmetric
                     else:
@@ -327,7 +331,9 @@ class ModelBuilder:
                     # if symmetric true, then add symmetric migration and add ceasing of migration
                     if self.config['symmetric']:
                         migration_demography.add_symmetric_migration_rate_change(
-                            migtimeholder, populationpair, rate=migrateholder)
+                            source=populationpair[0], dest=populationpair[1], rate=migrateholder)
+                        migration_demography.add_symmetric_migration_rate_change(
+                            source=populationpair[1], dest=populationpair[0], rate=migrateholder)
                     # if not symmetric then do asymmetric
                     else:
                         migration_demography.add_migration_rate_change(time=migtimeholder, \
@@ -465,7 +471,7 @@ class ModelBuilder:
             divergence_time_draws = self._draw_divergence_times(
                 population_size_draws, original_model, divergence_times)
             migration_rate_draws = self._draw_migration_rates(
-                population_size_keys, original_model)
+                population_size_keys, original_model, population_size_draws)
             migration_stop = self._get_migration_stops(divergence_time_draws)
 
             for rep in range(self.config['replicates']):
@@ -586,18 +592,25 @@ class ModelBuilder:
 
         return divergence_time_draws
 
-    def _draw_migration_rates(self, population_size_keys, model):
+    def _draw_migration_rates(self, population_size_keys, model, population_size_draws):
         """Draw migration rates from priors."""
 
         migration_rate_draws = {}
-
         for event in model.events:
             if hasattr(event, 'rate'):
-                if self.config['symmetric']:
-                    migration_rate_draws[f"{population_size_keys[event.populations[0]]}_{population_size_keys[event.populations[1]]}"] = \
-                            np.round(self.rng.uniform(low=self.config["migration rate"][0], \
-                                high=self.config["migration rate"][1], \
-                                    size=self.config["replicates"]),10)
+
+                if ("Nm" in self.config["migration rate"][0] and "Nm" in self.config["migration rate"][1]):
+                    low_value = float(self.config["migration rate"][0].strip('Nm'))
+                    high_value = float(self.config["migration rate"][0].strip('Nm'))
+                    raw_nm_values = \
+                            np.round(self.rng.uniform(low=low_value, high=high_value, \
+                            size=self.config["replicates"]),10)
+                    migration_rate_draws[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"] = \
+                            raw_nm_values / population_size_draws[event.dest]
+
+                elif "Nm" in self.config["migration rate"][0] or "Nm" in self.config["migration rate"][1]:
+                    raise ValueError(f"Error: Inconsistent use of Nm in migration rate prior.")
+
                 else:
                     migration_rate_draws[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"] = np.round(
                             self.rng.uniform(low=self.config["migration rate"][0],\

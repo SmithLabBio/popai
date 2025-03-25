@@ -54,8 +54,12 @@ class ModelConfigParser:
                 config_dict['migration df']=[pd.read_csv(x\
                     , index_col=0) for x in migration_paths]
                 config_dict['max migration events']=int(config['Model']['max migration events'])
-                config_dict["migration rate"] = [float(val.strip("U(").strip(")")) \
-                    for val in config['Model']["migration rate"].split(",")]
+                try:
+                    config_dict["migration rate"] = [float(val.strip("U(").strip(")")) \
+                        for val in config['Model']["migration rate"].split(",")]
+                except:
+                    config_dict["migration rate"] = [val.strip("U(").strip(")") \
+                        for val in config['Model']["migration rate"].split(",")]
                 config_dict["symmetric"] = config.getboolean("Model", "symmetric")
                 config_dict["secondary contact"] = config.getboolean("Model", "secondary contact")
                 config_dict["divergence with gene flow"] = config.getboolean(
