@@ -365,7 +365,6 @@ class DataSimulator:
                 arrays = []
                 for sfs in sfs_2d.values(): 
                     arrays.append(sfs)
-                    print(sfs.shape)
                 all_arrays.append(np.array(arrays, dtype=object))
 
             
