@@ -1,4 +1,4 @@
-These data were simulated under a model with gene flow between A and C, while A and B are sister.
+These data were simulated under a model with gene flow between A and B, while A and B are sister.
 
 They were simulated using the code in generate_data.py on May 24, 2024
 
