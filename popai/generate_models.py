@@ -601,7 +601,7 @@ class ModelBuilder:
 
                 if ("Nm" in self.config["migration rate"][0] and "Nm" in self.config["migration rate"][1]):
                     low_value = float(self.config["migration rate"][0].strip('Nm'))
-                    high_value = float(self.config["migration rate"][0].strip('Nm'))
+                    high_value = float(self.config["migration rate"][1].strip('Nm'))
                     raw_nm_values = \
                             np.round(self.rng.uniform(low=low_value, high=high_value, \
                             size=self.config["replicates"]),10)

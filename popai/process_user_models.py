@@ -82,10 +82,16 @@ class ModelReader:
 
                         start_event_time = self._get_event_value(item_dict, event_dict, 'start')
                         stop_event_time = self._get_event_value(item_dict, event_dict, 'stop')
-                        migration_rate = self._get_event_value(item_dict, event_dict, 'rate')
+                        
+                        migration_rate_0, migration_rate_1 = self._get_event_value(item_dict, event_dict, 'rate')
+                        print(migration_rate_0, migration_rate_1)
 
-                        demography.add_symmetric_migration_rate_change(populations=item_dict['populations'], time=start_event_time, rate=migration_rate)
-                        demography.add_symmetric_migration_rate_change(populations=item_dict['populations'], time=stop_event_time, rate=0)
+                        demography.add_migration_rate_change(source=item_dict['populations'][1], dest=item_dict['populations'][0], time=start_event_time, rate=migration_rate_0)
+                        demography.add_migration_rate_change(source=item_dict['populations'][0], dest=item_dict['populations'][1], time=start_event_time, rate=migration_rate_1)
+
+                        demography.add_migration_rate_change(source=item_dict['populations'][1], dest=item_dict['populations'][0], time=stop_event_time, rate=0)
+                        demography.add_migration_rate_change(source=item_dict['populations'][0], dest=item_dict['populations'][1], time=stop_event_time, rate=0)
+
 
                         event_dict[item] = [start_event_time, stop_event_time]
 
@@ -341,9 +347,23 @@ class ModelReader:
                 event_value = self.rng.uniform(low=minval, high=maxval, size=1)[0]
                 event_value = np.round(event_value,0)
             elif valuetype=='rate' or valuetype=='prop':
-                minval = self._evaluate_var(item_dict[valuetype][0], event_dict, 'float')
-                maxval = self._evaluate_var(item_dict[valuetype][1], event_dict, 'float')
-                event_value = self.rng.uniform(low=minval, high=maxval, size=1)[0]
+                if "Nm" in item_dict["rate"][0] and "Nm" in item_dict["rate"][1]:
+                    minval = float(item_dict["rate"][0].strip("Nm"))
+                    maxval = float(item_dict["rate"][1].strip("Nm"))
+                    unscaled = self.rng.uniform(low=minval, high=maxval, size=1)[0]
+                    if item_dict['event'] == "symmetric_migration":
+                        destpop0 = event_dict[f"pop_{item_dict['populations'][0]}"]
+                        destpop1 = event_dict[f"pop_{item_dict['populations'][1]}"]
+                        rate0 = unscaled / destpop0
+                        rate1 = unscaled / destpop1
+                        event_value = [rate0,rate1]
+                    elif item_dict['event'] == "asymmetric_migration":
+                        destpop = event_dict[f"pop_{item_dict['dest']}"]
+                        event_value = unscaled / destpop
+                else:
+                    minval = self._evaluate_var(item_dict[valuetype][0], event_dict, 'float')
+                    maxval = self._evaluate_var(item_dict[valuetype][1], event_dict, 'float')
+                    event_value = self.rng.uniform(low=minval, high=maxval, size=1)[0]
                 
         
         else:
@@ -352,7 +372,20 @@ class ModelReader:
                 if valuetype=='time' or valuetype=='start' or valuetype=='stop' or valuetype=='size':
                     event_value = int(event_value)
                 elif valuetype=='rate' or valuetype=='prop':
-                    event_value = float(event_value)
+                    if "Nm" in item_dict["rate"]:
+                        unscaled = float(item_dict["rate"].strip("Nm"))
+                        if item_dict['event'] == "symmetric_migration":
+                            destpop0 = event_dict[f"pop_{item_dict['populations'][0]}"]
+                            destpop1 = event_dict[f"pop_{item_dict['populations'][1]}"]
+                            rate0 = unscaled / destpop0
+                            rate1 = unscaled / destpop1
+                            event_value = [rate0,rate1]
+                        elif item_dict['event'] == "asymmetric_migration":
+                            destpop = event_dict[f"pop_{item_dict['dest']}"]
+                            event_value = unscaled / destpop
+
+                    else:
+                        event_value = float(event_value)
             except:
                 event_value = self._evaluate_var(item_dict[valuetype], event_dict, 'float')
         
