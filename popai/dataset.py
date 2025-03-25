@@ -114,7 +114,8 @@ def custom_collate_fn(batch):
     for item in data:
         for i in range(len(data[0])):  
             # Convert the sub-item (numpy array) to a tensor
-            data_batch_population_pairs[i].append(convert_to_tensor(item[i], dtype=float32))
+            normalized_array = item[i] / np.sum(item[i])  # Normalize so that elements sum to 1
+            data_batch_population_pairs[i].append(convert_to_tensor(normalized_array, dtype=float32))
 
     # Convert labels to tensors
     labels_batch = [convert_to_tensor(label, dtype=float32) for label in labels]
