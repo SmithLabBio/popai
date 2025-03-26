@@ -599,17 +599,18 @@ class ModelBuilder:
         for event in model.events:
             if hasattr(event, 'rate'):
 
-                if ("Nm" in self.config["migration rate"][0] and "Nm" in self.config["migration rate"][1]):
-                    low_value = float(self.config["migration rate"][0].strip('Nm'))
-                    high_value = float(self.config["migration rate"][1].strip('Nm'))
-                    raw_nm_values = \
-                            np.round(self.rng.uniform(low=low_value, high=high_value, \
-                            size=self.config["replicates"]),10)
-                    migration_rate_draws[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"] = \
-                            raw_nm_values / population_size_draws[event.dest]
+                if not all(isinstance(x,float) for x in self.config["migration rate"]):
+                    if ("Nm" in self.config["migration rate"][0] and "Nm" in self.config["migration rate"][1]):
+                        low_value = float(self.config["migration rate"][0].strip('Nm'))
+                        high_value = float(self.config["migration rate"][1].strip('Nm'))
+                        raw_nm_values = \
+                                np.round(self.rng.uniform(low=low_value, high=high_value, \
+                                size=self.config["replicates"]),10)
+                        migration_rate_draws[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"] = \
+                                raw_nm_values / population_size_draws[event.dest]
 
-                elif "Nm" in self.config["migration rate"][0] or "Nm" in self.config["migration rate"][1]:
-                    raise ValueError(f"Error: Inconsistent use of Nm in migration rate prior.")
+                    else:
+                        raise ValueError(f"Error: Inconsistent use of Nm in migration rate prior.")
 
                 else:
                     migration_rate_draws[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"] = np.round(
