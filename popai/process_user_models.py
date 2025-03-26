@@ -84,7 +84,6 @@ class ModelReader:
                         stop_event_time = self._get_event_value(item_dict, event_dict, 'stop')
                         
                         migration_rate_0, migration_rate_1 = self._get_event_value(item_dict, event_dict, 'rate')
-                        print(migration_rate_0, migration_rate_1)
 
                         demography.add_migration_rate_change(source=item_dict['populations'][1], dest=item_dict['populations'][0], time=start_event_time, rate=migration_rate_0)
                         demography.add_migration_rate_change(source=item_dict['populations'][0], dest=item_dict['populations'][1], time=start_event_time, rate=migration_rate_1)
