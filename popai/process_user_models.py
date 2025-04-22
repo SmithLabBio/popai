@@ -112,7 +112,7 @@ class ModelReader:
                     elif item_dict['event'] == 'popsize':
 
                         if not all(key in item_dict for key in ['time', 'size', 'population']):
-                            raise Exception(f"Check your assymmetric migration events. All must include a time, a population, and a size.")
+                            raise Exception(f"Check your pop size events. All must include a time, a population, and a size.")
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         population_size = self._get_event_value(item_dict, event_dict, 'size')
@@ -123,7 +123,7 @@ class ModelReader:
                     elif item_dict['event'] == 'popgrowth':
 
                         if not all(key in item_dict for key in ['time', 'rate', 'population']):
-                            raise Exception(f"Check your assymmetric migration events. All must include a time, a population, and a rate.")
+                            raise Exception(f"Check your pop growth events. All must include a time, a population, and a rate.")
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         growth_rate = self._get_event_value(item_dict, event_dict, 'rate')
@@ -362,7 +362,8 @@ class ModelReader:
                 else:
                     minval = self._evaluate_var(item_dict[valuetype][0], event_dict, 'float')
                     maxval = self._evaluate_var(item_dict[valuetype][1], event_dict, 'float')
-                    event_value = self.rng.uniform(low=minval, high=maxval, size=1)[0]
+                    unscaled = self.rng.uniform(low=minval, high=maxval, size=1)[0]
+                    event_value = [unscaled, unscaled]
                 
         
         else:
@@ -387,5 +388,4 @@ class ModelReader:
                         event_value = float(event_value)
             except:
                 event_value = self._evaluate_var(item_dict[valuetype], event_dict, 'float')
-        
         return(event_value)
