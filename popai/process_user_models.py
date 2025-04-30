@@ -363,7 +363,10 @@ class ModelReader:
                     minval = self._evaluate_var(item_dict[valuetype][0], event_dict, 'float')
                     maxval = self._evaluate_var(item_dict[valuetype][1], event_dict, 'float')
                     unscaled = self.rng.uniform(low=minval, high=maxval, size=1)[0]
-                    event_value = unscaled                
+                    if item_dict['event'] == "symmetric_migration":
+                        event_value = [unscaled, unscaled]
+                    else:
+                        event_value = unscaled                
         
         else:
             try:
