@@ -127,7 +127,7 @@ class ModelReader:
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         growth_rate = self._get_event_value(item_dict, event_dict, 'rate')
-
+                    
                         demography.add_population_parameters_change(population=item_dict['population'], time=event_time, initial_size=None, growth_rate=growth_rate)
 
                         event_dict[item] = event_time
@@ -363,8 +363,7 @@ class ModelReader:
                     minval = self._evaluate_var(item_dict[valuetype][0], event_dict, 'float')
                     maxval = self._evaluate_var(item_dict[valuetype][1], event_dict, 'float')
                     unscaled = self.rng.uniform(low=minval, high=maxval, size=1)[0]
-                    event_value = [unscaled, unscaled]
-                
+                    event_value = unscaled                
         
         else:
             try:
