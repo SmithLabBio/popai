@@ -356,6 +356,8 @@ def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir
         pred = []
         for batch_data in data:
             inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
+            for item in range(len(inputs)):
+                inputs[item] =  inputs[item] / np.sum(inputs[item])  # Normalize so that elements sum to 1
             inputs = [tf.expand_dims(pair, axis=0) for pair in inputs]
             pred.extend(model.predict(inputs))
         replicate_numbers = ["Replicate {}".format(i+1) for i in range(len(pred))]
@@ -376,7 +378,17 @@ def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir
         fh.write(tabulated)
 
     # feature extraction
-    new_features= extract_features(model, data, label)
+    if label=="cnn":
+        new_features = []
+        for batch_data in data:
+            inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
+            for item in range(len(inputs)):
+                inputs[item] =  inputs[item] / np.sum(inputs[item])  # Normalize so that elements sum to 1
+            inputs = [tf.expand_dims(pair, axis=0) for pair in inputs]
+            new_features.append(extract_features(model, inputs, label))
+        new_features = np.concatenate(new_features, axis=0)
+    else:
+        new_features= extract_features(model, data, label)
     new_features_path = os.path.join(out_dir, f"{label}_empirical_features.npy")
     np.save(new_features_path, new_features)
 
