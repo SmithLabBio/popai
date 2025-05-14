@@ -22,7 +22,7 @@ class DataSimulator:
 
     """Simulate data under specified demographies."""
 
-    def __init__(self, models, labels, config, cores, downsampling, max_sites, output, user=False, sp_tree_index = False, checkpoint = False):
+    def __init__(self, models, labels, config, cores, downsampling, max_sites=None, output='output', user=False, sp_tree_index = False, checkpoint = False, infinite = False):
         self.models = models
         self.labels = labels
         self.config = config
@@ -33,6 +33,9 @@ class DataSimulator:
         self.sp_tree_index = sp_tree_index
         self.output = output
         self.checkpoint = checkpoint
+        self.infinite = infinite
+        if self.infinite:
+            self.max_sites = len(self.config['lengths'])
 
         # to prevent pickling issues
         if 'fastas' in self.config:
@@ -553,19 +556,25 @@ class DataSimulator:
         parameter_arrays = []
 
         # get seeds for simulating data for each fragment
-        fragment_seeds = self.rng.integers(2**32, size=len(self.config['lengths']))
+        fragment_seeds_1 = self.rng.integers(2**32, size=len(self.config['lengths']))
+        fragment_seeds_2 = self.rng.integers(2**32, size=1)[0]
+
+        # use median length instead
+        median_length = int(np.median(self.config['lengths']))
 
         # iterate over fragments and perform simulations
-        for k,length in enumerate(self.config['lengths']):
+        #for k,length in enumerate(self.config['lengths']):
 
-            # simulate ancestries
-            ts = msprime.sim_ancestry(simulating_dict, demography=demography,
-                                        random_seed = fragment_seeds[k], sequence_length=length,
-                                        recombination_rate=0)
+            ## simulate ancestries
+            #ts = msprime.sim_ancestry(simulating_dict, demography=demography,
+            #                            random_seed = fragment_seeds[k], sequence_length=length,
+            #                            recombination_rate=0)
+        ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = fragment_seeds_2, sequence_length=median_length, recombination_rate=0, num_replicates=len(self.config['lengths']))
+        for k, ts in enumerate(ts_iterator):
             # add mutations
             mts = msprime.sim_mutations(ts, rate=mutation_rates,
                                         model=self.config["substitution model"],
-                                        random_seed=fragment_seeds[k])
+                                        random_seed=fragment_seeds_1[k])
 
             # get array
             array_dict = OrderedDict()
@@ -601,33 +610,83 @@ class DataSimulator:
         mutation_rates = np.round(mutation_rates, decimals=20)
 
         # get seeds for simulating data for each fragment
-        fragment_seeds = self.rng.integers(2**32, size=len(self.config['lengths']))
+        fragment_seeds_1 = self.rng.integers(2**32, size=len(self.config['lengths']))
+        fragment_seeds_2 = self.rng.integers(2**32, size=1)[0]
+        fragment_seeds_3 = self.rng.integers(2**32, size=len(self.config['lengths'])*10)
+
+        # use median length instead
+        median_length = int(np.median(self.config['lengths']))
 
         # iterate over fragments and perform simulations
         parameter_arrays = []
-        for k,length in enumerate(self.config['lengths']):
 
-            # simulate ancestries
-            ts = msprime.sim_ancestry(simulating_dict, demography=demography,
-                random_seed = fragment_seeds[k], sequence_length=length,
-                recombination_rate=0)
+        if self.infinite:
 
-            # add mutations
-            mts = msprime.sim_mutations(ts, rate=mutation_rates,
-                                            model=self.config["substitution model"],
-                                            random_seed=fragment_seeds[k])
+            num_sites=0
+            mts=[]
+            while num_sites < len(self.config['lengths']):
+                ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = fragment_seeds_2, discrete_genome=False, num_replicates=len(self.config['lengths'])*10)
 
-            # get array
+                for k, ts in enumerate(ts_iterator):
+                    if num_sites < len(self.config['lengths']):
+
+                        # add mutations
+                        mt = msprime.sim_mutations(ts, rate=mutation_rates,
+                                                            discrete_genome=False,
+                                                            model=msprime.BinaryMutationModel(),
+                                                            random_seed = fragment_seeds_3[k])
+                        if mt.num_mutations > 0:
+                            mts.append(mt)
+                            num_sites+=1
+
+                    else:
+                        break
+
+            # Initialize dictionary of lists
             array_dict = OrderedDict()
             for key in simulating_dict.keys():
-                array_dict[key] = mts.genotype_matrix(samples=mts.samples(id_map[key])).transpose()
+                array_dict[key] = []
+
+            # Loop over each mts object in the list
+            count_test = 0
+            for mts_item in mts:
+                for key in simulating_dict.keys():
+                    array = mts_item.genotype_matrix(samples=mts_item.samples(id_map[key])).transpose()
+                    if array.shape[1] > 1:
+                        array = array[:, [0]]
+                    array_dict[key].append(array)
+
+            # concatenate arrays
+            for key in array_dict.keys():
+                array_dict[key] = np.concatenate(array_dict[key], axis=1)
 
             ## organize matrix
             array = self._organize_matrix_user(array_dict, simulating_dict, demography)
             array = minor_encoding(array)
 
-
             parameter_arrays.append(array)
+
+        else:   
+            ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = fragment_seeds_2, sequence_length=median_length, recombination_rate=0, num_replicates=len(self.config['lengths']))
+            for k, ts in enumerate(ts_iterator):
+
+
+                # add mutations
+                mts = msprime.sim_mutations(ts, rate=mutation_rates,
+                                                model=self.config["substitution model"],
+                                                random_seed=fragment_seeds_1[k])
+
+                # get array
+                array_dict = OrderedDict()
+                for key in simulating_dict.keys():
+                    array_dict[key] = mts.genotype_matrix(samples=mts.samples(id_map[key])).transpose()
+
+                ## organize matrix
+                array = self._organize_matrix_user(array_dict, simulating_dict, demography)
+                array = minor_encoding(array)
+
+
+                parameter_arrays.append(array)
 
         # combine the parameter_ts arrays across fragments
         dataset_array = np.column_stack(parameter_arrays)

@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--maxsites', type=int, help="Max number of sites to use when building SFS from simulated")
     parser.add_argument('--cores', type=int, default=1, help="Number of cores to use when simulating data.")
     parser.add_argument('--checkpoint', action='store_true', help='Use output already generated if it exists, and do not repeat those simulations.')
+    parser.add_argument('--infinite', action='store_true', help='Use infinite sites model.')
 
     args = parser.parse_args()
 
@@ -52,7 +53,7 @@ def main():
                 return
 
             # simulate data
-            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, output=args.output, sp_tree_index=sp_tree_index, checkpoint=args.checkpoint)
+            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, output=args.output, sp_tree_index=sp_tree_index, checkpoint=args.checkpoint, infinite=args.infinite)
             arrays = data_simulator.simulate_ancestry_parallel()
 
     else:
@@ -74,7 +75,7 @@ def main():
                 return
 
             # simulate data
-            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, user=True, output=args.output)
+            data_simulator = simulate_data.DataSimulator(parameterized_models, labels, config=config_values, cores=args.cores, downsampling=downsampling_dict, max_sites = args.maxsites, user=True, output=args.output, checkpoint=args.checkpoint, infinite=args.infinite)
             arrays = data_simulator.simulate_ancestry_parallel()
 
     
