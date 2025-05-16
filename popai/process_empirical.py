@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from popai.utils import minor_encoding
+import re
 class DataProcessor:
 
     """Process empirical data."""
@@ -117,8 +118,11 @@ class DataProcessor:
                 info = vcf_table[item]
 
                 for row in info:
-                    value1 = row.split("|")[0]
-                    value2 = row.split("|")[1].split(":")[0]
+                    parts = re.split(r'[|/]', row)
+                    value1 = parts[0]
+                    value2 = parts[1].split(":")[0]
+                    #value1 = row.split("|")[0]
+                    #value2 = row.split("|")[1].split(":")[0]
                     if not dp_index is None:
                         dp = row.split(":")[dp_index]
                     else:
