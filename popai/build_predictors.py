@@ -18,6 +18,7 @@ import glob
 import re
 from torch.utils.data import DataLoader
 from tensorflow.keras.optimizers import Adam
+from keras.saving import register_keras_serializable
 
 class RandomForestsSFS:
     """Build a RF predictor that takes the SFS as input."""
@@ -62,6 +63,7 @@ class RandomForestsSFS:
         tabulated = tabulate(table_data, headers=headers, tablefmt="fancy_grid")
         return(tabulated)
 
+@register_keras_serializable(package="Custom")
 class CnnSFS(keras.Model):
     """
     CNN taking two dimensional site frequency spectra for each population pair as input.
@@ -108,6 +110,7 @@ class CnnSFS(keras.Model):
         n_classes = config.pop("n_classes")
         return (cls(n_pairs, n_classes, **config))
 
+@register_keras_serializable(package="Custom")
 class CnnNpy(keras.Model):
     """
     CNN taking SNP alignment as input.
@@ -249,6 +252,7 @@ class CnnNpy_old(keras.Model):
         n_classes = config.pop("n_classes")
         return (cls(n_sites, sampling_dict, n_classes, **config))
 
+@register_keras_serializable(package="Custom")
 class NeuralNetSFS(keras.Model):
     """
     Fully connected neural network taking multidimensional site frequency spectrum as input.
