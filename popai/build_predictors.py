@@ -292,8 +292,6 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
     label: label to prepend to output file
     """
 
-    print("We are training the model")
-
     optimizer = Adam(learning_rate = learning_rate)
 
     if label=="cnn":
@@ -316,7 +314,6 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
         model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
         model.fit(data.train_loader, epochs=epochs, batch_size=batch_size, validation_data=data.test_loader)
         model.save(os.path.join(outdir, f"{label}.keras"))
-
 
     # extract and save features
     extracted_features, all_labels = extract_features(model, data.train_loader, label)
@@ -385,10 +382,6 @@ def extract_features(model, dataset, label):
         return extracted_features, all_labels
     else:
         if label=="cnn":
-            #for batch_data in dataset:
-            #    inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
-            #    inputs = [tf.expand_dims(pair, axis=0) for pair in inputs]
-            #extracted_features = model(inputs, return_intermediate=True)
             extracted_features = model(dataset, return_intermediate=True)
         
         else:
