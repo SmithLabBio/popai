@@ -110,6 +110,7 @@ class DataSimulator:
                     modified_matrix = np.full((sum(self.config["sampling dict"].values()),
                                                num_missing_columns), -1)
                     all_arrays[model][i] = modified_matrix
+                
 
         return all_arrays
 
@@ -167,17 +168,43 @@ class DataSimulator:
                 matrix = all_arrays[matrix_ix]
                 if len(matrix) > 0:
                     if matrix.shape[1] > self.max_sites:
-                        all_arrays[matrix_ix] = matrix[:, :self.max_sites]
+                        modified_matrix = matrix[:, :self.max_sites]
+                        #all_arrays[matrix_ix] = matrix[:, :self.max_sites]
                     elif matrix.shape[1] < self.max_sites:
                         num_missing_columns = self.max_sites - matrix.shape[1]
                         missing_columns = np.full((matrix.shape[0], num_missing_columns), -1)
                         modified_matrix = np.concatenate((matrix, missing_columns), axis=1)
-                        all_arrays[matrix_ix]  = modified_matrix
+                        #all_arrays[matrix_ix]  = modified_matrix
                 else:
                     num_missing_columns = self.max_sites - 0
                     modified_matrix = np.full((sum(self.config["sampling dict"].values()),
                                                num_missing_columns), -1)
-                    all_arrays[matrix_ix]  = modified_matrix
+                    #all_arrays[matrix_ix]  = modified_matrix
+
+                # sort matrix
+                pop_sizes = self.config["sampling dict"].values()
+                split_indices = np.cumsum(pop_sizes)[:-1]
+                groups = np.split(modified_matrix, split_indices)
+
+                # Step 2: Sort within each group by similarity to top row
+                sorted_groups = []
+                for group in groups:
+
+                    ref = group[0:1]  # top row
+                    # Compute Euclidean distances to ref
+                    dists = np.linalg.norm(group - ref, axis=1)  # shape (group_size,)
+
+                    # Sort by smallest distance (most similar first)
+                    sort_idx = np.argsort(dists)  # ascending
+
+                    # Apply sorting
+                    sorted_group = group[sort_idx]
+                    sorted_groups.append(sorted_group)
+
+                # Step 3: Recombine
+                sorted_arr = np.vstack(sorted_groups)
+                all_arrays[matrix_ix] = sorted_arr
+
             with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(key)), 'wb') as f:
                 pickle.dump(all_arrays, f)
 

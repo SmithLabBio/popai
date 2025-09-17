@@ -118,16 +118,77 @@ class CnnNpy(keras.Model):
         self.n_sites = n_sites
         self.sampling_dict = sampling_dict
         self.n_classes = n_classes
+        self.conv1 = keras.layers.Conv2D(10, (3,3), activation="relu", 
+                                         padding="valid")
+        self.conv2 = keras.layers.Conv2D(10, (3,3), activation="relu", 
+                                         padding="valid")        
+        self.flat = keras.layers.Flatten()
+        self.dense1 = keras.layers.Dense(100, activation='relu')
+        self.drop = keras.layers.Dropout(0.1)
+        self.dense2 = keras.layers.Dense(50, activation='relu')
+        self.dense3 = keras.layers.Dense(n_classes, activation="softmax")
+
+        self.pooling = keras.layers.AveragePooling2D(pool_size=(2, 2), strides=(2, 2), padding="valid")
+        self.globalpool = keras.layers.GlobalAveragePooling2D()
+
+    def call(self, x, return_intermediate=False):
+        x = tf.cast(tf.expand_dims(x, axis=-1), dtype=tf.float64) # Reshape input and cast to float dtype
+        out = self.conv1(x)
+        out = self.pooling(out)
+        out = self.conv2(out)
+        out = self.pooling(out)
+
+        out = self.flat(out)
+        out = self.dense1(out)
+        out = self.drop(out)
+        out = self.dense2(out)
+        if return_intermediate:
+            return out  # Return feature map before further processing
+ 
+        out = self.dense3(out)
+        return out
+
+    def get_config(self):
+        # For saving model
+        config = super().get_config()
+        config.update(dict(
+            n_sites=self.n_sites, 
+            sampling_dict=self.sampling_dict,
+            n_classes=self.n_classes))
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        # For reading model from file
+        n_sites = config.pop("n_sites")
+        sampling_dict = config.pop("sampling_dict")
+        n_classes = config.pop("n_classes")
+        return (cls(n_sites, sampling_dict, n_classes, **config))
+
+
+class CnnNpy_old(keras.Model):
+    """
+    CNN taking SNP alignment as input.
+    """
+    def __init__(self, n_sites: int, sampling_dict: Dict[str,int], n_classes: int, name=None, 
+                 **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.n_sites = n_sites
+        self.sampling_dict = sampling_dict
+        self.n_classes = n_classes
         self.conv0_layers = []
         self.conv1_layers = []
         self.rows = []
         for key, num_rows in sampling_dict.items():
             self.rows.append(num_rows)
-            conv_a_layer = keras.layers.Conv2D(10, (3, 1), strides=(1,1), activation="relu", padding="same")
-            conv_layer = keras.layers.Conv2D(10, (int(num_rows/2), 1), strides=(int(num_rows/2), 1), 
-                    activation="relu", padding="valid")
+            #conv_a_layer = keras.layers.Conv2D(10, (3, 1), strides=(1,1), activation="relu", padding="same")
+            #conv_layer = keras.layers.Conv2D(10, (int(num_rows/2), 1), strides=(int(num_rows/2), 1), 
+            #        activation="relu", padding="valid")
+            conv_a_layer = keras.layers.Conv2D(10, (3, 3), strides=(1,1), activation="relu", padding="same")
+            #conv_layer = keras.layers.Conv2D(10, (3,3), strides=(1, 1), 
+            #        activation="relu", padding="valid")
             self.conv0_layers.append(conv_a_layer)
-            self.conv1_layers.append(conv_layer)
+            #self.conv1_layers.append(conv_layer)
         self.conv2 = keras.layers.Conv2D(10, (len(sampling_dict), 1), activation="relu", 
                                          padding="valid")
         self.flat = keras.layers.Flatten()
@@ -151,13 +212,13 @@ class CnnNpy(keras.Model):
             #print(f"Conv 0 2D layer {i} output shape:", out.shape)
             out = self.pooling(out)
             #print(f"Pool layer {i} output shape:", out.shape)
-            out = self.conv1_layers[i](out)
+            #out = self.conv1_layers[i](out)
             #print(f"Conv 1 2D layer {i} output shape:", out.shape)
             outputs.append(out)
         out = keras.layers.concatenate(outputs, axis=1)
-        out = self.conv2(out)
+        #out = self.conv2(out)
         #print(f"Conv 2 2D layer output shape:", out.shape)
-        out = self.pool2(out)
+        #out = self.pool2(out)
         #print(f"Pool layer output shape:", out.shape)
         #out = self.globalpool(out)
         #print(f"Global pooling output shape:", out.shape)

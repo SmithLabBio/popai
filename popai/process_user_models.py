@@ -54,11 +54,17 @@ class ModelReader:
 
                 # iterate over populations and add to demogrpahy
                 for item in modelinfo["Populations"]:
-                    size_range = [float(val.strip("[").strip("]")) for val in modelinfo['Populations'][item].split(",")]
-                    initial_size = np.round(self.rng.uniform(low=size_range[0], high=size_range[1], size=1),0)[0]
-                    demography.add_population(name = item, initial_size=initial_size)
-                    active_populations.append(item)
-                    event_dict[f"pop_{item}"] = initial_size
+                    try:
+                        size_range = [float(val.strip("[").strip("]")) for val in modelinfo['Populations'][item].split(",")]
+                        initial_size = np.round(self.rng.uniform(low=size_range[0], high=size_range[1], size=1),0)[0]
+                        demography.add_population(name = item, initial_size=initial_size)
+                        active_populations.append(item)
+                        event_dict[f"pop_{item}"] = initial_size
+                    except:
+                        initial_size = event_dict[f'pop_{modelinfo["Populations"][item]}']
+                        demography.add_population(name = item, initial_size=initial_size)
+                        active_populations.append(item)
+                        event_dict[f"pop_{item}"] = initial_size
 
 
                 for item in modelinfo["Events"]:
