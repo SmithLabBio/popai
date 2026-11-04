@@ -2,8 +2,8 @@
 demographies to be used in downstream simulation."""
 
 import copy # ModelBuilder
-from itertools import chain, combinations # ModelBuilder
-import random # ModelBuilder only used for demes plotting
+import pickle # ModelBuilder: fast copies of template demographies
+from itertools import chain, combinations, product # ModelBuilder
 import logging # ModelBuilder, ModelReader
 import msprime # ModelBuilder
 import numpy as np # ModelBuilder
@@ -29,7 +29,7 @@ class ModelBuilder:
         contact, and divergence with gene flow scenarios.
 
         Parameters:
-            config_vales: the configuration info parsed using the ModelConfigParser module.
+            config_values: the configuration info parsed using the ModelConfigParser module.
 
         Returns:
             a list of base msprime demographies
@@ -94,12 +94,12 @@ class ModelBuilder:
             self.logger.info("Creating %r different models for based on user input.", total_models)
 
         except ValueError as ve:
-            raise ValueError(f"ValueError: Issue when building baseline \
-                             msprime demographies: {ve}") from ve
+            raise ValueError(f"ValueError: Issue when building baseline"
+                             f"msprime demographies: {ve}") from ve
 
         except Exception as e:
-            raise RuntimeError(f"Error: Unexpected issue when building \
-                               baseline msprime demographies: {e}") from e
+            raise RuntimeError(f"Error: Unexpected issue when building"
+                               f"baseline msprime demographies: {e}") from e
 
         return(all_divergence_demographies, all_sc_demographies, all_dwg_demographies)
 
@@ -201,12 +201,12 @@ class ModelBuilder:
 
 
         except ValueError as ve:
-            raise ValueError(f"ValueError: Issue when plotting example \
-                             msprime demographies: {ve}") from ve
+            raise ValueError(f"ValueError: Issue when plotting example"
+                             f"msprime demographies: {ve}") from ve
 
         except Exception as e:
-            raise RuntimeError(f"Unexpected Error: Issue when plotting \
-                               example msprime demographies: {e}") from e
+            raise RuntimeError(f"Unexpected Error: Issue when plotting"
+                               f"example msprime demographies: {e}") from e
 
     def _create_divergence_demographies(self, tree):
         """Create baseline divergence demographies."""
@@ -215,13 +215,8 @@ class ModelBuilder:
         pop_size_holder = 1000
         div_time_holder = 1000
 
-        # get a list of collapsable nodes, and then get all potential combos of these
-        collapsable_nodes = tree.internal_nodes()
-        all_combos = [list(combo) for r in range(1, len(collapsable_nodes) + 1) \
-                      for combo in combinations(collapsable_nodes, r)]
-
-        # remove conflicting combos, to get a list of the models to include (minus the full model)
-        all_combos = self._remove_conflicting(all_combos)
+        # get all valid combos of nodes to collapse, then add the full model
+        all_combos = self._collapse_combos(tree)
         all_combos.append([]) # add the full model
 
         # now generate the demographies for all combos
@@ -309,7 +304,7 @@ class ModelBuilder:
         return migration_demographies
 
     def _create_dwg_demographies(self, divergence_demographies, migration_matrix):
-        """Create baseline secondary contact demographies."""
+        """Create baseline divergence with gene flow demographies."""
 
         migration_demographies = []
         migtimeholder = 100
@@ -355,28 +350,30 @@ class ModelBuilder:
                 # sort the events and add the demography to the list
                 migration_demography.sort_events()
                 migration_demographies.append(migration_demography)
-                del migration_demography
 
 
         return migration_demographies
 
-    def _remove_conflicting(self, all_combos):
-        """Remove any combos of nodes to collapse that are conflicting, 
-        meaning that daughter nodes of collapsed nodes are not collapsed."""
-        keep_combos = []
+    def _collapse_combos(self, tree):
+        """List every valid set of internal nodes to collapse, excluding the empty set.
 
-        for combo in all_combos:
+        A set is valid when every collapsed node also has all of its internal
+        descendants collapsed."""
 
-            all_child_nodes = []
+        internal_nodes = tree.internal_nodes()
+        position = {node: ix for ix, node in enumerate(internal_nodes)}
 
-            for node in combo:
-                child_nodes = [child for child in node.postorder_internal_node_iter()\
-                            if child not in combo]
-                all_child_nodes.extend(child_nodes)
-            if len(all_child_nodes)==0:
-                keep_combos.append(combo)
+        def options(node):
+            if node.is_leaf():
+                return [[]]
+            collapse_clade = [list(node.postorder_internal_node_iter())]
+            keep_node = [[n for part in parts for n in part]
+                         for parts in product(*(options(c) for c in node.child_nodes()))]
+            return collapse_clade + keep_node
 
-        return keep_combos
+        combos = [sorted(c, key=position.get) for c in options(tree.seed_node) if c]
+        combos.sort(key=lambda c: (len(c), [position[n] for n in c]))
+        return combos
 
     def _get_derived_populations(self, internal_node):
         """Get the names of populations descending from an internal node."""
@@ -399,7 +396,7 @@ class ModelBuilder:
             for colname, value in row.items():
                 include = [False,False]
 
-                if index != colname and value =="T":
+                if index != colname and _allows_migration(value):
 
                     # check that the population diverged from its ancestor at a time > 0
                     for population in enumerate([index, colname]):
@@ -428,7 +425,7 @@ class ModelBuilder:
             for colname, value in row.items():
                 include = False
 
-                if index != colname and value =="T":
+                if index != colname and _allows_migration(value):
 
                     # check that the population diverged from its ancestor at a time > 0
                     for event in item.events:
@@ -456,8 +453,9 @@ class ModelBuilder:
             divergence_time_draws = self._draw_divergence_times(
                 population_size_draws, original_model, divergence_times)
 
+            template = pickle.dumps(original_model)
             for rep in range(self.config['replicates']):
-                model = copy.deepcopy(original_model)
+                model = pickle.loads(template)
                 for population in model.populations:
                     population.initial_size = population_size_draws[population.name][rep]
                 for event in model.events:
@@ -487,8 +485,9 @@ class ModelBuilder:
                 population_size_keys, original_model, population_size_draws)
             migration_stop = self._get_migration_stops(divergence_time_draws)
 
+            template = pickle.dumps(original_model)
             for rep in range(self.config['replicates']):
-                model = copy.deepcopy(original_model)
+                model = pickle.loads(template)
                 for population in model.populations:
                     population.initial_size = population_size_draws[population.name][rep]
                 for event in model.events:
@@ -502,7 +501,7 @@ class ModelBuilder:
                 model.sort_events()
                 this_model_with_parameters.append(model)
 
-            models_with_parameters.append(this_model_with_parameters)   #
+            models_with_parameters.append(this_model_with_parameters)
         return models_with_parameters
 
     def _draw_parameters_dwg(self, divergence_times, population_sizes, dwg_demographies):
@@ -523,8 +522,9 @@ class ModelBuilder:
             migration_start = self._get_migration_starts(
                 original_model, divergence_time_draws, population_size_keys)
 
+            template = pickle.dumps(original_model)
             for rep in range(self.config['replicates']):
-                model = copy.deepcopy(original_model)
+                model = pickle.loads(template)
                 for population in model.populations:
                     population.initial_size = population_size_draws[population.name][rep]
                 for event in model.events:
@@ -585,12 +585,12 @@ class ModelBuilder:
                 if event.time != 0:
                     # get the divergence times of the derived populations,
                     # and use that to set the minimum value for drawing divergence times
-                    min_values = [max(x) for x in zip(divergence_time_draws[event.derived[0]]\
-                        , divergence_time_draws[event.derived[1]], np.repeat(
-                            divergence_times[event.ancestral][0], self.config['replicates']))]
-                    divergence_time_draws[event.ancestral] = [np.round(
-                        self.rng.uniform(low=x, high=divergence_times[event.ancestral][1]),0)\
-                             for x in min_values]
+                    min_values = np.maximum.reduce([
+                        divergence_time_draws[event.derived[0]],
+                        divergence_time_draws[event.derived[1]],
+                        np.repeat(divergence_times[event.ancestral][0], self.config['replicates'])])
+                    divergence_time_draws[event.ancestral] = np.round(self.rng.uniform(
+                        low=min_values, high=divergence_times[event.ancestral][1]), 0)
                 elif event.time == 0:
                     divergence_time_draws[event.ancestral] = np.repeat(0, self.config['replicates'])
 
@@ -603,7 +603,7 @@ class ModelBuilder:
         use_nm = not all(isinstance(x, float) for x in prior)
         if use_nm:
             if not ("Nm" in prior[0] and "Nm" in prior[1]):
-                raise ValueError(f"Error: Inconsistent use of Nm in migration rate prior.")
+                raise ValueError("Error: Inconsistent use of Nm in migration rate prior.")
             low_value, high_value = float(prior[0].strip('Nm')), float(prior[1].strip('Nm'))
         else:
             low_value, high_value = prior[0], prior[1]
@@ -724,8 +724,8 @@ def _get_priors(tree):
     except (KeyError) as ke:
         raise KeyError(f"Error: Issue when getting priors from species tree: {ke}") from ke
     except Exception as e:
-        raise RuntimeError(f"Unexpected Error: Issue when getting priors from species tree: \
-                           {e}") from e
+        raise RuntimeError("Unexpected Error: Issue when getting priors from species tree: "
+                           f"{e}") from e
 
     _check_priors(tree, population_sizes, divergence_times)
 
@@ -768,3 +768,15 @@ def _divergence_model_key(demography):
     splits = frozenset((e.ancestral, frozenset(e.derived))
                        for e in demography.events if hasattr(e, 'ancestral'))
     return populations, splits
+
+def _allows_migration(value):
+    """Read one migration matrix entry. pandas keeps T/F as text but turns a matrix
+    written entirely in TRUE/FALSE into booleans, so accept both."""
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    text = str(value).strip().upper()
+    if text in ("T", "TRUE"):
+        return True
+    if text in ("F", "FALSE"):
+        return False
+    raise ValueError(f"Error: migration matrix entries must be T or F, not {value!r}.")

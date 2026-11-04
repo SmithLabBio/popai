@@ -445,3 +445,23 @@ def test_different_trees_give_no_warning(caplog):
     finally:
         logging.disable(logging.INFO)
     assert not [r for r in caplog.records if r.levelno == logging.WARNING]
+
+
+
+def _matrix_from_text(pops, allowed_text, blocked_text):
+    csv = "," + ",".join(pops) + "\n" + "\n".join(
+        p + "," + ",".join(blocked_text if p == q else allowed_text for q in pops) for p in pops)
+    return pd.read_csv(io.StringIO(csv), index_col=0)
+
+
+@pytest.mark.parametrize("allowed,blocked", [("T", "F"), ("TRUE", "FALSE"), ("true", "false")])
+def test_migration_matrix_accepts_t_and_true(allowed, blocked):
+    mig = _matrix_from_text(all_populations(TREE3), allowed, blocked)
+    _, sc, _ = ModelBuilder(make_config(migration=mig)).build_models()
+    assert len(sc[0]) == 7
+
+
+def test_unrecognized_migration_matrix_value_gives_a_clear_error():
+    mig = _matrix_from_text(all_populations(TREE3), "Y", "N")
+    with pytest.raises(ValueError, match="must be T or F"):
+        ModelBuilder(make_config(migration=mig)).build_models()
