@@ -397,3 +397,4 @@ class ModelReader:
             except:
                 event_value = self._evaluate_var(item_dict[valuetype], event_dict, 'float')
         return(event_value)
+
