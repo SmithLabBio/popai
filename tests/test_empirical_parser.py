@@ -3,6 +3,7 @@ import tempfile
 import os
 from popai.parse_input import ModelConfigParser
 from popai.process_empirical import DataProcessor
+import numpy as np
 
 class TestEmpiricalParser(unittest.TestCase):
 
@@ -50,7 +51,7 @@ popfile = ./tests/populations.txt
         config_values = parser.parse_config()
 
         data_processor = DataProcessor(config=config_values)
-        empirical_array = data_processor.fasta_to_numpy()
+        empirical_array = data_processor.fasta_to_numpy(max_sites=np.inf)
         data_processor.find_downsampling(empirical_array)
         empirical_2d_sfs = data_processor.numpy_to_2d_sfs(
             empirical_array, downsampling={"A":8, "B":6, "C":6}, replicates = 10)

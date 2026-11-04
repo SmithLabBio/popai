@@ -54,7 +54,7 @@ popfile = ./tests/populations_mini.txt
         data_processor = DataProcessor(config=config_values)
 
         # test numpy array (biallelic)
-        empirical_array = data_processor.fasta_to_numpy()
+        empirical_array = data_processor.fasta_to_numpy(max_sites=np.inf)
         arr_comp = np.array([
             [2,0,0,0],
             [0,0,1,0],
@@ -80,13 +80,13 @@ popfile = ./tests/populations_mini.txt
         # test 3D sfs without downsampling or binning
         empirical_msfs, avg_sites = data_processor.numpy_to_msfs(
             empirical_array, downsampling={"pop1":2, "pop2":4}, replicates = 1)
-        msfs_comp = np.array([0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0])
+        msfs_comp = np.array([0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0])
         npt.assert_array_equal(msfs_comp, empirical_msfs[0])
 
         # test 3D sfs without downsampling but with binning
         empirical_msfs, avg_sites = data_processor.numpy_to_msfs(
             empirical_array, downsampling={"pop1":2, "pop2":4}, replicates = 1, nbins = 2)
-        msfs_comp = np.array([2, 0, 1, 0])
+        msfs_comp = np.array([2, 1, 0, 0])
         npt.assert_array_equal(msfs_comp, empirical_msfs[0])
 
         # test 2D sfs with downsampling

@@ -252,7 +252,7 @@ class DataSimulator:
 
 
             for replicate in arrays:
-
+                replicate = replicate[:, ~(replicate >= 2).any(axis=0)]
                 # sample from arrays
                 population_arrays = []
                 for key, value in self.config["sampling dict"].items():
@@ -344,7 +344,7 @@ class DataSimulator:
                 current = current+value
 
             for replicate in arrays:
-
+                replicate = replicate[:, ~(replicate >= 2).any(axis=0)]
                 # sample from arrays
                 population_arrays = []
                 for key, value in self.config["sampling dict"].items():

@@ -61,26 +61,12 @@ class DataProcessor:
         encoded_alignments = np.array(encoded_alignments)
 
         # remove invariable columns
-        frequencies = np.array([[np.sum(encoded_alignments[:, j] == i) \
-            for i in range(0, 4)] for j in range(encoded_alignments.shape[1])])
-        invariant_columns = np.where(np.sum(frequencies == 0, axis=1) >= 3)[0]
-        filtered_alignments = np.delete(encoded_alignments, invariant_columns, axis=1)
+        filtered_alignments = _remove_invariant_columns(encoded_alignments)
 
         # concert to minor allele encoding
         encoded_array = minor_encoding(filtered_alignments)
 
-        if not maxsites == np.inf:
-            if encoded_array.shape[1] > maxsites:
-                sampled_indices = np.random.choice(encoded_array.shape[1], size=maxsites, replace=False)
-                sampled_indices.sort()
-                filtered_array = encoded_array[:, sampled_indices]
-            elif encoded_array.shape[1] < maxsites:
-                print('doing this')
-                num_missing_columns = maxsites - encoded_array.shape[1]
-                missing_columns = np.full((encoded_array.shape[0], num_missing_columns), -1)
-                filtered_array = np.concatenate((encoded_array, missing_columns), axis=1)
-        else:
-            filtered_array = encoded_array
+        filtered_array = _apply_maxsites(encoded_array, maxsites)
 
         self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
                          encoded_array.shape[1], filtered_array.shape[1])
@@ -92,16 +78,13 @@ class DataProcessor:
         """Convert VCF to numpy array."""
 
         # vcf to table
-        start_index = [i for i, item in enumerate(self.config['vcf']) if 'CHROM' in item][0]
+        start_index = [i for i, item in enumerate(self.config['vcf']) if item.startswith('#CHROM')][0]
         relevant_lines = '\n'.join(self.config['vcf'][start_index:])
-        vcf_table = pd.read_csv(io.StringIO(relevant_lines), sep="\t", index_col=False)
+        vcf_table = pd.read_csv(io.StringIO(relevant_lines), sep="\t", index_col=False, dtype=str)
 
-        # get DP index
-        format_lines = [x for x in self.config['vcf'] if 'FORMAT' in x]
-        try:
-            dp_index = [i for i, item in enumerate(format_lines) if 'DP' in item][0]
-        except:
-            dp_index = None
+        # position of DP in each site's FORMAT field (None where a site has no DP)
+        dp_positions = [fields.index('DP') if 'DP' in fields else None
+                        for fields in vcf_table['FORMAT'].astype(str).str.split(':')]
 
         encoded_alignments = []
         for population in self.config['sampling dict'].keys():
@@ -117,25 +100,29 @@ class DataProcessor:
 
                 info = vcf_table[item]
 
-                for row in info:
-                    parts = re.split(r'[|/]', row)
+                for row, dp_position in zip(info, dp_positions):
+                    fields = row.split(":")
+                    parts = re.split(r'[|/]', fields[0])
+                    if len(parts) != 2:
+                        raise ValueError(f"Error: popai expects diploid genotypes, but sample "
+                                         f"{item} has genotype '{fields[0]}'.")
                     value1 = parts[0]
-                    value2 = parts[1].split(":")[0]
-                    #value1 = row.split("|")[0]
-                    #value2 = row.split("|")[1].split(":")[0]
-                    if not dp_index is None:
-                        dp = row.split(":")[dp_index]
+                    value2 = parts[1]
+
+                    # read depth, if this site records it (trailing fields may be left off)
+                    if dp_position is not None and dp_position < len(fields):
+                        dp = fields[dp_position]
                     else:
-                        dp =10
+                        dp = None
 
-                    if (value1 != "." or value2 != ".") and dp != '0':
-
-                        encoded_string_1.append(int(value1))
-                        encoded_string_2.append(int(value2))
-
-                    else:
+                    # a genotype with no reads is missing; otherwise encode each allele,
+                    # with -1 for a missing allele (e.g. ./1)
+                    if dp == '0':
                         encoded_string_1.append(-1)
                         encoded_string_2.append(-1)
+                    else:
+                        encoded_string_1.append(-1 if value1 == "." else int(value1))
+                        encoded_string_2.append(-1 if value2 == "." else int(value2))
 
                 encoded_alignments.append(encoded_string_1)
                 encoded_alignments.append(encoded_string_2)
@@ -150,17 +137,7 @@ class DataProcessor:
 
         encoded_array = minor_encoding(filtered_alignments)
 
-        if not maxsites == np.inf:
-            if encoded_array.shape[1] > maxsites:
-                filtered_array = encoded_array[:, :maxsites]
-            elif encoded_array.shape[1] < maxsites:
-                num_missing_columns = maxsites - encoded_array.shape[1]
-                missing_columns = np.full((encoded_array.shape[0], num_missing_columns), -1)
-                filtered_array = np.concatenate((encoded_array, missing_columns), axis=1)
-            else:
-                filtered_array = encoded_array
-        else:
-            filtered_array = encoded_array
+        filtered_array = _apply_maxsites(encoded_array, maxsites)
 
         self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
                          encoded_array.shape[1], filtered_array.shape[1])
@@ -271,13 +248,13 @@ class DataProcessor:
                     # sample random sites
                     if len(site_data_pop1) > downsampling[key[0]]:
                         site_data_pop1_sampled = [list(self.rng.choice(site_data_pop1, \
-                            downsampling[key[0]])) for m in range(replicates)]
+                            downsampling[key[0]], replace=False)) for m in range(replicates)]
                     else:
                         site_data_pop1_sampled = [site_data_pop1]*replicates
 
                     if len(site_data_pop2) > downsampling[key[1]]:
                         site_data_pop2_sampled = [list(self.rng.choice(site_data_pop2, \
-                            downsampling[key[1]])) for m in range(replicates)]
+                            downsampling[key[1]], replace=False)) for m in range(replicates)]
                     else:
                         site_data_pop2_sampled = [site_data_pop2]*replicates
 
@@ -364,28 +341,29 @@ class DataProcessor:
                 if (len(set(site_data)) == 2 and -1 not in site_data) \
                     or (len(set(site_data)) == 3 and -1 in site_data): # if it is > 1, keep going
 
-                    # get minor allele
-                    minor_allele = 1
-
-                    # find poulation counts
-                    counts_per_population = {}
+                    # downsample each population without replacement, ignoring missing data
+                    downsampled = {}
                     for population in self.config['sampling dict'].keys():
-
                         site_data_pop = site_data[sampling_indices[population][0]:
                                                 sampling_indices[population][1]]
-
-                        if downsampling != self.config['sampling dict']:
-                            site_data_pop = [x for x in site_data_pop if not x == -1]
+                        site_data_pop = [x for x in site_data_pop if x != -1]
+                        if len(site_data_pop) > downsampling[population]:
                             site_data_pop = list(self.rng.choice(site_data_pop, \
-                                downsampling[population]))
+                                downsampling[population], replace=False))
+                        downsampled[population] = site_data_pop
 
-                        counts_per_population[population] = Counter(site_data_pop)[minor_allele]
+                    # skip sites that are no longer variable after downsampling
+                    all_site_data = [x for values in downsampled.values() for x in values]
+                    if len(set(all_site_data)) != 2:
+                        continue
 
-                    string_for_count = [x for x in list(counts_per_population.values())]
-                    if sum(string_for_count) != 0:
-                        string_for_count = [str(x) for x in string_for_count]
-                        combo_key = '_'.join(string_for_count)
-                        rep_sfs_dict[combo_key]+=1
+                    # get the minor allele after downsampling (same rule as simulate_data)
+                    minor_allele = min(set(all_site_data), key=all_site_data.count)
+
+                    # count the minor allele in each population and add to the sfs
+                    combo_key = '_'.join(str(Counter(values)[minor_allele])
+                                         for values in downsampled.values())
+                    rep_sfs_dict[combo_key] += 1
 
             # convert SFS to binned
             if not nbins is None:
@@ -415,4 +393,21 @@ class DataProcessor:
         print(f"We used an average of {average_sites} to construct the mSFS.")
 
         return(all_sfs, average_sites)
-    
+
+def _remove_invariant_columns(encoded_alignments):
+    """Remove sites (columns) with fewer than two different alleles, ignoring missing data (-1)."""
+    missing = encoded_alignments == -1
+    largest = np.where(missing, -1, encoded_alignments).max(axis=0)
+    smallest = np.where(missing, np.iinfo(encoded_alignments.dtype).max, encoded_alignments).min(axis=0)
+    return encoded_alignments[:, smallest < largest]
+
+def _apply_maxsites(encoded_array, maxsites):
+    """Keep the first maxsites SNPs, or pad with missing data (-1) up to maxsites,
+    as simulate_data does for simulated data. maxsites=np.inf keeps every SNP."""
+    if encoded_array.shape[1] > maxsites:
+        return encoded_array[:, :maxsites]
+    if encoded_array.shape[1] < maxsites and maxsites != np.inf:
+        num_missing_columns = maxsites - encoded_array.shape[1]
+        missing_columns = np.full((encoded_array.shape[0], num_missing_columns), -1)
+        return np.concatenate((encoded_array, missing_columns), axis=1)
+    return encoded_array
