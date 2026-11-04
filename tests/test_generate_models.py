@@ -465,3 +465,33 @@ def test_unrecognized_migration_matrix_value_gives_a_clear_error():
     mig = _matrix_from_text(all_populations(TREE3), "Y", "N")
     with pytest.raises(ValueError, match="must be T or F"):
         ModelBuilder(make_config(migration=mig)).build_models()
+
+TREE3_MIXED_NE = ("((A[&ne=10000-50000],B[&ne=10000-50000])AB[&ne=20000-60000,div=10000-50000],"
+                  "C[&ne=5000-9000])ABC[&ne=10000-50000,div=100000-500000];")
+
+
+def _warnings_from_drawing(config, caplog):
+    logging.disable(logging.NOTSET)
+    try:
+        with caplog.at_level(logging.WARNING, logger="popai.generate_models"):
+            build(config)
+    finally:
+        logging.disable(logging.INFO)
+    return [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+
+
+def test_constant_ne_warns_about_ignored_ne_priors(caplog):
+    config = make_config(trees=(TREE3_MIXED_NE,), **{"constant Ne": True})
+    warnings = _warnings_from_drawing(config, caplog)
+    assert len(warnings) == 1
+    assert "Ne prior for A (10000-50000)" in warnings[0]
+    assert "given for AB, C are ignored" in warnings[0]
+
+
+def test_constant_ne_with_matching_priors_gives_no_warning(caplog):
+    assert _warnings_from_drawing(make_config(**{"constant Ne": True}), caplog) == []
+
+
+def test_variable_ne_gives_no_ne_warning(caplog):
+    config = make_config(trees=(TREE3_MIXED_NE,), **{"constant Ne": False})
+    assert _warnings_from_drawing(config, caplog) == []
