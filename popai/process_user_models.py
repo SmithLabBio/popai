@@ -385,11 +385,11 @@ class ModelReader:
                         if item_dict['event'] == "symmetric_migration":
                             destpop0 = event_dict[f"pop_{item_dict['populations'][0]}"]
                             destpop1 = event_dict[f"pop_{item_dict['populations'][1]}"]
-                            rate0 = unscaled / destpop0
-                            rate1 = unscaled / destpop1
+                            rate0 = unscaled / destpop1
+                            rate1 = unscaled / destpop0
                             event_value = [rate0,rate1]
                         elif item_dict['event'] == "asymmetric_migration":
-                            destpop = event_dict[f"pop_{item_dict['dest']}"]
+                            destpop = event_dict[f"pop_{item_dict['source']}"]
                             event_value = unscaled / destpop
 
                     else:

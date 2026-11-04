@@ -9,7 +9,6 @@ import msprime # ModelBuilder
 import numpy as np # ModelBuilder
 import demesdraw # ModelBuilder
 import matplotlib.pyplot as plt # ModelBuilder
-#import yaml # ModelWriter
 from matplotlib.backends.backend_pdf import PdfPages
 
 class ModelBuilder:
@@ -41,7 +40,8 @@ class ModelBuilder:
         try:
 
             all_divergence_demographies = []
-            flat_divergence_demographies = []
+            seen_divergence_models = set()
+            full_model_trees = {}
             all_sc_demographies = []
             all_dwg_demographies = []
             total_models = 0
@@ -51,9 +51,23 @@ class ModelBuilder:
                 # get baseline divergence demographies
                 divergence_demographies = self._create_divergence_demographies(tree)
 
+
+                # warn if this tree is identical to an earlier one (the full model,
+                # with no nodes collapsed, is the last one in the list)
+                full_key = _divergence_model_key(divergence_demographies[-1])
+                if full_key in full_model_trees:
+                    self.logger.warning(
+                        "Species trees %d and %d are identical (same topology and node "
+                        "labels). Tree %d adds no new models, and its priors and migration "
+                        "matrix are ignored.", full_model_trees[full_key] + 1, ix + 1, ix + 1)
+                else:
+                    full_model_trees[full_key] = ix
+
                 to_keep = []
                 for item in divergence_demographies:
-                    if not item in flat_divergence_demographies:
+                    key = _divergence_model_key(item)
+                    if key not in seen_divergence_models:
+                        seen_divergence_models.add(key)
                         to_keep.append(item)
                 divergence_demographies = to_keep
 
@@ -73,7 +87,6 @@ class ModelBuilder:
                     + len(dwg_demographies)
                 
                 # add demographies to list
-                flat_divergence_demographies.extend(divergence_demographies)
                 all_divergence_demographies.append(divergence_demographies)
                 all_sc_demographies.append(sc_demographies)
                 all_dwg_demographies.append(dwg_demographies)
@@ -330,9 +343,9 @@ class ModelBuilder:
                     populationpair=list(populationpair)
                     # if symmetric true, then add symmetric migration and add ceasing of migration
                     if self.config['symmetric']:
-                        migration_demography.add_symmetric_migration_rate_change(
+                        migration_demography.add_migration_rate_change(time=migtimeholder, \
                             source=populationpair[0], dest=populationpair[1], rate=migrateholder)
-                        migration_demography.add_symmetric_migration_rate_change(
+                        migration_demography.add_migration_rate_change(time=migtimeholder, \
                             source=populationpair[1], dest=populationpair[0], rate=migrateholder)
                     # if not symmetric then do asymmetric
                     else:
@@ -486,9 +499,6 @@ class ModelBuilder:
                 for key in migration_rate_draws:
                     model.migration_matrix[int(str(key.split('_')[0])),int(str(key.split('_')[1]))]\
                         = migration_rate_draws[key][rep]
-                    if self.config["symmetric"]:
-                        model.migration_matrix[int(str(key.split('_')[1])),int(str(key.split('_')\
-                            [0]))] = migration_rate_draws[key][rep]
                 model.sort_events()
                 this_model_with_parameters.append(model)
 
@@ -509,7 +519,7 @@ class ModelBuilder:
             divergence_time_draws = self._draw_divergence_times(
                 population_size_draws, original_model, divergence_times)
             migration_rate_draws = self._draw_migration_rates(
-                population_size_keys, original_model)
+                population_size_keys, original_model, population_size_draws)
             migration_start = self._get_migration_starts(
                 original_model, divergence_time_draws, population_size_keys)
 
@@ -521,15 +531,9 @@ class ModelBuilder:
                     if hasattr(event, 'ancestral'):
                         event.time = divergence_time_draws[event.ancestral][rep]
                     elif hasattr(event, 'rate'):
-                        if self.config['symmetric']:
-                            event.time = migration_start[\
-                                f"{population_size_keys[event.populations[0]]}_{population_size_keys[event.populations[1]]}"][rep]
-                            event.rate = migration_rate_draws[\
-                                f"{population_size_keys[event.populations[0]]}_{population_size_keys[event.populations[1]]}"][rep]
-                        else:
-                            event.time = migration_start[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"][rep]
-                            event.rate = migration_rate_draws[f"\
-                                                    {population_size_keys[event.source]}_{population_size_keys[event.dest]}"][rep]
+                        key = f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"
+                        event.time = migration_start[key][rep]
+                        event.rate = migration_rate_draws[key][rep]
 
                 model.sort_events()
                 this_model_with_parameters.append(model)
@@ -595,28 +599,32 @@ class ModelBuilder:
     def _draw_migration_rates(self, population_size_keys, model, population_size_draws):
         """Draw migration rates from priors."""
 
-        migration_rate_draws = {}
+        prior = self.config["migration rate"]
+        use_nm = not all(isinstance(x, float) for x in prior)
+        if use_nm:
+            if not ("Nm" in prior[0] and "Nm" in prior[1]):
+                raise ValueError(f"Error: Inconsistent use of Nm in migration rate prior.")
+            low_value, high_value = float(prior[0].strip('Nm')), float(prior[1].strip('Nm'))
+        else:
+            low_value, high_value = prior[0], prior[1]
+
+        draws = {}
+        directions = []
         for event in model.events:
             if hasattr(event, 'rate'):
+                pair = frozenset((event.source, event.dest)) if self.config['symmetric'] \
+                    else (event.source, event.dest)
+                draws[pair] = np.round(self.rng.uniform(
+                    low=low_value, high=high_value, size=self.config["replicates"]), 10)
+                directions.append((event.source, event.dest, pair))
 
-                if not all(isinstance(x,float) for x in self.config["migration rate"]):
-                    if ("Nm" in self.config["migration rate"][0] and "Nm" in self.config["migration rate"][1]):
-                        low_value = float(self.config["migration rate"][0].strip('Nm'))
-                        high_value = float(self.config["migration rate"][1].strip('Nm'))
-                        raw_nm_values = \
-                                np.round(self.rng.uniform(low=low_value, high=high_value, \
-                                size=self.config["replicates"]),10)
-                        migration_rate_draws[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"] = \
-                                raw_nm_values / population_size_draws[event.dest]
-
-                    else:
-                        raise ValueError(f"Error: Inconsistent use of Nm in migration rate prior.")
-
-                else:
-                    migration_rate_draws[f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"] = np.round(
-                            self.rng.uniform(low=self.config["migration rate"][0],\
-                                high=self.config["migration rate"][1], \
-                                    size=self.config["replicates"]),10)
+        migration_rate_draws = {}
+        for source, dest, pair in directions:
+            key = f"{population_size_keys[source]}_{population_size_keys[dest]}"
+            if use_nm:
+                migration_rate_draws[key] = draws[pair] / population_size_draws[source]
+            else:
+                migration_rate_draws[key] = draws[pair]
         return migration_rate_draws
 
     def _get_migration_stops(self, divergence_time_draws):
@@ -643,10 +651,7 @@ class ModelBuilder:
             for event in model.events:
 
                 if hasattr(event, 'rate'):
-                    if self.config['symmetric']:
-                        daughter1, daughter2 = event.populations
-                    else:
-                        daughter1, daughter2 = event.source, event.dest
+                    daughter1, daughter2 = event.source, event.dest
 
                     for divevent in model.events:
                         if hasattr(divevent, 'ancestral'):
@@ -722,5 +727,44 @@ def _get_priors(tree):
         raise RuntimeError(f"Unexpected Error: Issue when getting priors from species tree: \
                            {e}") from e
 
+    _check_priors(tree, population_sizes, divergence_times)
+
+
     return(population_sizes, divergence_times)
 
+def _check_priors(tree, population_sizes, divergence_times):
+    """Raise a clear error for priors that cannot produce a valid model."""
+
+    for name, (low, high) in population_sizes.items():
+        if not 0 < low <= high:
+            raise ValueError(f"Error: Ne prior for {name} ({low}-{high}) must be positive, "
+                             "with the minimum no larger than the maximum.")
+
+    for name, (low, high) in divergence_times.items():
+        if not 0 <= low <= high:
+            raise ValueError(f"Error: divergence time prior for {name} ({low}-{high}) must be "
+                             "non-negative, with the minimum no larger than the maximum.")
+
+    # an ancestor is drawn between its oldest child's time and its own maximum,
+    # so no child may have a maximum older than its ancestor's maximum
+    for node in tree.postorder_internal_node_iter():
+        parent = node.parent_node
+        if parent is None:
+            continue
+        child_name = node.label.strip("'")
+        parent_name = parent.label.strip("'")
+        child_max = divergence_times[child_name][1]
+        parent_max = divergence_times[parent_name][1]
+        if child_max > parent_max:
+            raise ValueError(
+                f"Error: the divergence time prior for {child_name} (maximum {child_max}) "
+                f"is older than the maximum for its ancestor {parent_name} ({parent_max}), "
+                f"so {parent_name} could be drawn younger than {child_name}. Raise the "
+                f"maximum for {parent_name} or lower the maximum for {child_name}.")
+
+def _divergence_model_key(demography):
+    """Structure of a divergence model, independent of population and event order."""
+    populations = frozenset(p.name for p in demography.populations)
+    splits = frozenset((e.ancestral, frozenset(e.derived))
+                       for e in demography.events if hasattr(e, 'ancestral'))
+    return populations, splits
