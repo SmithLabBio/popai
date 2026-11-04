@@ -3,7 +3,7 @@ demographies to be used in downstream simulation."""
 
 import copy # ModelBuilder
 import pickle # ModelBuilder: fast copies of template demographies
-from itertools import chain, combinations, product # ModelBuilder
+from itertools import combinations, product # ModelBuilder
 import logging # ModelBuilder, ModelReader
 import msprime # ModelBuilder
 import numpy as np # ModelBuilder
@@ -130,13 +130,17 @@ class ModelBuilder:
 
             # get priors
             population_sizes, divergence_times = _get_priors(tree)
+            if self.config['constant Ne']:
+                self._warn_ignored_ne_priors(ix, population_sizes)
+
             # draw parameters for each type of model, numbering models consecutively
-            for draw, models in [(self._draw_parameters_divergence, divergence_demographies[ix]),
-                                 (self._draw_parameters_sc, sc_demographies[ix]),
-                                 (self._draw_parameters_dwg, dwg_demographies[ix])]:
+            for kind, models in [("divergence", divergence_demographies[ix]),
+                                 ("secondary contact", sc_demographies[ix]),
+                                 ("gene flow", dwg_demographies[ix])]:
                 if len(models) == 0:
                     continue
-                parameterized = draw(divergence_times, population_sizes, models)
+                parameterized = self._draw_model_parameters(
+                    divergence_times, population_sizes, models, kind)
                 for replicates in parameterized:
                     labels.extend([labelcount] * len(replicates))
                     sp_tree_index.extend([ix] * len(replicates))
@@ -213,112 +217,54 @@ class ModelBuilder:
 
     def _create_sc_demographies(self, divergence_demographies, migration_matrix):
         """Create baseline secondary contact demographies."""
-
-        migration_demographies = []
-        migtimeholder = 100
-        migrateholder = 1e-3
-
-        # iterate over demographies
-        for item in divergence_demographies:
-
-            # list of events to include
-            to_include = sorted(set(self._find_sc_to_include(item, migration_matrix)))
-
-            # keep only one per pair if symmetric rates are enforced
-            if self.config['symmetric']:
-                to_include_frozensets = []
-                for pair in to_include:
-                    sorted_pair = sorted(pair)
-                    to_include_frozensets.append(tuple(sorted_pair))
-
-                to_include = sorted(set(to_include_frozensets))
-
-            # get all combos of events
-            combos_of_migration = chain.from_iterable(combinations(to_include, r) for r in \
-                range(1, min(self.config['max migration events'],len(to_include)) + 1))
-            combos_of_migration = [list(combo) for combo in combos_of_migration]
-
-            # create histories with each combo of events
-            for combo in combos_of_migration:
-                migration_demography = copy.deepcopy(item)
-
-                for populationpair in combo:
-                    populationpair=list(populationpair)
-
-                    # if symmetric true, then add symmetric migration and add ceasing of migration
-                    if self.config['symmetric']:
-                        migration_demography.set_migration_rate(
-                            source=populationpair[0], dest=populationpair[1], rate=migrateholder)
-                        migration_demography.add_migration_rate_change(time=migtimeholder, \
-                            source=populationpair[0], dest=populationpair[1], rate=0)
-                        migration_demography.set_migration_rate(
-                            source=populationpair[1], dest=populationpair[0], rate=migrateholder)
-                        migration_demography.add_migration_rate_change(time=migtimeholder, \
-                            source=populationpair[1], dest=populationpair[0], rate=0)
-
-                    # if not symmetric then do asymmetric
-                    else:
-                        migration_demography.set_migration_rate(
-                            source=populationpair[0], dest=populationpair[1], rate=migrateholder)
-                        migration_demography.add_migration_rate_change(time=migtimeholder, \
-                            source=populationpair[0], dest=populationpair[1], rate=0)
-
-                # sort the events and add the demography to the list
-                migration_demography.sort_events()
-                migration_demographies.append(migration_demography)
-
-        return migration_demographies
+        return self._create_migration_demographies(divergence_demographies, migration_matrix,
+            self._find_sc_to_include, self._add_sc_migration)
 
     def _create_dwg_demographies(self, divergence_demographies, migration_matrix):
         """Create baseline divergence with gene flow demographies."""
+        return self._create_migration_demographies(divergence_demographies, migration_matrix,
+            self._find_dwg_to_include, self._add_dwg_migration)
+
+    def _create_migration_demographies(self, divergence_demographies, migration_matrix,
+                                       find_pairs, add_migration):
+        """For each divergence model, make one copy per combination of allowed
+        migration events (up to 'max migration events'). find_pairs lists the allowed
+        (source, dest) pairs; add_migration adds one direction of migration."""
 
         migration_demographies = []
-        migtimeholder = 100
-        migrateholder = 1e-3
 
-        # iterate over demographies
         for item in divergence_demographies:
 
-            # list of events to include
-            to_include = sorted(set(self._find_dwg_to_include(item, migration_matrix)))
-
-            # keep only one per pair if symmetric rates are enforced
+            # list of events to include, keeping one per pair if symmetric rates are enforced
+            to_include = sorted(set(find_pairs(item, migration_matrix)))
             if self.config['symmetric']:
-                to_include_frozensets = []
-                for pair in to_include:
-                    sorted_pair = sorted(pair)
-                    to_include_frozensets.append(tuple(sorted_pair))
-
-                to_include = sorted(set(to_include_frozensets))
-
-            # get all combos of events
-            combos_of_migration = chain.from_iterable(combinations(to_include, r) for r in \
-                range(1, min(self.config['max migration events'],len(to_include)) + 1))
-            combos_of_migration = [list(combo) for combo in combos_of_migration]
+                to_include = sorted({tuple(sorted(pair)) for pair in to_include})
 
             # create histories with each combo of events
-            for combo in combos_of_migration:
-                migration_demography = copy.deepcopy(item)
-
-                for populationpair in combo:
-                    populationpair=list(populationpair)
-                    # if symmetric true, then add symmetric migration and add ceasing of migration
-                    if self.config['symmetric']:
-                        migration_demography.add_migration_rate_change(time=migtimeholder, \
-                            source=populationpair[0], dest=populationpair[1], rate=migrateholder)
-                        migration_demography.add_migration_rate_change(time=migtimeholder, \
-                            source=populationpair[1], dest=populationpair[0], rate=migrateholder)
-                    # if not symmetric then do asymmetric
-                    else:
-                        migration_demography.add_migration_rate_change(time=migtimeholder, \
-                            source=populationpair[0], dest=populationpair[1], rate=migrateholder)
-
-                # sort the events and add the demography to the list
-                migration_demography.sort_events()
-                migration_demographies.append(migration_demography)
-
+            max_events = min(self.config['max migration events'], len(to_include))
+            for n_events in range(1, max_events + 1):
+                for combo in combinations(to_include, n_events):
+                    migration_demography = copy.deepcopy(item)
+                    for pair in combo:
+                        directions = [pair, pair[::-1]] if self.config['symmetric'] else [pair]
+                        for source, dest in directions:
+                            add_migration(migration_demography, source, dest)
+                    migration_demography.sort_events()
+                    migration_demographies.append(migration_demography)
 
         return migration_demographies
+
+    def _add_sc_migration(self, demography, source, dest):
+        """Secondary contact: migration from the present back to a stop time.
+        The rate and stop time are placeholders, set when parameters are drawn."""
+        demography.set_migration_rate(source=source, dest=dest, rate=1e-3)
+        demography.add_migration_rate_change(time=100, source=source, dest=dest, rate=0)
+
+    def _add_dwg_migration(self, demography, source, dest):
+        """Divergence with gene flow: migration from a start time back to the split of
+        the two populations' ancestor, where msprime ends it. The rate and start time
+        are placeholders, set when parameters are drawn."""
+        demography.add_migration_rate_change(time=100, source=source, dest=dest, rate=1e-3)
 
     def _collapse_combos(self, tree):
         """List every valid set of internal nodes to collapse, excluding the empty set.
@@ -384,7 +330,7 @@ class ModelBuilder:
 
                 if index != colname and _allows_migration(value):
 
-                    # check that the populations are sister
+                    # check that the two populations are sisters
                     for event in item.events:
                         if index in event.derived and colname in event.derived:
                             include = True
@@ -395,53 +341,41 @@ class ModelBuilder:
 
         return to_include
 
-    def _draw_parameters_divergence(self, divergence_times, population_sizes, \
-                                    divergence_demographies):
-        """Draw parameters for divergence models."""
+    def _warn_ignored_ne_priors(self, tree_index, population_sizes):
+        """With constant Ne, every population uses the first population's Ne prior.
+        Warn if the tree gives other populations different priors."""
+        first = next(iter(population_sizes))
+        ignored = [name for name, prior in population_sizes.items()
+                   if prior != population_sizes[first]]
+        if ignored:
+            low, high = population_sizes[first]
+            self.logger.warning(
+                "Species tree %d: 'constant Ne' is on, so all populations use the Ne prior "
+                "for %s (%d-%d). The different Ne priors given for %s are ignored.",
+                tree_index + 1, first, low, high, ", ".join(ignored))
+
+    def _draw_model_parameters(self, divergence_times, population_sizes, base_models, kind):
+        """Draw parameters for every replicate of each base model.
+        kind is 'divergence', 'secondary contact' or 'gene flow'."""
 
         models_with_parameters = []
 
-        for original_model in divergence_demographies:
-
-            this_model_with_parameters = []
+        for original_model in base_models:
 
             population_size_draws, population_size_keys = self._draw_population_sizes(
                 original_model, population_sizes)
             divergence_time_draws = self._draw_divergence_times(
-                population_size_draws, original_model, divergence_times)
-
-            template = pickle.dumps(original_model)
-            for rep in range(self.config['replicates']):
-                model = pickle.loads(template)
-                for population in model.populations:
-                    population.initial_size = population_size_draws[population.name][rep]
-                for event in model.events:
-                    if hasattr(event, 'ancestral'):
-                        event.time = divergence_time_draws[event.ancestral][rep]
-                model.sort_events()
-                this_model_with_parameters.append(model)
-
-            models_with_parameters.append(this_model_with_parameters)
-
-        return models_with_parameters
-
-    def _draw_parameters_sc(self, divergence_times, population_sizes, sc_demographies):
-        """Draw parameters for secondary contact models."""
-
-        models_with_parameters = []
-
-        for original_model in sc_demographies:
+                original_model, divergence_times)
+            if kind != "divergence":
+                migration_rate_draws = self._draw_migration_rates(
+                    population_size_keys, original_model, population_size_draws)
+            if kind == "secondary contact":
+                migration_stop = self._get_migration_stops(divergence_time_draws)
+            elif kind == "gene flow":
+                migration_start = self._get_migration_starts(
+                    original_model, divergence_time_draws, population_size_keys)
 
             this_model_with_parameters = []
-
-            population_size_draws, population_size_keys = \
-                self._draw_population_sizes(original_model, population_sizes)
-            divergence_time_draws = self._draw_divergence_times(
-                population_size_draws, original_model, divergence_times)
-            migration_rate_draws = self._draw_migration_rates(
-                population_size_keys, original_model, population_size_draws)
-            migration_stop = self._get_migration_stops(divergence_time_draws)
-
             template = pickle.dumps(original_model)
             for rep in range(self.config['replicates']):
                 model = pickle.loads(template)
@@ -450,48 +384,15 @@ class ModelBuilder:
                 for event in model.events:
                     if hasattr(event, 'ancestral'):
                         event.time = divergence_time_draws[event.ancestral][rep]
-                    elif hasattr(event, 'rate'):
-                        event.time = migration_stop[rep]
-                for key in migration_rate_draws:
-                    model.migration_matrix[int(str(key.split('_')[0])),int(str(key.split('_')[1]))]\
-                        = migration_rate_draws[key][rep]
-                model.sort_events()
-                this_model_with_parameters.append(model)
-
-            models_with_parameters.append(this_model_with_parameters)
-        return models_with_parameters
-
-    def _draw_parameters_dwg(self, divergence_times, population_sizes, dwg_demographies):
-        """Draw parameters for divergence with gene flow models."""
-
-        models_with_parameters = []
-
-        for original_model in dwg_demographies:
-
-            this_model_with_parameters = []
-
-            population_size_draws, population_size_keys = self._draw_population_sizes(
-                original_model, population_sizes)
-            divergence_time_draws = self._draw_divergence_times(
-                population_size_draws, original_model, divergence_times)
-            migration_rate_draws = self._draw_migration_rates(
-                population_size_keys, original_model, population_size_draws)
-            migration_start = self._get_migration_starts(
-                original_model, divergence_time_draws, population_size_keys)
-
-            template = pickle.dumps(original_model)
-            for rep in range(self.config['replicates']):
-                model = pickle.loads(template)
-                for population in model.populations:
-                    population.initial_size = population_size_draws[population.name][rep]
-                for event in model.events:
-                    if hasattr(event, 'ancestral'):
-                        event.time = divergence_time_draws[event.ancestral][rep]
-                    elif hasattr(event, 'rate'):
-                        key = f"{population_size_keys[event.source]}_{population_size_keys[event.dest]}"
-                        event.time = migration_start[key][rep]
+                    elif kind == "secondary contact" and hasattr(event, 'rate'):
+                        event.time = migration_stop[rep] # when migration ends
+                    elif kind == "gene flow" and hasattr(event, 'rate'):
+                        key = (population_size_keys[event.source], population_size_keys[event.dest])
+                        event.time = migration_start[key][rep] # when migration begins
                         event.rate = migration_rate_draws[key][rep]
-
+                if kind == "secondary contact":
+                    for (source, dest), rates in migration_rate_draws.items():
+                        model.migration_matrix[source, dest] = rates[rep]
                 model.sort_events()
                 this_model_with_parameters.append(model)
 
@@ -522,13 +423,13 @@ class ModelBuilder:
 
         return(population_size_draws, population_size_keys)
 
-    def _draw_divergence_times(self, population_size_draws, model, divergence_times):
+    def _draw_divergence_times(self, model, divergence_times):
         """Draw divergence times from priors."""
 
         divergence_time_draws = {}
 
         # create a list of populations that are never ancestors
-        all_populations = population_size_draws.keys()
+        all_populations = [population.name for population in model.populations]
         ancestral = [x for x in model.events if hasattr(x, 'ancestral')]
         ancestral = [x.ancestral for x in ancestral]
         non_ancestral = list(set(all_populations)- set(ancestral))
@@ -539,15 +440,14 @@ class ModelBuilder:
 
         for event in model.events:
             if hasattr(event, 'ancestral'):
-                if event.time != 0:
-                    # get the divergence times of the derived populations,
-                    # and use that to set the minimum value for drawing divergence times
-                    min_values = np.maximum.reduce([
-                        divergence_time_draws[event.derived[0]],
-                        divergence_time_draws[event.derived[1]],
-                        np.repeat(divergence_times[event.ancestral][0], self.config['replicates'])])
-                    divergence_time_draws[event.ancestral] = np.round(self.rng.uniform(
-                        low=min_values, high=divergence_times[event.ancestral][1]), 0)
+                # get the divergence times of the derived populations,
+                # and use that to set the minimum value for drawing divergence times
+                min_values = np.maximum.reduce([
+                    divergence_time_draws[event.derived[0]],
+                    divergence_time_draws[event.derived[1]],
+                    np.repeat(divergence_times[event.ancestral][0], self.config['replicates'])])
+                divergence_time_draws[event.ancestral] = np.round(self.rng.uniform(
+                    low=min_values, high=divergence_times[event.ancestral][1]), 0)
 
         return divergence_time_draws
 
@@ -575,7 +475,7 @@ class ModelBuilder:
 
         migration_rate_draws = {}
         for source, dest, pair in directions:
-            key = f"{population_size_keys[source]}_{population_size_keys[dest]}"
+            key = (population_size_keys[source], population_size_keys[dest])
             if use_nm:
                 migration_rate_draws[key] = draws[pair] / population_size_draws[source]
             else:
@@ -583,44 +483,30 @@ class ModelBuilder:
         return migration_rate_draws
 
     def _get_migration_stops(self, divergence_time_draws):
-        """Get stop times for migration in the secondary contact models."""
+        """Get stop times for migration in the secondary contact models:
+        half the most recent divergence time in each replicate."""
 
-        minimum_divergence = []
-        for rep in range(self.config["replicates"]):
-            min_div = np.inf
-            for key in divergence_time_draws:
-                if divergence_time_draws[key][rep] > 0 and \
-                    divergence_time_draws[key][rep] < min_div:
-                    min_div = divergence_time_draws[key][rep]
-            minimum_divergence.append(min_div)
-        migration_stop = [np.ceil(x/2) for x in minimum_divergence]
-        return migration_stop
+        times = np.array(list(divergence_time_draws.values()), dtype=float)
+        most_recent = np.where(times > 0, times, np.inf).min(axis=0)
+        return np.ceil(most_recent / 2)
 
     def _get_migration_starts(self, model, divergence_time_draws, population_size_keys):
-        """Get start times for migration in the divergence with gene flow models."""
+        """Get start times for migration in the divergence with gene flow models:
+        halfway between the more recent of the two daughters' own splits and the
+        split of their ancestor."""
+
+        parent = {derived: event.ancestral for event in model.events
+                  if hasattr(event, 'ancestral') for derived in event.derived}
 
         migration_start = {}
-
-        for rep in range(self.config['replicates']):
-
-            for event in model.events:
-
-                if hasattr(event, 'rate'):
-                    daughter1, daughter2 = event.source, event.dest
-
-                    for divevent in model.events:
-                        if hasattr(divevent, 'ancestral'):
-                            if daughter1 in divevent.derived and daughter2 in divevent.derived:
-                                ancestor = divevent.ancestral
-
-                    tdiv_ancestor = divergence_time_draws[ancestor][rep]
-                    tdiv_daughter1 = divergence_time_draws[daughter1][rep]
-                    tdiv_daughter2 = divergence_time_draws[daughter2][rep]
-                    startime = ((tdiv_ancestor-max(tdiv_daughter1, tdiv_daughter2))/2) \
-                        + max(tdiv_daughter1, tdiv_daughter2)
-
-                    key = f"{population_size_keys[daughter1]}_{population_size_keys[daughter2]}"
-                    migration_start.setdefault(key, []).append(startime)
+        for event in model.events:
+            if hasattr(event, 'rate'):
+                daughter1, daughter2 = event.source, event.dest
+                t_ancestor = np.asarray(divergence_time_draws[parent[daughter1]])
+                t_daughters = np.maximum(divergence_time_draws[daughter1],
+                                         divergence_time_draws[daughter2])
+                key = (population_size_keys[daughter1], population_size_keys[daughter2])
+                migration_start[key] = (t_ancestor - t_daughters) / 2 + t_daughters
 
         return migration_start
 
