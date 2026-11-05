@@ -1,33 +1,47 @@
-import unittest
-import tempfile
+"""Empirical data read through the config parser (parse_input -> process_empirical).
+
+test_empirical_parser_v2.py builds its configs by hand. These tests instead read the
+small data files in tests/ through ModelConfigParser, so they also check how the
+parser loads the popfile, FASTA folder and VCF, orders populations in the sampling
+dict, and turns VCF samples into haplotypes.
+
+Run with:  python -m pytest tests/test_empirical_parser_config.py
+"""
+
+import logging
 import os
+from collections import OrderedDict
+from itertools import product
+
+import numpy as np
+import pytest
+
 from popai.parse_input import ModelConfigParser
 from popai.process_empirical import DataProcessor
-import numpy as np
 
-class TestEmpiricalParser(unittest.TestCase):
+logging.disable(logging.INFO)
 
-    """Test the empirical data processor module."""
+TESTS = os.path.dirname(os.path.abspath(__file__))
 
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.temp_config_file = os.path.join(self.temp_dir.name, 'test_config.ini')
 
-        # Create a sample config file for testing
-        with open(self.temp_config_file, 'w', encoding='utf-8') as f:
-            f.write("""
+def parse(tmp_path, popfile, alignments=None, vcf=None, tree="species_tree_mini.nex",
+          migration="migration_mini.txt"):
+    """Write a config for the given test files, parse it, and return the config values."""
+    data = (f"alignments = {os.path.join(TESTS, alignments)}/" if alignments else
+            f"alignments = None\nvcf = {os.path.join(TESTS, vcf)}")
+    config = f"""
 [Model]
-species tree file = ./tests/species_tree.nex
-migration matrix = ./tests/migration.txt
+species tree file = {os.path.join(TESTS, tree)}
+migration matrix = {os.path.join(TESTS, migration)}
 symmetric = True
 secondary contact = True
 divergence with gene flow = False
-max migration events = 2
+max migration events = 1
 migration rate = U(1e-5, 1e-4)
-constant Ne = True # population sizes equal across all populations
+constant Ne = True
 
 [Other]
-output directory = ./examples/test
+output directory = {tmp_path}
 seed = 1234
 replicates = 10
 
@@ -36,39 +50,141 @@ mutation rate = U(1e-8, 1e-7)
 substitution model = JC69
 
 [Data]
-alignments = ./tests/alignments/
-popfile = ./tests/populations.txt
-
-            """)
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    def test_empirical_data(self):
-
-        """Ensure we correctly parse empirical data."""
-        parser = ModelConfigParser(self.temp_config_file)
-        config_values = parser.parse_config()
-
-        data_processor = DataProcessor(config=config_values)
-        empirical_array = data_processor.fasta_to_numpy(maxsites=np.inf)
-        data_processor.find_downsampling(empirical_array)
-        empirical_2d_sfs = data_processor.numpy_to_2d_sfs(
-            empirical_array, downsampling={"A":8, "B":6, "C":6}, replicates = 10)
-        empirical_msfs, sites = data_processor.numpy_to_msfs(
-            empirical_array, downsampling={"A":8, "B": 6, "C":6}, replicates = 10)
-        empirical_msfs_binned, sites_binned = data_processor.numpy_to_msfs(
-            empirical_array, downsampling={"A":8, "B": 6, "C":6}, replicates = 10, nbins=4)
+{data}
+popfile = {os.path.join(TESTS, popfile)}
+"""
+    path = os.path.join(tmp_path, "config.txt")
+    with open(path, "w") as f:
+        f.write(config)
+    return ModelConfigParser(path).parse_config()
 
 
-        self.assertEqual(len(empirical_2d_sfs), 10)
-        self.assertEqual(len(empirical_msfs), 10)
-        self.assertEqual(empirical_2d_sfs[0][('A','B')].shape, (9,7))
-        self.assertEqual(empirical_2d_sfs[0][('A','C')].shape, (9,7))
-        self.assertEqual(empirical_2d_sfs[0][('C','B')].shape, (7,7))
-        self.assertEqual(empirical_msfs[0].shape, (9*7*7,))
-        self.assertEqual(empirical_msfs_binned[0].shape, (4*4*4,))
-        self.assertEqual(empirical_array.shape, (30,1038))
+def nonzero_cells(msfs, sizes):
+    cells = ["_".join(map(str, c)) for c in product(*(range(n + 1) for n in sizes))]
+    return {cell: int(v) for cell, v in zip(cells, msfs) if v}
 
-if __name__ == '__main__':
-    unittest.main()
+
+# ---------------------------------------------------------------------------
+# The mini datasets: 6 haplotypes, pop2 (4) listed before pop1 (2)
+# ---------------------------------------------------------------------------
+# FASTA (populations_mini.txt): n0, n1 in pop1; n2-n5 in pop2, one sequence each.
+# VCF (populations_mini_vcf.txt): n0 in pop1; n1, n2 in pop2, two haplotypes each.
+# The sampling dict comes from value_counts(), so the larger population, pop2,
+# comes first, and rows are pop2's haplotypes, then pop1's.
+#
+# Variable sites, rows n2 n3 n4 n5 | n0 n1 (FASTA) or n1a n1b n2a n2b | n0a n0b (VCF),
+# recoded so 0 is the most common allele (ties: the allele seen first):
+#   site 1: FASTA  - A A A | T T   -> -1 0 0 0 1 1   (n2 has a gap)
+#           VCF    . . 1 1 | 0 0   -> -1 -1 0 0 1 1 (n1 missing)
+#   site 2: T T T T | C T          ->  0 0 0 0 1 0
+#   site 3: T C C C | T T  (3-3)   ->  0 1 1 1 0 0
+#   site 4: T T G G | T T          ->  0 0 1 1 0 0
+FASTA_ARRAY = np.array([[-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 1], [0, 0, 1, 1],
+                        [1, 1, 0, 0], [1, 0, 0, 0]])
+VCF_ARRAY = np.array([[-1, 0, 0, 0], [-1, 0, 1, 0], [0, 0, 1, 1], [0, 0, 1, 1],
+                      [1, 1, 0, 0], [1, 0, 0, 0]])
+# The multiallelic versions replace site 1 with G A A A | T T (FASTA) or 2 1 1 1 | 0 0
+# (VCF): three alleles, recoded A/1 -> 0, T/0 -> 1, G/2 -> 2.
+MULTIALLELIC_ARRAY = np.array([[2, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 1], [0, 0, 1, 1],
+                               [1, 1, 0, 0], [1, 0, 0, 0]])
+
+MINI = {
+    "fasta": dict(popfile="populations_mini.txt", alignments="mini_dataset"),
+    "vcf": dict(popfile="populations_mini_vcf.txt", vcf="mini_dataset/alignment.vcf"),
+    "fasta, multiallelic": dict(popfile="populations_mini.txt",
+                                alignments="mini_dataset_multiallelic"),
+    "vcf, multiallelic": dict(popfile="populations_mini_vcf.txt",
+                              vcf="mini_dataset_multiallelic/alignment.vcf"),
+}
+EXPECTED_ARRAY = {"fasta": FASTA_ARRAY, "vcf": VCF_ARRAY,
+                  "fasta, multiallelic": MULTIALLELIC_ARRAY,
+                  "vcf, multiallelic": MULTIALLELIC_ARRAY}
+
+
+def to_numpy(config):
+    dp = DataProcessor(config)
+    if "vcf" in config:
+        return dp, dp.vcf_to_numpy(np.inf)
+    return dp, dp.fasta_to_numpy(np.inf)
+
+
+def test_fasta_config(tmp_path):
+    config = parse(tmp_path, **MINI["fasta"])
+    assert config["sampling dict"] == OrderedDict([("pop2", 4), ("pop1", 2)])
+    assert list(config["sampling dict"]) == ["pop2", "pop1"]
+    assert config["population dictionary"] == {
+        "n0": "pop1", "n1": "pop1", "n2": "pop2", "n3": "pop2", "n4": "pop2", "n5": "pop2"}
+
+
+def test_vcf_config_counts_two_haplotypes_per_sample(tmp_path):
+    config = parse(tmp_path, **MINI["vcf"])
+    assert list(config["sampling dict"].items()) == [("pop2", 4), ("pop1", 2)]
+    assert config["population dictionary"] == {
+        "n0_a": "pop1", "n0_b": "pop1", "n1_a": "pop2", "n1_b": "pop2",
+        "n2_a": "pop2", "n2_b": "pop2"}
+
+
+@pytest.mark.parametrize("dataset", list(MINI))
+def test_mini_dataset_array(tmp_path, dataset):
+    _, arr = to_numpy(parse(tmp_path, **MINI[dataset]))
+    np.testing.assert_array_equal(arr, EXPECTED_ARRAY[dataset])
+
+
+@pytest.mark.parametrize("dataset", list(MINI))
+def test_mini_dataset_sfs_without_downsampling(tmp_path, dataset):
+    # Site 1 never counts: it has missing data in pop2 (so it can't give 4 alleles) or,
+    # in the multiallelic data, three alleles. The other sites, as minor-allele counts
+    # in pop2_pop1 (site 3 is a tie, so allele 0 is counted): 0_1, 1_2, 2_0.
+    dp, arr = to_numpy(parse(tmp_path, **MINI[dataset]))
+    downsampling = {"pop1": 2, "pop2": 4}
+    msfs, _ = dp.numpy_to_msfs(arr, downsampling)
+    assert nonzero_cells(msfs[0], [4, 2]) == {"0_1": 1, "1_2": 1, "2_0": 1}
+    sfs_2d = dp.numpy_to_2d_sfs(arr, downsampling)[0]
+    assert list(sfs_2d) == [("pop2", "pop1")]
+    assert sfs_2d[("pop2", "pop1")].sum() == 3
+
+
+# ---------------------------------------------------------------------------
+# A larger, three-population FASTA dataset (tests/alignments, populations.txt)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def three_populations(tmp_path_factory):
+    config = parse(tmp_path_factory.mktemp("three_pops"), popfile="populations.txt",
+                   alignments="alignments", tree="species_tree.nex", migration="migration.txt")
+    dp = DataProcessor(config)
+    return config, dp, dp.fasta_to_numpy(np.inf)
+
+
+def test_three_populations_config_and_array(three_populations):
+    config, _, arr = three_populations
+    # 12 A, 10 C and 8 B individuals, ordered largest first
+    assert list(config["sampling dict"].items()) == [("A", 12), ("C", 10), ("B", 8)]
+    assert len(config["fastas"]) == 10
+    assert arr.shape == (30, 1038)
+
+
+def test_three_populations_downsampling_options(three_populations):
+    _, dp, arr = three_populations
+    options = dp.find_downsampling(arr)
+    assert (8, 6, 6) in options   # sizes for A, C, B
+    assert all(all(size % 2 == 0 for size in key) for key in options)
+    assert options[(12, 10, 8)] <= options[(8, 6, 6)] <= arr.shape[1]
+
+
+def test_three_populations_sfs(three_populations):
+    _, dp, arr = three_populations
+    downsampling = {"A": 8, "B": 6, "C": 6}
+    sfs_2d = dp.numpy_to_2d_sfs(arr, downsampling, replicates=2)
+    assert len(sfs_2d) == 2
+    assert {key: s.shape for key, s in sfs_2d[0].items()} == {
+        ("A", "C"): (9, 7), ("A", "B"): (9, 7), ("C", "B"): (7, 7)}
+    msfs, sites = dp.numpy_to_msfs(arr, downsampling, replicates=2)
+    assert len(msfs) == 2 and msfs[0].shape == (9 * 7 * 7,)
+    assert 0 < sites <= arr.shape[1]
+    # folded across all three populations: at most half of the 20 sampled alleles
+    for cell in nonzero_cells(msfs[0], [8, 6, 6]):
+        assert 0 < sum(map(int, cell.split("_"))) <= 10
+    binned, _ = dp.numpy_to_msfs(arr, downsampling, replicates=2, nbins=4)
+    assert binned[0].shape == (4 * 4 * 4,)
+    assert binned[0].sum() > 0   # separate random draws, so totals differ a little from msfs
