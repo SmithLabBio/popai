@@ -51,7 +51,7 @@ popfile = ./tests/populations.txt
         config_values = parser.parse_config()
 
         data_processor = DataProcessor(config=config_values)
-        empirical_array = data_processor.fasta_to_numpy(max_sites=np.inf)
+        empirical_array = data_processor.fasta_to_numpy(maxsites=np.inf)
         data_processor.find_downsampling(empirical_array)
         empirical_2d_sfs = data_processor.numpy_to_2d_sfs(
             empirical_array, downsampling={"A":8, "B":6, "C":6}, replicates = 10)

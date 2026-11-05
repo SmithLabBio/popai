@@ -55,7 +55,7 @@ vcf = ./tests/mini_dataset/alignment.vcf
         data_processor = DataProcessor(config=config_values)
 
         # test numpy array (biallelic)
-        empirical_array = data_processor.vcf_to_numpy(max_sites=np.inf)
+        empirical_array = data_processor.vcf_to_numpy(maxsites=np.inf)
 
         # NOTE::WHY DOES THIS SEEM WRONG!? CHECK FASTA TEST
         arr_comp = np.array([

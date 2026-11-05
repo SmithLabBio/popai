@@ -54,7 +54,7 @@ popfile = ./tests/populations_mini.txt
         data_processor = DataProcessor(config=config_values)
 
         # test numpy array (biallelic)
-        empirical_array = data_processor.fasta_to_numpy(max_sites=np.inf)
+        empirical_array = data_processor.fasta_to_numpy(maxsites=np.inf)
         arr_comp = np.array([
             [2,0,0,0],
             [0,0,1,0],

@@ -130,10 +130,7 @@ class DataProcessor:
         encoded_alignments = np.array(encoded_alignments)
 
         # remove invariable columns
-        frequencies = np.array([[np.sum(encoded_alignments[:, j] == i) \
-            for i in range(0, 4)] for j in range(encoded_alignments.shape[1])])
-        invariant_columns = np.where(np.sum(frequencies == 0, axis=1) >= 3)[0]
-        filtered_alignments = np.delete(encoded_alignments, invariant_columns, axis=1)
+        filtered_alignments = _remove_invariant_columns(encoded_alignments)
 
         encoded_array = minor_encoding(filtered_alignments)
 
