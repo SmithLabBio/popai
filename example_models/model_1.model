@@ -4,7 +4,11 @@ B=[10000,50000]
 C=[10000,50000]
 AB=[10000,50000]
 ABC=[10000,50000]
-
+[Migration]
+   matrix =
+           A	B
+       A	0	[1e-5,1e-4]
+       B	[1e-5,1e-4]	0
 [Events]
 div_AB = split{time=[10000,20000], descendants=[A,B], ancestor=AB}
 div_ABC = split{time=[50000,100000], descendants=[AB,C], ancestor=ABC}
