@@ -600,59 +600,9 @@ class ModelReader:
         return(result)
 
     def _get_event_value(self, item_dict, event_dict, valuetype):
-        
-        
-        if isinstance(item_dict[valuetype], list):
-            
-            if valuetype=='time' or valuetype=='start' or valuetype=='stop' or valuetype=='size':
-                minval = self._evaluate_var(item_dict[valuetype][0], event_dict, 'int')
-                maxval = self._evaluate_var(item_dict[valuetype][1], event_dict, 'int')
-                event_value = self.rng.uniform(low=minval, high=maxval, size=1)[0]
-                event_value = np.round(event_value,0)
-            elif valuetype=='rate' or valuetype=='prop':
-                if "Nm" in item_dict["rate"][0] and "Nm" in item_dict["rate"][1]:
-                    minval = float(item_dict["rate"][0].strip("Nm"))
-                    maxval = float(item_dict["rate"][1].strip("Nm"))
-                    unscaled = self.rng.uniform(low=minval, high=maxval, size=1)[0]
-                    if item_dict['event'] == "symmetric_migration":
-                        destpop0 = event_dict[f"pop_{item_dict['populations'][0]}"]
-                        destpop1 = event_dict[f"pop_{item_dict['populations'][1]}"]
-                        rate0 = unscaled / destpop1
-                        rate1 = unscaled / destpop0
-                        event_value = [rate0,rate1]
-                    elif item_dict['event'] == "asymmetric_migration":
-                        destpop = event_dict[f"pop_{item_dict['source']}"]
-                        event_value = unscaled / destpop
-                else:
-                    minval = self._evaluate_var(item_dict[valuetype][0], event_dict, 'float')
-                    maxval = self._evaluate_var(item_dict[valuetype][1], event_dict, 'float')
-                    unscaled = self.rng.uniform(low=minval, high=maxval, size=1)[0]
-                    if item_dict['event'] == "symmetric_migration":
-                        event_value = [unscaled, unscaled]
-                    else:
-                        event_value = unscaled                
-        
-        else:
-            try:
-                event_value = item_dict[valuetype]
-                if valuetype=='time' or valuetype=='start' or valuetype=='stop' or valuetype=='size':
-                    event_value = int(event_value)
-                elif valuetype=='rate' or valuetype=='prop':
-                    if "Nm" in item_dict["rate"]:
-                        unscaled = float(item_dict["rate"].strip("Nm"))
-                        if item_dict['event'] == "symmetric_migration":
-                            destpop0 = event_dict[f"pop_{item_dict['populations'][0]}"]
-                            destpop1 = event_dict[f"pop_{item_dict['populations'][1]}"]
-                            rate0 = unscaled / destpop1
-                            rate1 = unscaled / destpop0
-                            event_value = [rate0,rate1]
-                        elif item_dict['event'] == "asymmetric_migration":
-                            destpop = event_dict[f"pop_{item_dict['source']}"]
-                            event_value = unscaled / destpop
-
-                    else:
-                        event_value = float(event_value)
-            except:
-                event_value = self._evaluate_var(item_dict[valuetype], event_dict, 'float')
-        return(event_value)
-
+        """Draw a time, size, growth rate, or proportion. A fixed value or expression is used
+        as it is; a [min,max] range is drawn uniformly, rounded for times and sizes."""
+        low, high = self._value_range(item_dict, event_dict, valuetype)
+        if valuetype in ('time', 'size'):
+            return self._draw_time(low, high)
+        return low if low == high else self.rng.uniform(low=low, high=high, size=1)[0]
