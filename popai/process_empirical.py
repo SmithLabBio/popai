@@ -1,16 +1,13 @@
 """This module contains the Class for processing empirical data."""
 import logging
-import itertools
-from collections import Counter, OrderedDict
 from itertools import product
-import copy
 import os
 import io
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from popai.utils import minor_encoding
-import re
+
 class DataProcessor:
 
     """Process empirical data."""
@@ -29,49 +26,25 @@ class DataProcessor:
 
         """Convert a list of fasta files into a numpy array."""
 
-        # dictionary for encoding
-        integer_encoding_dict = {"A": 0, "T": 1, "C": 2, "G": 3}
+        # bases are encoded A=0, T=1, C=2, G=3; anything else (N, gaps, ambiguity codes) is -1
+        lookup = np.full(256, -1, dtype=np.int64)
+        for base, code in {"A": 0, "T": 1, "C": 2, "G": 3}.items():
+            lookup[ord(base)] = code
 
-        # list for storing results
-        encoded_alignments = []
+        # one row per sample, ordered by population; a sample absent from an alignment
+        # is missing data for that alignment
+        rows = []
+        for sample in self._samples_in_order("population dictionary"):
+            print(f"Processing sample {sample}...")
+            row = []
+            for alignment in self.config["fastas"]:
+                if sample in alignment:
+                    row.append(lookup[np.frombuffer(str(alignment[sample]).encode(), dtype=np.uint8)])
+                else:
+                    row.append(np.full(alignment.max_sequence_size, -1, dtype=np.int64))
+            rows.append(np.concatenate(row))
 
-        # iterate over populations and create ordered numpy array
-        for population in self.config["sampling dict"].keys():
-
-            # get all samples from that population/species
-            samples_from_population = [key for key, value in \
-                self.config["population dictionary"].items() if value == population]
-
-            for item in samples_from_population:
-
-                encoded_string = []
-
-                for alignment in self.config["fastas"]:
-                    if item in alignment:
-                        encoded_string_current = np.array(self._encode_string(
-                            string=str(alignment[item]), encoding_dict=integer_encoding_dict))
-                    else:
-                        encoded_string_current = [-1]*alignment.max_sequence_size
-
-                    encoded_string.extend(encoded_string_current)
-
-                encoded_alignments.append(encoded_string)
-
-        # convert to numpy array
-        encoded_alignments = np.array(encoded_alignments)
-
-        # remove invariable columns
-        filtered_alignments = _remove_invariant_columns(encoded_alignments)
-
-        # concert to minor allele encoding
-        encoded_array = minor_encoding(filtered_alignments)
-
-        filtered_array = _apply_maxsites(encoded_array, maxsites)
-
-        self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
-                         encoded_array.shape[1], filtered_array.shape[1])
-
-        return filtered_array
+        return self._finish_array(np.array(rows), maxsites)
 
     def vcf_to_numpy(self, maxsites):
 
@@ -81,214 +54,104 @@ class DataProcessor:
         start_index = [i for i, item in enumerate(self.config['vcf']) if item.startswith('#CHROM')][0]
         relevant_lines = '\n'.join(self.config['vcf'][start_index:])
         vcf_table = pd.read_csv(io.StringIO(relevant_lines), sep="\t", index_col=False, dtype=str)
+        samples = self._samples_in_order("original population dictionary")
+        n_sites = len(vcf_table)
 
-        # position of DP in each site's FORMAT field (None where a site has no DP)
-        dp_positions = [fields.index('DP') if 'DP' in fields else None
+        # split every genotype into its colon-separated fields (sites x samples, flattened;
+        # an empty cell counts as missing)
+        cells = [cell.split(":") if isinstance(cell, str) else ["./."]
+                 for cell in vcf_table[samples].to_numpy().ravel()]
+
+        # read depth, from DP's position in each site's own FORMAT field (trailing fields
+        # may be left off, and some sites may not record DP at all)
+        dp_positions = [fields.index('DP') if 'DP' in fields else -1
                         for fields in vcf_table['FORMAT'].astype(str).str.split(':')]
+        dp_position = np.repeat(dp_positions, len(samples)).tolist()
+        no_reads = np.fromiter((0 <= dp < len(fields) and fields[dp] == '0'
+                                for fields, dp in zip(cells, dp_position)),
+                               dtype=bool, count=len(cells))
 
-        encoded_alignments = []
-        for population in self.config['sampling dict'].keys():
+        # alleles, parsed once for each distinct genotype (0/1, 1|1, ./. ...)
+        codes, genotypes = pd.factorize(np.array([fields[0] for fields in cells], dtype=object))
+        alleles = np.empty((len(genotypes), 2), dtype=np.int64)
+        for ix, genotype in enumerate(genotypes):
+            parts = genotype.replace("|", "/").split("/")
+            if len(parts) != 2:
+                sample = samples[np.nonzero(codes == ix)[0][0] % len(samples)]
+                raise ValueError(f"Error: popai expects diploid genotypes, but sample "
+                                 f"{sample} has genotype '{genotype}'.")
+            alleles[ix] = [-1 if allele == "." else int(allele) for allele in parts]
+        haplotypes = alleles[codes]                       # (sites * samples) x 2
+        haplotypes[no_reads] = -1                         # a genotype with no reads is missing
 
-            # get all samples for that poulation/species
-            samples_from_population = [key for key, value in \
-                self.config["original population dictionary"].items() if value == population]
-
-            for item in samples_from_population:
-
-                encoded_string_1 = []
-                encoded_string_2 = []
-
-                info = vcf_table[item]
-
-                for row, dp_position in zip(info, dp_positions):
-                    fields = row.split(":")
-                    parts = re.split(r'[|/]', fields[0])
-                    if len(parts) != 2:
-                        raise ValueError(f"Error: popai expects diploid genotypes, but sample "
-                                         f"{item} has genotype '{fields[0]}'.")
-                    value1 = parts[0]
-                    value2 = parts[1]
-
-                    # read depth, if this site records it (trailing fields may be left off)
-                    if dp_position is not None and dp_position < len(fields):
-                        dp = fields[dp_position]
-                    else:
-                        dp = None
-
-                    # a genotype with no reads is missing; otherwise encode each allele,
-                    # with -1 for a missing allele (e.g. ./1)
-                    if dp == '0':
-                        encoded_string_1.append(-1)
-                        encoded_string_2.append(-1)
-                    else:
-                        encoded_string_1.append(-1 if value1 == "." else int(value1))
-                        encoded_string_2.append(-1 if value2 == "." else int(value2))
-
-                encoded_alignments.append(encoded_string_1)
-                encoded_alignments.append(encoded_string_2)
-
-        encoded_alignments = np.array(encoded_alignments)
-
-        # remove invariable columns
-        filtered_alignments = _remove_invariant_columns(encoded_alignments)
-
-        encoded_array = minor_encoding(filtered_alignments)
-
-        filtered_array = _apply_maxsites(encoded_array, maxsites)
-
-        self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
-                         encoded_array.shape[1], filtered_array.shape[1])
-
-        return filtered_array
-
-    def _encode_string(self, string, encoding_dict):
-        encoded_string = []
-        for char in string:
-            if char in encoding_dict:
-                encoded_string.append(encoding_dict[char])
-            else:
-                encoded_string.append(-1)
-        return encoded_string
+        # rows: each sample's two haplotypes, samples ordered by population
+        encoded = haplotypes.reshape(n_sites, len(samples), 2).transpose(1, 2, 0)
+        return self._finish_array(encoded.reshape(2 * len(samples), n_sites), maxsites)
 
     def find_downsampling(self, encoded_alignment):
-        """This function will convert an empirical alignment to a site frequency spectrum.
-        It needs to deal with missing data in an intelligent way (e.g., downsampling)."""
+        """For each combination of even sample sizes (one per population), count the sites
+        with at least that many called alleles in every population."""
 
-        sampled = 0
-        pop_failure_masks = []
+        sizes = list(self.config['sampling dict'].values())
+        pairs = [(block != -1).sum(axis=0) // 2 for block in self._population_blocks(encoded_alignment)]
 
-        for population in self.config['sampling dict'].values():
-            this_array = encoded_alignment[sampled:sampled+population,:]
-            mask = this_array == -1
-            count_minus_ones = np.sum(mask, axis=0)
-            failure_masks = {population-j: (count_minus_ones <= j) \
-                             for j in range(population)}
-            pop_failure_masks.append(failure_masks)
-            sampled += population
-        all_combinations = itertools.product(*pop_failure_masks)
+        # sites_with[k1, k2, ...]: number of sites with at least 2*k1 called alleles in the
+        # first population, 2*k2 in the second, and so on
+        sites_with = np.zeros([n // 2 + 1 for n in sizes], dtype=np.int64)
+        np.add.at(sites_with, tuple(pairs), 1)
+        for axis in range(len(sizes)):
+            sites_with = np.flip(np.cumsum(np.flip(sites_with, axis), axis=axis), axis)
+
         results = {}
-        for thresholds in all_combinations:
-            if all(value % 2 == 0 for value in thresholds):
-                thethresholds = [pop_failure_masks[j][thresholds[j]] \
-                                 for j in range(len(pop_failure_masks))]
-                combined_mask = np.logical_and.reduce(thethresholds)
-                results[thresholds] = np.sum(combined_mask)
-        results = {key: value for key, value in results.items() if value != 0}
-
+        for thresholds in product(*(range(n - n % 2, 0, -2) for n in sizes)):
+            count = sites_with[tuple(t // 2 for t in thresholds)]
+            if count != 0:
+                results[thresholds] = count
         return results
 
     def numpy_to_2d_sfs(self, encoded_alignment, downsampling, replicates = 1):
 
         """Convert numpy array to 2d SFS."""
 
-        # check that using even values
-        key_even = all(value % 2 == 0 for value in downsampling.values())
-        if not key_even:
-            raise ValueError("Error in downampling, all keys must be even.")
-
-        # get indices for samples
-        current = 0
-        sampling_indices = {}
-        for key, value in self.config["sampling dict"].items():
-            sampling_indices[key] = [current, value + current]
-            current = current+value
-
-        # remove columns that do not meet thresholds
-        sampled = 0
-        pop_failure_masks = []
-        for name, population in self.config["sampling dict"].items():
-            this_array = encoded_alignment[sampled:sampled+population,:]
-            mask = this_array==-1
-            count_minus_ones = np.sum(mask, axis=0)
-            failure_mask = count_minus_ones <= population - downsampling[name]
-            pop_failure_masks.append(failure_mask)
-            sampled += population
-        combined_mask = np.logical_and.reduce(pop_failure_masks)
-        filtered_encoded_alignment = encoded_alignment[:,combined_mask]
-
-        # create empty sfs
-        # iterate over each pair of populations
+        _check_even(downsampling)
         populations = list(self.config["sampling dict"].keys())
-        sfs_2d = {}
-        sfs_list = []
-        for i, pop1 in enumerate(populations):
-            for j, pop2 in enumerate(populations):
-                if i < j:
-                    # create an empty 2D numpy array with the correct shape
-                    array_shape = (downsampling[pop1]+1, downsampling[pop2]+1)
-                    sfs_2d[(pop1, pop2)] = np.zeros(array_shape)
+        pairs = [(pop1, pop2) for i, pop1 in enumerate(populations)
+                 for pop2 in populations[i + 1:]]
+        sites = self._usable_sites(encoded_alignment, downsampling)
 
-        # conver to list of sfs, one per replicate
         sfs_list = []
         for _ in range(replicates):
-            sfs_list.append(copy.deepcopy(sfs_2d))
+            # downsample each population once per replicate; count the higher-coded allele
+            counts = self._downsampled_counts(sites, downsampling)
+            print(counts)
+            sfs_2d = {}
+            for pop1, pop2 in pairs:
+                total = downsampling[pop1] + downsampling[pop2]
+                count1, count2 = counts[pop1], counts[pop2]
+                both = count1 + count2
 
-        for site in range(filtered_encoded_alignment.shape[1]): # iterate over sites
-            site_data = list(filtered_encoded_alignment[:,site]) # get the data for that site
+                # keep sites with two alleles in these populations; count the minor allele,
+                # choosing at random when the two are equally common
+                variable = (both > 0) & (both < total)
+                tie = 2 * both == total
+                use_other = (2 * both > total) | (tie & (self.rng.random(len(both)) < 0.5))
+                count1 = np.where(use_other, downsampling[pop1] - count1, count1)[variable]
+                count2 = np.where(use_other, downsampling[pop2] - count2, count2)[variable]
 
-            if (len(set(site_data)) == 2 and -1 not in site_data) or \
-                (len(set(site_data)) == 3 and -1 in site_data): # if it is > 1, keep going
-
-                for key, value in sfs_2d.items(): # iterate over population pairs
-
-                    # get the site data for those two populations
-                    site_data_pop1 = site_data[sampling_indices[key[0]][0]:
-                                               sampling_indices[key[0]][1]]
-                    site_data_pop2 = site_data[sampling_indices[key[1]][0]:
-                                               sampling_indices[key[1]][1]]
-
-
-                    # remove negative ones
-                    site_data_pop1 = [x for x in site_data_pop1 if not x == -1]
-                    site_data_pop2 = [x for x in site_data_pop2 if not x == -1]
-
-                    # sample random sites
-                    if len(site_data_pop1) > downsampling[key[0]]:
-                        site_data_pop1_sampled = [list(self.rng.choice(site_data_pop1, \
-                            downsampling[key[0]], replace=False)) for m in range(replicates)]
-                    else:
-                        site_data_pop1_sampled = [site_data_pop1]*replicates
-
-                    if len(site_data_pop2) > downsampling[key[1]]:
-                        site_data_pop2_sampled = [list(self.rng.choice(site_data_pop2, \
-                            downsampling[key[1]], replace=False)) for m in range(replicates)]
-                    else:
-                        site_data_pop2_sampled = [site_data_pop2]*replicates
-
-                    
-                    for k in range(replicates):
-                        all_site_data = site_data_pop1_sampled[k]+site_data_pop2_sampled[k]
-
-                        # check that this site has two variants in these populations
-                        if len(set(all_site_data)) == 2:
-                            # get minor allele
-                            counter = Counter(all_site_data)
-                            min_count = min(counter.values())
-                            least_common_numbers = [num for num, cnt in counter.items() if cnt == min_count]
-                            minor_allele = self.rng.choice(least_common_numbers)
-                            #print(minor_allele)
-                            # find counts in each population
-                            pop1_count = Counter(site_data_pop1_sampled[k])[minor_allele]
-                            pop2_count = Counter(site_data_pop2_sampled[k])[minor_allele]
-                            #print(pop1_count, pop2_count)
-                            # add to the sfs
-                            sfs_list[k][key][pop1_count, pop2_count] += 1
-
+                sfs = np.zeros((downsampling[pop1] + 1, downsampling[pop2] + 1))
+                np.add.at(sfs, (count1, count2), 1)
+                sfs_2d[(pop1, pop2)] = sfs
+            sfs_list.append(sfs_2d)
 
         return sfs_list
 
     def plot_2dsfs(self, sfs_list, output_directory):
         """Plot average 2 dimensional Site frequency spectra."""
 
-        averages = {}
         for key in sfs_list[0].keys():
-            arrays = [d[key] for d in sfs_list]
-            average_array  = np.mean(arrays, axis=0)
-            averages[key] = average_array
-        # Create heatmaps
-        for key, value in averages.items():
+            average = np.mean([d[key] for d in sfs_list], axis=0)
             outfile  = os.path.join(output_directory, f"2D_SFS_{key}_empirical.png")
-            plt.imshow(value, cmap='viridis', origin="lower")
+            plt.imshow(average, cmap='viridis', origin="lower")
             plt.colorbar()  # Add colorbar to show scale
             plt.title(f"2D SFS {key}")
             plt.savefig(outfile)
@@ -298,98 +161,96 @@ class DataProcessor:
 
         """Convert numpy array to multidimensional site frequency spectra"""
 
-        # check that using even values
-        key_even = all(value % 2 == 0 for value in downsampling.values())
-        if not key_even:
-            raise ValueError("Error in downampling, all keys must be even.")
+        _check_even(downsampling)
+        populations = list(self.config["sampling dict"].keys())
+        sizes = [downsampling[population] for population in populations]
+        total = sum(sizes)
+
+        # with binning, each count maps to the smallest bin edge at or above it
+        # (edges per population: floor(size / nbins * (x + 1)) for x = 0 .. nbins - 1)
+        if nbins is None:
+            to_cell = [np.arange(size + 1) for size in sizes]
+            shape = [size + 1 for size in sizes]
+        else:
+            to_cell, shape = [], []
+            for size in sizes:
+                edges = np.unique([int(np.floor(size / nbins * (x + 1))) for x in range(nbins)])
+                to_cell.append(np.searchsorted(edges, np.arange(size + 1)))
+                shape.append(len(edges))
+
+        sites = self._usable_sites(encoded_alignment, downsampling)
 
         all_sfs = []
-
-
-        # get indices for samples
-        current = 0
-        sampling_indices = {}
-        for key, value in self.config["sampling dict"].items():
-            sampling_indices[key] = [current, value + current]
-            current = current+value
-        reordered_downsampling = OrderedDict({key: downsampling[key] for key in self.config["sampling dict"]})
-
-        # remove columns that do not meet thresholds
-        sampled = 0
-        pop_failure_masks = []
-        for name, population in self.config["sampling dict"].items():
-            this_array = encoded_alignment[sampled:sampled+population,:]
-            mask = this_array==-1
-            count_minus_ones = np.sum(mask, axis=0)
-            failure_mask = count_minus_ones <= population - downsampling[name]
-            pop_failure_masks.append(failure_mask)
-            sampled += population
-        combined_mask = np.logical_and.reduce(pop_failure_masks)
-        filtered_encoded_alignment = encoded_alignment[:,combined_mask]
-
         for _ in range(replicates):
+            counts = self._downsampled_counts(sites, downsampling)
+            both = sum(counts.values())
 
-            # Generate all possible combinations of counts per population
-            combos = product(*(range(count + 1) for count in reordered_downsampling.values()))
-            rep_sfs_dict = OrderedDict({'_'.join(map(str, combo)): 0 for combo in combos})
-
-            for site in range(filtered_encoded_alignment.shape[1]): # iterate over sites
-                site_data = list(filtered_encoded_alignment[:,site]) # get the data for that site
-                if (len(set(site_data)) == 2 and -1 not in site_data) \
-                    or (len(set(site_data)) == 3 and -1 in site_data): # if it is > 1, keep going
-
-                    # downsample each population without replacement, ignoring missing data
-                    downsampled = {}
-                    for population in self.config['sampling dict'].keys():
-                        site_data_pop = site_data[sampling_indices[population][0]:
-                                                sampling_indices[population][1]]
-                        site_data_pop = [x for x in site_data_pop if x != -1]
-                        if len(site_data_pop) > downsampling[population]:
-                            site_data_pop = list(self.rng.choice(site_data_pop, \
-                                downsampling[population], replace=False))
-                        downsampled[population] = site_data_pop
-
-                    # skip sites that are no longer variable after downsampling
-                    all_site_data = [x for values in downsampled.values() for x in values]
-                    if len(set(all_site_data)) != 2:
-                        continue
-
-                    # get the minor allele after downsampling (same rule as simulate_data)
-                    minor_allele = min(set(all_site_data), key=all_site_data.count)
-
-                    # count the minor allele in each population and add to the sfs
-                    combo_key = '_'.join(str(Counter(values)[minor_allele])
-                                         for values in downsampled.values())
-                    rep_sfs_dict[combo_key] += 1
-
-            # convert SFS to binned
-            if not nbins is None:
-                thresholds = []
-                for value in reordered_downsampling.values():
-                    thresholds.append([int(np.floor(value/nbins*(x+1))) for x in range(nbins)])
-                threshold_combos = list(product(*thresholds))
-                binned_rep_sfs_dict = OrderedDict({'_'.join(map(str, combo)): 0 for combo in threshold_combos})
-
-                for key, value in rep_sfs_dict.items():
-                    new_string = ''
-                    for count, entry in enumerate(key.split('_')):
-                        minthresh = min([x for x in thresholds[count] if int(entry) <= x])
-                        new_string+=str(minthresh)
-                        new_string+='_'
-                    new_string = new_string.strip('_')
-                    binned_rep_sfs_dict[new_string] += value
-                rep_sfs_dict = binned_rep_sfs_dict
-            
-            rep_sfs_dict = [value for value in rep_sfs_dict.values()]
-
-            all_sfs.append(np.array(rep_sfs_dict))
-
-            # calculate average number of sites used
+            # keep sites that still have two alleles, and count the minor allele after
+            # downsampling (ties: the lower-coded allele, as in simulate_data)
+            variable = (both > 0) & (both < total)
+            use_other = 2 * both >= total
+            cells = [to_cell[ix][np.where(use_other, size - counts[population],
+                                          counts[population])[variable]]
+                     for ix, (population, size) in enumerate(zip(populations, sizes))]
+            flat = np.ravel_multi_index(cells, shape)
+            all_sfs.append(np.bincount(flat, minlength=int(np.prod(shape))).astype(np.int64))
 
         average_sites = int(np.ceil(np.mean([np.sum(x) for x in all_sfs])))
-        print(f"We used an average of {average_sites} to construct the mSFS.")
+        self.logger.info("We used an average of %s sites to construct the mSFS.", average_sites)
 
         return(all_sfs, average_sites)
+
+    def _samples_in_order(self, dictionary):
+        """Samples grouped by population, in sampling dict order."""
+        return [sample for population in self.config["sampling dict"]
+                for sample, value in self.config[dictionary].items() if value == population]
+
+    def _population_blocks(self, encoded_alignment):
+        """The rows of each population, in sampling dict order."""
+        blocks, start = [], 0
+        for size in self.config["sampling dict"].values():
+            blocks.append(encoded_alignment[start:start + size])
+            start += size
+        return blocks
+
+    def _finish_array(self, encoded_alignments, maxsites):
+        """Drop invariant sites, recode alleles by frequency, and apply maxsites."""
+        encoded_array = minor_encoding(_remove_invariant_columns(encoded_alignments))
+        filtered_array = _apply_maxsites(encoded_array, maxsites)
+        self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
+                         encoded_array.shape[1], filtered_array.shape[1])
+        return filtered_array
+
+    def _usable_sites(self, encoded_alignment, downsampling):
+        """Sites with exactly two alleles (ignoring missing data) and enough called
+        alleles in every population to downsample to the requested sizes."""
+        enough = np.logical_and.reduce([
+            (block != -1).sum(axis=0) >= downsampling[population]
+            for population, block in zip(self.config["sampling dict"],
+                                         self._population_blocks(encoded_alignment))])
+        observed = encoded_alignment != -1
+        low = np.where(observed, encoded_alignment, np.iinfo(encoded_alignment.dtype).max).min(axis=0)
+        high = np.where(observed, encoded_alignment, -1).max(axis=0)
+        two_alleles = (low < high) & ((encoded_alignment == low) | (encoded_alignment == high)
+                                      | ~observed).all(axis=0)
+        keep = enough & two_alleles
+        return encoded_alignment[:, keep], high[keep]
+
+    def _downsampled_counts(self, sites, downsampling):
+        """For each population, sample the requested number of called alleles at every
+        site without replacement, and count the higher-coded allele among them."""
+        alignment, high = sites
+        counts = {}
+        for population, block in zip(self.config["sampling dict"], self._population_blocks(alignment)):
+            keys = self.rng.random(block.shape)
+            keys[block == -1] = 2.0                    # missing alleles sort last
+            chosen = np.argsort(keys, axis=0)[:downsampling[population]]
+            counts[population] = (np.take_along_axis(block, chosen, axis=0) == high).sum(axis=0)
+        return counts
+
+def _check_even(downsampling):
+    if not all(value % 2 == 0 for value in downsampling.values()):
+        raise ValueError("Error in downampling, all keys must be even.")
 
 def _remove_invariant_columns(encoded_alignments):
     """Remove sites (columns) with fewer than two different alleles, ignoring missing data (-1)."""
