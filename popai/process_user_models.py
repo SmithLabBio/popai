@@ -83,7 +83,7 @@ class ModelReader:
                         if not all(key in item_dict for key in ['time', 'descendants', 'ancestor']):
                             raise Exception(f"Check your split events. All must include a time, descendants, and an ancestor.")
 
-                        event_time = self._get_event_value(item_dict, event_dict, 'time')
+                        event_time = self._split_time(item, item_dict, splits, event_dict, model)
                         demography.add_population_split(derived=item_dict['descendants'], ancestral=item_dict['ancestor'], time=event_time)
                         splits.append((event_time, item_dict['descendants'], item_dict['ancestor']))
                         active_populations = [x for x in active_populations if x != item_dict['ancestor']]
@@ -250,6 +250,27 @@ class ModelReader:
         # stop: in its own range, and after the start
         stop = self._draw_time(max(stop_min, start + 1), stop_max)
         return start, stop
+
+    def _split_time(self, item, item_dict, splits, event_dict, model):
+        """Draw the time of a split so it is no younger than the splits that form its
+        descendants (AB must form before it can split from C, backwards in time).
+        Raises an error only if the model's values make that impossible."""
+
+        # times of the splits (already drawn) that form this split's descendants
+        formed = [time for time, _, ancestor in splits if ancestor in item_dict['descendants']]
+
+        time_min, time_max = self._value_range(item_dict, event_dict, 'time')
+
+        # in its own range, and no younger than each of those splits (the same time is fine:
+        # msprime applies splits at the same time in the order they were added)
+        low = max([time_min] + formed)
+        if low > time_max:
+            raise ValueError(
+                f"Error in {model}: no time works for {item}. Its time must be between "
+                f"{time_min:g} and {time_max:g}, and no younger than the splits that form its "
+                f"descendants (at {', '.join(f'{t:g}' for t in formed) or 'none'} "
+                f"generations ago in this replicate).")
+        return self._draw_time(low, time_max)
 
     def _value_range(self, item_dict, event_dict, key):
         """The smallest and largest values a time can take: the two ends of a [min,max]
