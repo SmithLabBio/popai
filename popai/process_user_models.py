@@ -45,6 +45,11 @@ class ModelReader:
 
             # migration matrix, if the model has one (read once; rates drawn per replicate)
             migration_matrix = self._read_migration_matrix(modelinfo, model)
+
+            # read the events once, and order them so each comes after the events it depends on
+            events = {name: self._split_parameters(text) for name, text in modelinfo["Events"].items()}
+            event_order = self._order_events(events, model)
+
             # iterate over parameterizations
             for _ in range(self.config["replicates"]):
 
@@ -69,9 +74,9 @@ class ModelReader:
                         event_dict[f"pop_{item}"] = initial_size
 
 
-                for item in modelinfo["Events"]:
+                for item in event_order:
 
-                    item_dict = self._split_parameters(modelinfo["Events"][item])
+                    item_dict = events[item]
 
                     if item_dict['event'] == 'split':
 
@@ -168,6 +173,50 @@ class ModelReader:
                 demographies.append(demography)
                 labels.append(model.split(".model")[0])
         return(demographies, labels)
+
+    def _order_events(self, events, model):
+        """Order events so that each one comes after every event it depends on:
+        - events named in its values (stop=div_AB needs div_AB first),
+        - for a split, the splits that form its descendants (AB's split before ABC's),
+        - for migration, the splits that form and end its populations.
+        Events that don't depend on each other keep their order in the file."""
+
+        # which split forms each population (as the ancestor), and which ends it
+        formed_by, ended_by = {}, {}
+        for name, item in events.items():
+            if item.get('event') == 'split':
+                formed_by[item.get('ancestor')] = name
+                for population in item.get('descendants', []):
+                    ended_by[population] = name
+
+        depends_on = {}
+        for name, item in events.items():
+            needs = set()
+            # events named in values that can hold expressions
+            for key in ('time', 'start', 'stop', 'size', 'rate', 'prop'):
+                values = item.get(key, [])
+                for value in (values if isinstance(values, list) else [values]):
+                    needs.update(word for word in re.findall(r'[A-Za-z_]\w*', value) if word in events)
+            if item.get('event') == 'split':
+                needs.update(formed_by[d] for d in item.get('descendants', []) if d in formed_by)
+            elif item.get('event') in ('symmetric_migration', 'asymmetric_migration'):
+                populations = item.get('populations') or [item.get('source'), item.get('dest')]
+                for population in populations:
+                    needs.update(split for split in (formed_by.get(population), ended_by.get(population)) if split)
+            depends_on[name] = needs
+
+        # repeatedly take the first event (in file order) whose dependencies are all done
+        order, remaining = [], list(events)
+        while remaining:
+            ready = [name for name in remaining if depends_on[name] <= set(order)]
+            if not ready:
+                raise ValueError(
+                    f"Error in {model}: the events {', '.join(remaining)} can't be put in order, "
+                    f"because some of them depend on each other in a loop (for example, an event "
+                    f"whose time refers to a second event whose time refers back to the first).")
+            order.append(ready[0])
+            remaining.remove(ready[0])
+        return order
 
     def _read_migration_matrix(self, modelinfo, model):
         """Read the [Migration] section of a model file, if there is one.
