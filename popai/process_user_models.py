@@ -3,9 +3,6 @@ import numpy as np
 import logging
 import msprime
 import configparser
-import io
-import pandas as pd
-import ast
 import demesdraw # ModelBuilder
 import matplotlib.pyplot as plt # ModelBuilder
 from matplotlib.backends.backend_pdf import PdfPages
@@ -50,10 +47,6 @@ class ModelReader:
         for number in sorted(model_files):
             model = model_files[number]
 
-            # list for storing active populations and populations with migration at the present.
-            active_populations = []
-            pops_w_present_migration = []
-
             modelinfo = configparser.ConfigParser(inline_comment_prefixes="#")
             modelinfo.optionxform = str
             modelinfo.read(os.path.join(self.config["user models"],model))
@@ -83,7 +76,6 @@ class ModelReader:
                 for item in modelinfo["Populations"]:
                     initial_size = self._population_size(item, modelinfo["Populations"][item], event_dict, model)
                     demography.add_population(name = item, initial_size=initial_size)
-                    active_populations.append(item)
                     event_dict[f"pop_{item}"] = initial_size
 
                 for item in event_order:
@@ -92,19 +84,16 @@ class ModelReader:
 
                     if item_dict['event'] == 'split':
 
-                        if not all(key in item_dict for key in ['time', 'descendants', 'ancestor']):
-                            raise Exception(f"Check your split events. All must include a time, descendants, and an ancestor.")
+                        self._require(item, item_dict, ['time', 'descendants', 'ancestor'], model)
 
                         event_time = self._split_time(item, item_dict, splits, event_dict, model)
                         demography.add_population_split(derived=item_dict['descendants'], ancestral=item_dict['ancestor'], time=event_time)
                         splits.append((event_time, item_dict['descendants'], item_dict['ancestor']))
-                        active_populations = [x for x in active_populations if x != item_dict['ancestor']]
                         event_dict[item] = event_time
 
                     elif item_dict['event'] == 'symmetric_migration':
 
-                        if not all(key in item_dict for key in ['start', 'stop', 'populations', 'rate']):
-                            raise Exception(f"Check your symmetric migration events. All must include a start and stop time, populations, and a rate.")
+                        self._require(item, item_dict, ['start', 'stop', 'populations', 'rate'], model)
 
                         start_event_time, stop_event_time = self._migration_window(item, item_dict, item_dict['populations'], splits, event_dict, model)
                         
@@ -125,8 +114,7 @@ class ModelReader:
 
                     elif item_dict['event'] == 'asymmetric_migration':
 
-                        if not all(key in item_dict for key in ['start', 'stop', 'source', 'dest', 'rate']):
-                            raise Exception(f"Check your assymmetric migration events. All must include a start and stop time, a source, a dest, and a rate.")
+                        self._require(item, item_dict, ['start', 'stop', 'source', 'dest', 'rate'], model)
 
 
                         start_event_time, stop_event_time = self._migration_window(item, item_dict, [item_dict['source'], item_dict['dest']], splits, event_dict, model)
@@ -140,8 +128,7 @@ class ModelReader:
 
                     elif item_dict['event'] == 'popsize':
 
-                        if not all(key in item_dict for key in ['time', 'size', 'population']):
-                            raise Exception(f"Check your pop size events. All must include a time, a population, and a size.")
+                        self._require(item, item_dict, ['time', 'size', 'population'], model)
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         population_size = self._get_event_value(item_dict, event_dict, 'size')
@@ -151,8 +138,7 @@ class ModelReader:
 
                     elif item_dict['event'] == 'popgrowth':
 
-                        if not all(key in item_dict for key in ['time', 'rate', 'population']):
-                            raise Exception(f"Check your pop growth events. All must include a time, a population, and a rate.")
+                        self._require(item, item_dict, ['time', 'rate', 'population'], model)
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         growth_rate = self._get_event_value(item_dict, event_dict, 'rate')
@@ -163,8 +149,7 @@ class ModelReader:
 
                     elif item_dict['event'] == 'bottleneck':
 
-                        if not all(key in item_dict for key in ['time', 'population', 'prop']):
-                            raise Exception(f"Check your bottleneck events. All must include a time, a population, and a prop.")
+                        self._require(item, item_dict, ['time', 'population', 'prop'], model)
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         bottleneck_prop = self._get_event_value(item_dict, event_dict, 'prop')
@@ -175,8 +160,7 @@ class ModelReader:
 
                     elif item_dict['event'] == 'pulse':
 
-                        if not all(key in item_dict for key in ['time', 'source', 'dest', 'prop']):
-                            raise Exception(f"Check your pulse events. All must include a time, a source, a dest, and a prop.")
+                        self._require(item, item_dict, ['time', 'source', 'dest', 'prop'], model)
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         pulse_prop = self._get_event_value(item_dict, event_dict, 'prop')
@@ -327,6 +311,13 @@ class ModelReader:
                 f"descendants (at {', '.join(f'{t:g}' for t in formed) or 'none'} "
                 f"generations ago in this replicate).")
         return self._draw_time(low, time_max)
+
+    def _require(self, item, item_dict, keys, model):
+        """Raise a clear error if an event is missing any of the values it needs."""
+        missing = [key for key in keys if key not in item_dict]
+        if missing:
+            raise ValueError(f"Error in {model}: the {item_dict['event']} event {item} is missing "
+                             f"{', '.join(missing)}. It needs {', '.join(keys)}.")
 
     def _population_size(self, population, value, event_dict, model):
         """Draw a population's size. The size can be a range ([10000,50000]), a number
