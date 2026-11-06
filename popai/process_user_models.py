@@ -312,7 +312,7 @@ class ModelReader:
         if is_nm[0]:
             ends = [end[:-2] for end in ends]
 
-        low, high = [self._evaluate_var(end, event_dict, 'float') for end in ends]
+        low, high = [self._evaluate_var(end, event_dict) for end in ends]
         rate = low if low == high else self.rng.uniform(low=low, high=high, size=1)[0]
         return rate, is_nm[0]
 
@@ -321,9 +321,9 @@ class ModelReader:
         range, or the same number twice for a fixed value or an expression."""
         value = item_dict[key]
         if isinstance(value, list):
-            return (self._evaluate_var(value[0], event_dict, 'float'),
-                    self._evaluate_var(value[1], event_dict, 'float'))
-        value = self._evaluate_var(value, event_dict, 'float')
+            return (self._evaluate_var(value[0], event_dict),
+                    self._evaluate_var(value[1], event_dict))
+        value = self._evaluate_var(value, event_dict)
         return value, value
 
     def _draw_time(self, low, high):
@@ -522,15 +522,6 @@ class ModelReader:
                         pdf.savefig(fig)
                         plt.close(fig)
 
-    def _replace_variables(self, expr, event_dict):
-        operators = ['min','max', 'mean', 'median']
-        def replacer(match):
-            var = match.group(0)
-            return f'{{{event_dict[var]}}}' if var not in operators else var
-    
-        # Use regex to find words
-        return re.sub(r'([A-Za-z_]\w*)', replacer, expr)
-
     def _split_parameters(self, params):
 
         split_results = {}
@@ -552,18 +543,26 @@ class ModelReader:
 
         return split_results
     
-    def _evaluate_var(self, var, event_dict, vartype):
+    def _evaluate_var(self, var, event_dict):
+        """Turn a value from a model file into a number. It can be a number (1e-5) or an
+        expression using earlier events, population sizes, and min, max, mean, or median
+        (for example, 0.5*pop_C or max(div_AB, 45000))."""
         try:
-            if vartype=='int':
-                result = int(var)
-            elif vartype=='float':
-                result = float(var)
-        except:
-            result = var
-            result_str = self._replace_variables(result, event_dict)
-            result = eval(f"f'{result_str}'")
-            result = eval(result)
-        return(result)
+            return float(var)
+        except ValueError:
+            pass
+
+        # the names an expression can use
+        names = {'min': min, 'max': max,
+                 'mean': lambda *values: float(np.mean(values)),
+                 'median': lambda *values: float(np.median(values))}
+        names.update(event_dict)
+        try:
+            return eval(var, {'__builtins__': {}}, names)
+        except NameError as error:
+            raise ValueError(f"Can't work out the value '{var}' ({error}). Expressions can use "
+                             f"the names of earlier events, population sizes (as pop_A), and "
+                             f"min, max, mean, and median.") from None
 
     def _split_ignore_char(self, string, char1, char2):
         result = []
