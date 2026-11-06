@@ -514,11 +514,34 @@ class ModelReader:
 
 
     def _nonzero(self, model):
-        count=0
+        """Change a copy of a model so demes can draw it. demes can't draw a population that
+        exists for no time, so splits at time 0 move to times 1, 2, 3, ... (in order), and
+        anything else at time 0 that involves a population they form (a migration event or
+        matrix migration, a size change) starts when that population forms."""
+
+        # move the time-0 splits, and note when each population they form now forms
+        formed_at = {}
+        for event in model.events:
+            if event.time == 0 and hasattr(event, 'derived'):
+                event.time = len(formed_at) + 1
+                formed_at[event.ancestral] = event.time
+
+        # other events at time 0 start when the populations they involve form
         for event in model.events:
             if event.time == 0:
-                count+=1
-                event.time = count*1
+                involved = [getattr(event, key, None) for key in ('source', 'dest', 'population')]
+                event.time = max(formed_at.get(population, 0) for population in involved)
+
+        # so does matrix migration
+        names = [population.name for population in model.populations]
+        for j, k in zip(*np.nonzero(model.migration_matrix)):
+            start = max(formed_at.get(names[j], 0), formed_at.get(names[k], 0))
+            if start > 0:
+                model.add_migration_rate_change(time=start, rate=model.migration_matrix[j, k],
+                                                source=names[j], dest=names[k])
+                model.migration_matrix[j, k] = 0
+
+        model.sort_events()
         return model
 
     def _plot_models(self, demographies, labels, outplot):
