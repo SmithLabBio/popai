@@ -57,6 +57,10 @@ class ModelReader:
             modelinfo = configparser.ConfigParser(inline_comment_prefixes="#")
             modelinfo.optionxform = str
             modelinfo.read(os.path.join(self.config["user models"],model))
+            if not modelinfo.has_section("Populations"):
+                raise ValueError(f"Error in {model}: there is no [Populations] section.")
+            if not modelinfo.has_section("Events"):
+                modelinfo.add_section("Events")   # a model can have no events (one population)
 
             # migration matrix, if the model has one (read once; rates drawn per replicate)
             migration_matrix = self._read_migration_matrix(modelinfo, model)
@@ -76,18 +80,10 @@ class ModelReader:
                 splits = []   # (time, descendants, ancestor) for each split in this replicate
                 # iterate over populations and add to demogrpahy
                 for item in modelinfo["Populations"]:
-                    try:
-                        size_range = [float(val.strip("[").strip("]")) for val in modelinfo['Populations'][item].split(",")]
-                        initial_size = np.round(self.rng.uniform(low=size_range[0], high=size_range[1], size=1),0)[0]
-                        demography.add_population(name = item, initial_size=initial_size)
-                        active_populations.append(item)
-                        event_dict[f"pop_{item}"] = initial_size
-                    except:
-                        initial_size = event_dict[f'pop_{modelinfo["Populations"][item]}']
-                        demography.add_population(name = item, initial_size=initial_size)
-                        active_populations.append(item)
-                        event_dict[f"pop_{item}"] = initial_size
-
+                    initial_size = self._population_size(item, modelinfo["Populations"][item], event_dict, model)
+                    demography.add_population(name = item, initial_size=initial_size)
+                    active_populations.append(item)
+                    event_dict[f"pop_{item}"] = initial_size
 
                 for item in event_order:
 
@@ -166,6 +162,9 @@ class ModelReader:
 
                     elif item_dict['event'] == 'bottleneck':
 
+                        if not all(key in item_dict for key in ['time', 'population', 'prop']):
+                            raise Exception(f"Check your bottleneck events. All must include a time, a population, and a prop.")
+
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         bottleneck_prop = self._get_event_value(item_dict, event_dict, 'prop')
 
@@ -174,6 +173,9 @@ class ModelReader:
                         event_dict[item] = event_time
 
                     elif item_dict['event'] == 'pulse':
+
+                        if not all(key in item_dict for key in ['time', 'source', 'dest', 'prop']):
+                            raise Exception(f"Check your pulse events. All must include a time, a source, a dest, and a prop.")
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         pulse_prop = self._get_event_value(item_dict, event_dict, 'prop')
@@ -291,6 +293,26 @@ class ModelReader:
                 f"descendants (at {', '.join(f'{t:g}' for t in formed) or 'none'} "
                 f"generations ago in this replicate).")
         return self._draw_time(low, time_max)
+
+    def _population_size(self, population, value, event_dict, model):
+        """Draw a population's size. The size can be a range ([10000,50000]), a number
+        (20000), the name of a population listed above it (the same size as that population),
+        or an expression using those sizes (0.5*pop_A)."""
+        value = value.strip()
+        if f"pop_{value}" in event_dict:
+            return event_dict[f"pop_{value}"]
+        try:
+            if value.startswith('['):
+                ends = [end.strip() for end in value.strip('[]').split(',')]
+                if len(ends) != 2:
+                    raise ValueError
+                low, high = [self._evaluate_var(end, event_dict) for end in ends]
+                return self._draw_time(low, high)
+            return self._evaluate_var(value, event_dict)
+        except (ValueError, SyntaxError, TypeError):
+            raise ValueError(f"Error in {model}: can't read the size of population {population}, "
+                             f"'{value}'. Use a range ([10000,50000]), a number (20000), or the "
+                             f"name of a population listed above it.") from None
 
     def _migration_rate(self, item, item_dict, event_dict, model):
         """Draw the rate of a migration event. The rate can be fixed (1e-5), a range
