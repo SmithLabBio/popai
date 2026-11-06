@@ -43,6 +43,8 @@ class ModelReader:
             modelinfo.optionxform = str
             modelinfo.read(os.path.join(self.config["user models"],model))
 
+            # migration matrix, if the model has one (read once; rates drawn per replicate)
+            migration_matrix = self._read_migration_matrix(modelinfo, model)
             # iterate over parameterizations
             for _ in range(self.config["replicates"]):
 
@@ -51,7 +53,7 @@ class ModelReader:
 
                 # empty demography
                 demography = msprime.Demography()
-
+                splits = []   # (time, descendants, ancestor) for each split in this replicate
                 # iterate over populations and add to demogrpahy
                 for item in modelinfo["Populations"]:
                     try:
@@ -78,6 +80,7 @@ class ModelReader:
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         demography.add_population_split(derived=item_dict['descendants'], ancestral=item_dict['ancestor'], time=event_time)
+                        splits.append((event_time, item_dict['descendants'], item_dict['ancestor']))
                         active_populations = [x for x in active_populations if x != item_dict['ancestor']]
                         event_dict[item] = event_time
 
@@ -159,10 +162,117 @@ class ModelReader:
                     else:
                         raise Exception(f"Type {item_dict['event']} is not a valid option. Valid options include split, symmetric migration, asymmetric migration, popsize, popgrowth, and bottleneck.")
 
+                if migration_matrix is not None:
+                    self._add_matrix_migration(demography, migration_matrix, splits, event_dict, model)
                 demography.sort_events()
                 demographies.append(demography)
                 labels.append(model.split(".model")[0])
         return(demographies, labels)
+
+    def _read_migration_matrix(self, modelinfo, model):
+        """Read the [Migration] section of a model file, if there is one.
+
+        The section holds one table, with population names as column headers and as the
+        first entry of each row. Each cell is 0 (no migration), a rate (1e-5), a uniform
+        prior on the rate ([1e-5,1e-4]), or the same as a number of migrants (Nm1 or
+        [0.5 Nm,2 Nm]). The cell in row j, column k is msprime's M[j, k]: the rate at which
+        lineages move from population j to population k, backwards in time. Each cell is
+        drawn separately.
+
+        Returns {(source, dest): (low, high, is_nm)} for the non-zero cells, or None."""
+
+        if not modelinfo.has_section("Migration"):
+            return None
+
+        populations = list(modelinfo["Populations"])
+        keys = list(modelinfo["Migration"])
+        if len(keys) != 1:
+            raise ValueError(f"Error in {model}: the [Migration] section should hold one table "
+                             f"(for example 'matrix = ...'), but it has {len(keys)} entries.")
+
+        # split each line into cells, keeping [min, max] together even if it contains spaces
+        lines = [re.findall(r"\[[^\]]*\]|\S+", line)
+                 for line in modelinfo["Migration"][keys[0]].splitlines() if line.strip()]
+        if not lines:
+            raise ValueError(f"Error in {model}: the [Migration] table is empty.")
+        header, rows = lines[0], lines[1:]
+
+        row_names = [row[0] for row in rows]
+        if sorted(row_names) != sorted(header):
+            raise ValueError(f"Error in {model}: the [Migration] table should have the same "
+                             f"populations as rows and columns, but has columns {header} "
+                             f"and rows {row_names}.")
+        unknown = [name for name in header if name not in populations]
+        if unknown:
+            raise ValueError(f"Error in {model}: the [Migration] table includes {unknown}, "
+                             f"which are not listed in [Populations].")
+
+        cells = {}
+        for row in rows:
+            source, values = row[0], row[1:]
+            if len(values) != len(header):
+                raise ValueError(f"Error in {model}: row {source} of the [Migration] table has "
+                                 f"{len(values)} entries, but there are {len(header)} columns.")
+            for dest, value in zip(header, values):
+                rate = self._parse_matrix_cell(value, source, dest, model)
+                if rate is None:
+                    continue
+                if source == dest:
+                    raise ValueError(f"Error in {model}: the [Migration] table has migration "
+                                     f"from {source} to itself. Diagonal entries must be 0.")
+                cells[(source, dest)] = rate
+        return cells
+
+    def _parse_matrix_cell(self, value, source, dest, model):
+        """One cell of the migration matrix: None for no migration, else (low, high, is_nm)."""
+        ends = [x.strip() for x in value.strip("[]").split(",")]
+        if len(ends) == 1:
+            ends = ends * 2
+        problem = (f"Error in {model}: the [Migration] entry for {source} to {dest} is '{value}'. "
+                   "Use 0, a rate (1e-5), a range ([1e-5,1e-4]), or Nm values (Nm1 or [Nm0.5,Nm2]).")
+        if len(ends) != 2:
+            raise ValueError(problem)
+        is_nm = [end.endswith("Nm") for end in ends]
+        if is_nm[0] != is_nm[1]:
+            raise ValueError(problem + " Both ends of a range must be rates, or both Nm values.")
+        try:
+            low, high = [float(end[:-2] if is_nm[0] else end) for end in ends]
+        except ValueError:
+            raise ValueError(problem) from None
+        if low < 0 or low > high:
+            raise ValueError(problem + " Values must be non-negative, minimum first.")
+        if high == 0:
+            return None
+        return (low, high, is_nm[0])
+
+    def _add_matrix_migration(self, demography, cells, splits, event_dict, model):
+        """Set migration from the present, as given by the migration matrix. msprime turns
+        it off when the populations involved split from their ancestor."""
+
+        merged_at_present = {d for time, descendants, _ in splits if time == 0 for d in descendants}
+        ancestral = {ancestor for time, _, ancestor in splits if time > 0}
+
+        for (source, dest), (low, high, is_nm) in cells.items():
+            for population in (source, dest):
+                if population in ancestral:
+                    raise ValueError(
+                        f"Error in {model}: the migration matrix includes migration between "
+                        f"{source} and {dest}, but {population} is an ancestral population (it "
+                        f"forms at a split before the present). The matrix sets migration from "
+                        f"the present, so it can only include present-day populations. For "
+                        f"migration involving ancestral populations, use a symmetric_migration "
+                        f"or asymmetric_migration event with start and stop times.")
+                if population in merged_at_present:
+                    raise ValueError(
+                        f"Error in {model}: the migration matrix includes migration between "
+                        f"{source} and {dest}, but {population} merges with another population "
+                        f"at time 0, so it doesn't exist at the present. Use the name of the "
+                        f"merged population instead.")
+            rate = low if low == high else self.rng.uniform(low=low, high=high)
+            if is_nm:
+                # M[j, k] is a fraction of population j (forward in time), so m = Nm / N_j
+                rate = rate / event_dict[f"pop_{source}"]
+            demography.set_migration_rate(source=source, dest=dest, rate=rate)
 
     def validate_models(self, demographies, labels, outplot=None):
         """
