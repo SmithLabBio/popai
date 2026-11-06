@@ -68,6 +68,7 @@ class ModelReader:
             # read the events once, and order them so each comes after the events it depends on
             events = {name: self._split_parameters(text) for name, text in modelinfo["Events"].items()}
             event_order = self._order_events(events, model)
+            self._check_numbers(modelinfo, events, model)
 
             # iterate over parameterizations
             for _ in range(self.config["replicates"]):
@@ -193,6 +194,40 @@ class ModelReader:
                 demographies.append(demography)
                 labels.append(f"model_{number}")
         return(demographies, labels)
+
+    def _check_numbers(self, modelinfo, events, model):
+        """Before drawing anything, check the numbers written in the model file: a range must
+        have its smaller value first, and values must make sense (times and migration rates
+        can't be negative, sizes must be above 0, proportions must be between 0 and 1).
+        Expressions (like 2*div_AB) aren't known until they're drawn, so they're skipped."""
+
+        # (what, event type, key, ends) for every value to check
+        values = [(f"population {name}", None, 'size', text.strip().strip('[]').split(','))
+                  for name, text in modelinfo["Populations"].items()]
+        for name, item in events.items():
+            for key in ('time', 'start', 'stop', 'size', 'prop', 'rate'):
+                if key in item:
+                    ends = item[key] if isinstance(item[key], list) else [item[key]]
+                    values.append((f"event {name}", item.get('event'), key, ends))
+
+        for what, event_type, key, ends in values:
+            try:
+                numbers = [float(re.sub(r'Nm$', '', end.strip())) for end in ends]   # Nm cut off the end
+            except ValueError:
+                continue   # an expression (or a mistake that's reported when it's drawn)
+            shown = f"[{','.join(end.strip() for end in ends)}]" if len(ends) > 1 else ends[0].strip()
+            problem = f"Error in {model}: the {key} of {what} is {shown}"
+
+            if len(numbers) == 2 and numbers[0] > numbers[1]:
+                raise ValueError(f"{problem}. Put the smaller value first.")
+            if key == 'size' and min(numbers) <= 0:
+                raise ValueError(f"{problem}, but sizes must be above 0.")
+            if key in ('time', 'start', 'stop') and min(numbers) < 0:
+                raise ValueError(f"{problem}, but times can't be negative.")
+            if key == 'prop' and (min(numbers) < 0 or max(numbers) > 1):
+                raise ValueError(f"{problem}, but proportions must be between 0 and 1.")
+            if key == 'rate' and event_type != 'popgrowth' and min(numbers) < 0:
+                raise ValueError(f"{problem}, but migration rates can't be negative.")
 
     def _order_events(self, events, model):
         """Order events so that each one comes after every event it depends on:
