@@ -96,7 +96,11 @@ class ModelReader:
 
                         start_event_time, stop_event_time = self._migration_window(item, item_dict, item_dict['populations'], splits, event_dict, model)
                         
-                        migration_rate_0, migration_rate_1 = self._get_event_value(item_dict, event_dict, 'rate')
+                        # one draw for both directions; as Nm, each direction is divided by its own source's size
+                        rate, is_nm = self._migration_rate(item, item_dict, event_dict, model)
+                        population_0, population_1 = item_dict['populations']
+                        migration_rate_0 = rate / event_dict[f"pop_{population_1}"] if is_nm else rate
+                        migration_rate_1 = rate / event_dict[f"pop_{population_0}"] if is_nm else rate\
 
                         demography.add_migration_rate_change(source=item_dict['populations'][1], dest=item_dict['populations'][0], time=start_event_time, rate=migration_rate_0)
                         demography.add_migration_rate_change(source=item_dict['populations'][0], dest=item_dict['populations'][1], time=start_event_time, rate=migration_rate_1)
@@ -114,7 +118,8 @@ class ModelReader:
 
 
                         start_event_time, stop_event_time = self._migration_window(item, item_dict, [item_dict['source'], item_dict['dest']], splits, event_dict, model)
-                        migration_rate = self._get_event_value(item_dict, event_dict, 'rate')
+                        rate, is_nm = self._migration_rate(item, item_dict, event_dict, model)
+                        migration_rate = rate / event_dict[f"pop_{item_dict['source']}"] if is_nm else rate
 
                         demography.add_migration_rate_change(source=item_dict['source'], dest=item_dict['dest'], time=start_event_time, rate=migration_rate)
                         demography.add_migration_rate_change(source=item_dict['source'], dest=item_dict['dest'], time=stop_event_time, rate=0)
@@ -272,6 +277,30 @@ class ModelReader:
                 f"generations ago in this replicate).")
         return self._draw_time(low, time_max)
 
+    def _migration_rate(self, item, item_dict, event_dict, model):
+        """Draw the rate of a migration event. The rate can be fixed (1e-5), a range
+        ([1e-5,1e-4]), or a number of migrants (1Nm or [0.5Nm,2Nm]).
+        Returns (rate, is_nm); an Nm value still needs dividing by the source's size."""
+
+        value = item_dict['rate']
+        ends = [end.strip() for end in (value if isinstance(value, list) else [value, value])]
+        shown = f"[{','.join(value)}]" if isinstance(value, list) else value   # for error messages
+
+        for end in ends:
+            if "Nm" in end and not end.endswith("Nm"):
+                raise ValueError(f"Error in {model}: the rate of {item} is {shown}. "
+                                 f"Write Nm after the number, as in 1Nm or [0.5Nm,2Nm].")
+        is_nm = [end.endswith("Nm") for end in ends]
+        if is_nm[0] != is_nm[1]:
+            raise ValueError(f"Error in {model}: the rate of {item} is {shown}. Both ends of "
+                             f"a range must be rates, or both Nm values.")
+        if is_nm[0]:
+            ends = [end[:-2] for end in ends]
+
+        low, high = [self._evaluate_var(end, event_dict, 'float') for end in ends]
+        rate = low if low == high else self.rng.uniform(low=low, high=high, size=1)[0]
+        return rate, is_nm[0]
+
     def _value_range(self, item_dict, event_dict, key):
         """The smallest and largest values a time can take: the two ends of a [min,max]
         range, or the same number twice for a fixed value or an expression."""
@@ -310,7 +339,7 @@ class ModelReader:
                              f"(for example 'matrix = ...'), but it has {len(keys)} entries.")
 
         # split each line into cells, keeping [min, max] together even if it contains spaces
-        lines = [re.findall(r"\[[^\]]*\]|\S+", line)
+        lines = [re.findall(r"\[[^\]]*\]|\S+(?:\s+Nm\b)?", line)
                  for line in modelinfo["Migration"][keys[0]].splitlines() if line.strip()]
         if not lines:
             raise ValueError(f"Error in {model}: the [Migration] table is empty.")
