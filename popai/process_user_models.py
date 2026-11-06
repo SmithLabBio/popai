@@ -186,8 +186,7 @@ class ModelReader:
                         event_dict[item] = event_time
 
                     else:
-                        raise Exception(f"Type {item_dict['event']} is not a valid option. Valid options include split, symmetric migration, asymmetric migration, popsize, popgrowth, and bottleneck.")
-
+                        raise ValueError(f"Error in {model}: {item} has the event type '{item_dict['event']}', which isn't valid. Use split, symmetric_migration, asymmetric_migration, popsize, popgrowth, bottleneck, or pulse.")
                 if migration_matrix is not None:
                     self._add_matrix_migration(demography, migration_matrix, splits, event_dict, model)
                 demography.sort_events()
@@ -585,7 +584,7 @@ class ModelReader:
 
         # get event type
         event_type, params = params.split('{')
-        split_results['event'] = event_type
+        split_results['event'] = event_type.strip()
 
        # split parameters by commas, ignoring commas inside brackets.
         
