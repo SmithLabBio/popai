@@ -552,35 +552,6 @@ class ModelReader:
             if pdf is not None:
                 pdf.close()
 
-        else:
-            with PdfPages(outplot) as pdf:
-                for modelix, model in enumerate(demographies):
-                    if modelix % self.config['replicates'] == 0:
-                        new_model = copy.deepcopy(model)
-                        new_model = self._nonzero(new_model)
-                        try:
-                            graph = new_model.to_demes()
-
-                            # Plot the model
-                            fig, ax = plt.subplots()
-                            demesdraw.tubes(graph, ax=ax, seed=1)
-                        except:
-                            # Clear the plot
-                            ax.clear()
-
-                            # Add the warning text in the center of the blank page
-                            ax.text(0.5, 0.5, "There was an issue with plotting your model. Please verify that your model is working as desired.\nThis could arise if the migration matrix includes migration between populations not extant at the present.\nWe recommend using events for such migration, rather than the matrix. This will prevent issues with plotting.",
-                                    ha='center', va='center', wrap=True, fontsize=12)
-
-                            # Hide axes
-                            ax.set_xticks([])
-                            ax.set_yticks([])
-                            logging.warning(f"There was an issue with plotting your model. Please verify that your model is working as desired. This could arise if the migration matrix includes migration between populations not extant at the present. We recommend using events for such migration, rather than the matrix. This prevent issues with plotting.")
-
-                        plt.title(f"Model: {labels[modelix]}")
-                        pdf.savefig(fig)
-                        plt.close(fig)
-
     def _split_parameters(self, params):
 
         split_results = {}
