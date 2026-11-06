@@ -26,14 +26,29 @@ class ModelReader:
     
     def read_models(self):
 
-        # get list of .model files
-        model_files_unsorted = [x for x in os.listdir(self.config["user models"]) if x.endswith('model')]
-        model_files = sorted(model_files_unsorted, key=lambda x: int(x.split('_')[1].split('.')[0]))
+        # find the .model files. Each name ends in _<number>.model, and the model's label is
+        # model_<number>, which later steps use to find each model's simulations.
+        model_files = {}
+        for name in os.listdir(self.config["user models"]):
+            if not name.endswith('.model'):
+                continue
+            match = re.search(r"_(\d+)\.model$", name)
+            if not match:
+                raise ValueError(f"The model file {name} must end in _x.model, where x is a whole "
+                                 f"number (for example, model_0.model).")
+            number = int(match.group(1))
+            if number in model_files:
+                raise ValueError(f"The model files {model_files[number]} and {name} both end in "
+                                 f"_{number}. Each model needs its own number.")
+            model_files[number] = name
+        if not model_files:
+            raise ValueError(f"There are no .model files in {self.config['user models']}.")
 
         # iterate over model files
         demographies = []
         labels = []
-        for model in model_files:
+        for number in sorted(model_files):
+            model = model_files[number]
 
             # list for storing active populations and populations with migration at the present.
             active_populations = []
@@ -174,7 +189,7 @@ class ModelReader:
                     self._add_matrix_migration(demography, migration_matrix, splits, event_dict, model)
                 demography.sort_events()
                 demographies.append(demography)
-                labels.append(model.split(".model")[0])
+                labels.append(f"model_{number}")
         return(demographies, labels)
 
     def _order_events(self, events, model):
