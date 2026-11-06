@@ -13,6 +13,18 @@ class ModelReader:
 
     """Read user specified models."""
 
+
+    # the parameters each event type takes
+    EVENT_PARAMETERS = {
+        'split': ['time', 'descendants', 'ancestor'],
+        'symmetric_migration': ['start', 'stop', 'populations', 'rate'],
+        'asymmetric_migration': ['start', 'stop', 'source', 'dest', 'rate'],
+        'popsize': ['time', 'population', 'size'],
+        'popgrowth': ['time', 'population', 'rate'],
+        'bottleneck': ['time', 'population', 'prop'],
+        'pulse': ['time', 'source', 'dest', 'prop'],
+    }
+
     def __init__(self, config_values):
         self.config = config_values
         self.rng = np.random.default_rng(self.config['seed'])
@@ -59,7 +71,9 @@ class ModelReader:
             migration_matrix = self._read_migration_matrix(modelinfo, model)
 
             # read the events once, and order them so each comes after the events it depends on
-            events = {name: self._split_parameters(text) for name, text in modelinfo["Events"].items()}
+            populations = list(modelinfo["Populations"])
+            events = {name: self._split_parameters(name, text, populations, model)
+                      for name, text in modelinfo["Events"].items()}
             event_order = self._order_events(events, model)
             self._check_numbers(modelinfo, events, model)
 
@@ -84,16 +98,12 @@ class ModelReader:
 
                     if item_dict['event'] == 'split':
 
-                        self._require(item, item_dict, ['time', 'descendants', 'ancestor'], model)
-
                         event_time = self._split_time(item, item_dict, splits, event_dict, model)
                         demography.add_population_split(derived=item_dict['descendants'], ancestral=item_dict['ancestor'], time=event_time)
                         splits.append((event_time, item_dict['descendants'], item_dict['ancestor']))
                         event_dict[item] = event_time
 
                     elif item_dict['event'] == 'symmetric_migration':
-
-                        self._require(item, item_dict, ['start', 'stop', 'populations', 'rate'], model)
 
                         start_event_time, stop_event_time = self._migration_window(item, item_dict, item_dict['populations'], splits, event_dict, model)
                         
@@ -114,9 +124,6 @@ class ModelReader:
 
                     elif item_dict['event'] == 'asymmetric_migration':
 
-                        self._require(item, item_dict, ['start', 'stop', 'source', 'dest', 'rate'], model)
-
-
                         start_event_time, stop_event_time = self._migration_window(item, item_dict, [item_dict['source'], item_dict['dest']], splits, event_dict, model)
                         rate, is_nm = self._migration_rate(item, item_dict, event_dict, model)
                         migration_rate = rate / event_dict[f"pop_{item_dict['source']}"] if is_nm else rate
@@ -128,8 +135,6 @@ class ModelReader:
 
                     elif item_dict['event'] == 'popsize':
 
-                        self._require(item, item_dict, ['time', 'size', 'population'], model)
-
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         population_size = self._get_event_value(item_dict, event_dict, 'size')
 
@@ -137,8 +142,6 @@ class ModelReader:
                         event_dict[item] = event_time
 
                     elif item_dict['event'] == 'popgrowth':
-
-                        self._require(item, item_dict, ['time', 'rate', 'population'], model)
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         growth_rate = self._get_event_value(item_dict, event_dict, 'rate')
@@ -149,8 +152,6 @@ class ModelReader:
 
                     elif item_dict['event'] == 'bottleneck':
 
-                        self._require(item, item_dict, ['time', 'population', 'prop'], model)
-
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         bottleneck_prop = self._get_event_value(item_dict, event_dict, 'prop')
 
@@ -159,8 +160,6 @@ class ModelReader:
                         event_dict[item] = event_time
 
                     elif item_dict['event'] == 'pulse':
-
-                        self._require(item, item_dict, ['time', 'source', 'dest', 'prop'], model)
 
                         event_time = self._get_event_value(item_dict, event_dict, 'time')
                         pulse_prop = self._get_event_value(item_dict, event_dict, 'prop')
@@ -234,7 +233,14 @@ class ModelReader:
             for key in ('time', 'start', 'stop', 'size', 'rate', 'prop'):
                 values = item.get(key, [])
                 for value in (values if isinstance(values, list) else [values]):
-                    needs.update(word for word in re.findall(r'[A-Za-z_]\w*', value) if word in events)
+                    for word in re.findall(r'[A-Za-z_]\w*', value):
+                        if word in events and events[word]['event'] in ('symmetric_migration', 'asymmetric_migration'):
+                            raise ValueError(
+                                f"Error in {model}: {name} uses {word}, which is a migration event. "
+                                f"A migration event's name can't be used as a value, because it has "
+                                f"a start and a stop rather than one time.")
+                        if word in events:
+                            needs.add(word)
             if item.get('event') == 'split':
                 needs.update(formed_by[d] for d in item.get('descendants', []) if d in formed_by)
             elif item.get('event') in ('symmetric_migration', 'asymmetric_migration'):
@@ -311,13 +317,6 @@ class ModelReader:
                 f"descendants (at {', '.join(f'{t:g}' for t in formed) or 'none'} "
                 f"generations ago in this replicate).")
         return self._draw_time(low, time_max)
-
-    def _require(self, item, item_dict, keys, model):
-        """Raise a clear error if an event is missing any of the values it needs."""
-        missing = [key for key in keys if key not in item_dict]
-        if missing:
-            raise ValueError(f"Error in {model}: the {item_dict['event']} event {item} is missing "
-                             f"{', '.join(missing)}. It needs {', '.join(keys)}.")
 
     def _population_size(self, population, value, event_dict, model):
         """Draw a population's size. The size can be a range ([10000,50000]), a number
@@ -575,27 +574,69 @@ class ModelReader:
             if pdf is not None:
                 pdf.close()
 
-    def _split_parameters(self, params):
+     def _split_parameters(self, item, text, populations, model):
+        """Read one event, e.g. split{time=[10000,20000], descendants=[A,B], ancestor=AB},
+        into {'event': 'split', 'time': ['10000', '20000'], 'descendants': ['A', 'B'],
+        'ancestor': 'AB'}. Checks that the event type exists, that it has exactly the
+        parameters that type takes, and that its populations are in [Populations]."""
 
-        split_results = {}
+        problem = f"Error in {model}: can't read event {item} ({text.strip()})"
+        if text.count('{') != 1:
+            raise ValueError(f"{problem}. Write events as type{{name=value, ...}}.")
 
-        # get event type
-        event_type, params = params.split('{')
-        split_results['event'] = event_type.strip()
+        # event type
+        event_type, params = text.split('{')
+        event_type = event_type.strip()
+        if event_type not in self.EVENT_PARAMETERS:
+            raise ValueError(f"Error in {model}: {item} has the event type '{event_type}', which "
+                             f"isn't valid. Use {', '.join(self.EVENT_PARAMETERS)}.")
+        split_results = {'event': event_type}
 
-       # split parameters by commas, ignoring commas inside brackets.
-        
-        result = self._split_ignore_char_extend(params)
-        
-        for item in result:
-            if '[' in item.split('=')[1]:
-                value = [x.strip('[] ') for x in self._split_ignore_char(item.split('=')[1], '(', ')')]
-            else:
-                value = item.split('=')[1].strip()
-            split_results[item.split('=')[0].strip()] = value
+        # parameters, split by commas, ignoring commas inside brackets
+        for entry in self._split_ignore_char_extend(params):
+            entry = entry.strip()
+            if not entry:
+                continue   # e.g. after a trailing comma
+            if '=' not in entry:
+                raise ValueError(f"{problem}: '{entry}' should be written as name=value.")
+            key, value = [part.strip() for part in entry.split('=', 1)]
+            if '[' in value:
+                value = [x.strip('[] ') for x in self._split_ignore_char(value, '(', ')')]
+            split_results[key] = value
+
+        # exactly the parameters this type takes
+        expected = self.EVENT_PARAMETERS[event_type]
+        unknown = [key for key in split_results if key != 'event' and key not in expected]
+        missing = [key for key in expected if key not in split_results]
+        if unknown or missing:
+            found = [f"has {', '.join(unknown)}"] if unknown else []
+            found += [f"is missing {', '.join(missing)}"] if missing else []
+            raise ValueError(f"Error in {model}: the {event_type} event {item} "
+                             f"{' and '.join(found)}. It takes {', '.join(expected)}.")
+
+        # ranges have two values
+        for key in ('time', 'start', 'stop', 'size', 'rate', 'prop'):
+            if isinstance(split_results.get(key), list) and len(split_results[key]) != 2:
+                raise ValueError(f"{problem}: a range for {key} needs two values, [min,max].")
+
+        # population names: lists where there can be several, single names elsewhere
+        if event_type == 'symmetric_migration' and (not isinstance(split_results['populations'], list)
+                                                    or len(split_results['populations']) != 2):
+            raise ValueError(f"{problem}: populations should be two populations, as in populations=[A,B].")
+        if event_type == 'split' and not isinstance(split_results['descendants'], list):
+            split_results['descendants'] = [split_results['descendants']]
+        for key in ('ancestor', 'source', 'dest', 'population'):
+            if isinstance(split_results.get(key), list):
+                raise ValueError(f"{problem}: {key} should be one population.")
+        named = [split_results[key] for key in ('ancestor', 'source', 'dest', 'population') if key in split_results]
+        named += split_results.get('descendants', []) + split_results.get('populations', [])
+        unknown = [population for population in named if population not in populations]
+        if unknown:
+            raise ValueError(f"Error in {model}: event {item} includes {', '.join(unknown)}, "
+                             f"which isn't listed in [Populations].")
 
         return split_results
-    
+
     def _evaluate_var(self, var, event_dict):
         """Turn a value from a model file into a number. It can be a number (1e-5) or an
         expression using earlier events, population sizes, and min, max, mean, or median
