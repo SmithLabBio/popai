@@ -522,23 +522,35 @@ class ModelReader:
         return model
 
     def _plot_models(self, demographies, labels, outplot):
-        """Plot example models for a given type of demography."""
+        """Plot the first replicate of each model: to a PDF if outplot is a path, otherwise
+        on screen. A model that can't be drawn gets a page explaining why."""
 
-        if outplot is None:
-            for modelix, model in enumerate(demographies):
-                if modelix % self.config['replicates'] == 0:
-                    new_model = copy.deepcopy(model)
-                    new_model = self._nonzero(new_model)
-                    try:
-                        graph = new_model.to_demes()
-
-                        # Plot the model
-                        fig = plt.subplots()
-                        demesdraw.tubes(graph, ax=fig[1], seed=1)
-                    except:
-                        logging.warning(f"There was an issue with plotting your model. Please verify that your model is working as desired. This could arise if the migration matrix includes migration between populations not extant at the present. We recommend using events for such migration, rather than the matrix. This prevent issues with plotting.")
-                    plt.title(f"Model: {labels[modelix]}")
+        pdf = PdfPages(outplot) if outplot is not None else None
+        try:
+            for modelix in range(0, len(demographies), self.config['replicates']):
+                fig, ax = plt.subplots()
+                try:
+                    graph = self._nonzero(copy.deepcopy(demographies[modelix])).to_demes()
+                    demesdraw.tubes(graph, ax=ax, seed=1)
+                except Exception as error:
+                    # write the reason on the page instead of the plot
+                    message = (f"{labels[modelix]} couldn't be plotted: {error}. This doesn't "
+                               f"necessarily mean the model is wrong (the plotting package is "
+                               f"stricter than msprime), but check that it's what you intended.")
+                    ax.clear()
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+                    ax.text(0.5, 0.5, message, ha='center', va='center', wrap=True, fontsize=12)
+                    logging.warning(message)
+                ax.set_title(f"Model: {labels[modelix]}")
+                if pdf is not None:
+                    pdf.savefig(fig)
+                    plt.close(fig)
+                else:
                     plt.show()
+        finally:
+            if pdf is not None:
+                pdf.close()
 
         else:
             with PdfPages(outplot) as pdf:
