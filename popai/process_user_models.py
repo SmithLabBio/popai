@@ -94,8 +94,7 @@ class ModelReader:
                         if not all(key in item_dict for key in ['start', 'stop', 'populations', 'rate']):
                             raise Exception(f"Check your symmetric migration events. All must include a start and stop time, populations, and a rate.")
 
-                        start_event_time = self._get_event_value(item_dict, event_dict, 'start')
-                        stop_event_time = self._get_event_value(item_dict, event_dict, 'stop')
+                        start_event_time, stop_event_time = self._migration_window(item, item_dict, item_dict['populations'], splits, event_dict, model)
                         
                         migration_rate_0, migration_rate_1 = self._get_event_value(item_dict, event_dict, 'rate')
 
@@ -114,8 +113,7 @@ class ModelReader:
                             raise Exception(f"Check your assymmetric migration events. All must include a start and stop time, a source, a dest, and a rate.")
 
 
-                        start_event_time = self._get_event_value(item_dict, event_dict, 'start')
-                        stop_event_time = self._get_event_value(item_dict, event_dict, 'stop')
+                        start_event_time, stop_event_time = self._migration_window(item, item_dict, [item_dict['source'], item_dict['dest']], splits, event_dict, model)
                         migration_rate = self._get_event_value(item_dict, event_dict, 'rate')
 
                         demography.add_migration_rate_change(source=item_dict['source'], dest=item_dict['dest'], time=start_event_time, rate=migration_rate)
@@ -217,6 +215,57 @@ class ModelReader:
             order.append(ready[0])
             remaining.remove(ready[0])
         return order
+
+    def _migration_window(self, item, item_dict, populations, splits, event_dict, model):
+        """Draw the start and stop times of a migration event (backwards in time) so that
+        - the stop comes after the start, and
+        - the start falls while the populations all exist: after the split that forms
+          them (if they are ancestral) and before the split that ends them.
+        Raises an error only if the model's values make that impossible."""
+
+        # when the populations all exist, in this replicate
+        exists_from, exists_until = 0, np.inf
+        for time, descendants, ancestor in splits:
+            for population in populations:
+                if population == ancestor:
+                    exists_from = max(exists_from, time)
+                if population in descendants:
+                    exists_until = min(exists_until, time)
+
+        start_min, start_max = self._value_range(item_dict, event_dict, 'start')
+        stop_min, stop_max = self._value_range(item_dict, event_dict, 'stop')
+
+        # start: in its own range, while the populations exist, and before the latest possible stop
+        # (times are whole numbers, so "before" means at least one generation before)
+        low = max(start_min, exists_from)
+        high = min(start_max, exists_until - 1, stop_max - 1)
+        if low > high:
+            raise ValueError(
+                f"Error in {model}: no start time works for {item}. The start must be between "
+                f"{start_min:g} and {start_max:g}, before the stop (at most {stop_max:g}), and while "
+                f"{' and '.join(populations)} all exist (from {exists_from:g} to {exists_until:g} "
+                f"generations ago in this replicate).")
+        start = self._draw_time(low, high)
+
+        # stop: in its own range, and after the start
+        stop = self._draw_time(max(stop_min, start + 1), stop_max)
+        return start, stop
+
+    def _value_range(self, item_dict, event_dict, key):
+        """The smallest and largest values a time can take: the two ends of a [min,max]
+        range, or the same number twice for a fixed value or an expression."""
+        value = item_dict[key]
+        if isinstance(value, list):
+            return (self._evaluate_var(value[0], event_dict, 'float'),
+                    self._evaluate_var(value[1], event_dict, 'float'))
+        value = self._evaluate_var(value, event_dict, 'float')
+        return value, value
+
+    def _draw_time(self, low, high):
+        """A whole-number time drawn uniformly between low and high (or low, if they're equal)."""
+        if low == high:
+            return low
+        return np.round(self.rng.uniform(low=low, high=high, size=1)[0], 0)
 
     def _read_migration_matrix(self, modelinfo, model):
         """Read the [Migration] section of a model file, if there is one.
