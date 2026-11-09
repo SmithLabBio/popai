@@ -19,15 +19,13 @@ class ModelConfigParser:
         """
         Parse a configuration file and return a dictionary containing the parsed values.
 
-        Parameters:
-            configfile (str): Path to the configuration file.
+          Returns:
+              dict: A dictionary containing the parsed configuration values.
 
-        Returns:
-            dict: A dictionary containing the parsed configuration values.
-
-        Raises:
-            KeyError: If a required key is missing in the configuration file.
-            ValueError: If there is an issue with parsing or converting the configuration values.
+          Raises:
+              FileNotFoundError: If the configuration file, or a file it names, does not exist.
+              KeyError: If a required setting is missing from the configuration file.
+              ValueError: If a setting or an input file is written incorrectly.
         """
 
         if not os.path.isfile(self.configfile):
@@ -37,7 +35,7 @@ class ModelConfigParser:
         config.read(self.configfile)
         config_dict = {}
 
-         # determine whether user supplied models
+        # determine whether user supplied models
         config_dict['user models'] = self._optional(config, "Model", "user models")
 
         try: # read all the keys
@@ -88,7 +86,7 @@ class ModelConfigParser:
             # get population sampling info
             pop_df = pd.read_csv(config_dict["popfile"], delimiter='\t', dtype=str)
             pop_df.columns = pop_df.columns.str.strip()
-            pop_df = pop_df.apply(lambda column: column.str.strip())   # remove spaces around names'
+            pop_df = pop_df.apply(lambda column: column.str.strip())   # remove spaces around names
             if not all(col in pop_df.columns for col in ['individual', 'population']):
                 raise ValueError(f"The popfile must be tab-separated, with a header row naming the columns "
                                  f"individual and population. Found the columns: {', '.join(pop_df.columns)}.")
@@ -99,8 +97,8 @@ class ModelConfigParser:
                 raise ValueError("Some lines in the popfile are missing an individual or a population.")
             config_dict["original population dictionary"] = pop_df.set_index('individual')\
                 ['population'].to_dict()
-            config_dict["sampling dict"] = OrderedDict(pop_df['population'].value_counts().to_dict())
-
+            config_dict["sampling dict"] = OrderedDict(
+                pop_df['population'].value_counts().reindex(pop_df['population'].unique()).to_dict())
             if "vcf" in config_dict:
                 data_source = "vcf"
                 config_dict["population dictionary"] = {}
@@ -298,9 +296,7 @@ class ModelConfigParser:
 
     def _get_individuals(self, fastas):
 
-        """Count the number of variable sites in the fasta files, 
-        while accounting for the presence of IUPAC ambiguity codes, 
-        which are all treated as missing."""
+          """The sample names in the fasta files, with any quotes removed."""
         individuals = []
         for item in fastas:
             individuals.extend([str(x) for x in item.taxon_namespace])
