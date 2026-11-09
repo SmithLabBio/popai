@@ -11,8 +11,7 @@ def main():
     parser.add_argument('--plot', action='store_true', help='Plot the popai models.')
     parser.add_argument('--simulate', action='store_true', help='Simulate data under the popai models.')
     parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
-    parser.add_argument('--nbins', type=int, default=None, help='Number of bins for creating a binned SFSsimu (default: None)')
-    parser.add_argument('--output', help="Path to output folder for storing SFS.")
+    parser.add_argument('--nbins', type=int, default=None, help='Number of bins for creating a binned SFS. Use the same value as when processing the empirical data (default: None)')    parser.add_argument('--output', help="Path to output folder for storing SFS.")
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
     parser.add_argument('--maxsites', type=int, help="Max number of sites to use when building SFS from simulated")
     parser.add_argument('--cores', type=int, default=1, help="Number of cores to use when simulating data.")
@@ -83,7 +82,7 @@ def main():
 
         # build SFS for simulate data
         sfs_2d = data_simulator.mutations_to_2d_sfs()
-        msfs = data_simulator.mutations_to_sfs(arrays)
+        msfs = data_simulator.mutations_to_sfs(arrays, nbins=args.nbins)
 
         data_simulator.plot_2dsfs(sfs_2d,output_directory=args.output)
 
