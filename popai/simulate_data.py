@@ -71,7 +71,7 @@ class DataSimulator:
             if ix % 100 == 0:
                 print(f"Beginning simulation {ix} of {len(self.models)}.")
 
-            matrix, sizes = self.process_demography(ix, demography, self._draw_random_values())
+            matrix, sizes = self.process_demography(demography, self._tree(ix), self._draw_random_values())
 
             if self.labels[ix] in all_arrays:
                 all_arrays[self.labels[ix]].append(matrix)
@@ -97,9 +97,23 @@ class DataSimulator:
 
         return all_arrays
 
-    def process_demography(self, ix, demography, draws):
-        tree = None if self.user else self.config['species tree'][self.sp_tree_index[ix]]
+     def process_demography(self, demography, tree, draws):
         return self._simulate_demography(demography, tree, draws)
+
+    def _tree(self, ix):
+        """The species tree for model ix, or None for user models."""
+        return None if self.user else self.config['species tree'][self.sp_tree_index[ix]]
+
+    def __getstate__(self):
+        """What is copied to a worker process with each task (see simulate_ancestry_parallel).
+        The workers only use what _simulate_demography needs, so leave out the full lists of
+        models and labels and the data: copying them with every task made each copy bigger
+        as the number of models grew."""
+        state = self.__dict__.copy()
+        for key in ('models', 'labels', 'sp_tree_index'):
+            state.pop(key)
+        state['config'] = {key: self.config[key] for key in ('sampling dict', 'lengths', 'substitution model')}
+        return state
 
     def _draw_random_values(self):
         """Draw the random values for one replicate: its mutation rate, and the seeds for its
@@ -148,7 +162,7 @@ class DataSimulator:
             with ProcessPoolExecutor(max_workers=self.cores) as executor:
                 # Submit tasks, remembering each one's position in the list of replicates
                 futures = {
-                    executor.submit(self.process_demography, ix, demography, draw): position
+                    executor.submit(self.process_demography, demography, self._tree(ix), draw): position
                     for position, ((ix, demography), draw) in enumerate(zip(value, draws))
                 }
 
