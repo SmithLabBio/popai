@@ -468,9 +468,6 @@ class DataSimulator:
         sample_sets = self._sample_sets(demography, tree)
         n_loci = len(self.config['lengths'])
 
-        # use median length instead
-        median_length = int(np.median(self.config['lengths']))
-
         # list for storing arrays from this parameterization
         parameter_arrays = []
 
@@ -501,11 +498,20 @@ class DataSimulator:
             parameter_arrays.append(minor_encoding(np.concatenate(columns, axis=1)))
 
         else:
-            ts_iterator = msprime.sim_ancestry(sample_sets, demography=demography, random_seed = draws['ancestry seed'], sequence_length=median_length, recombination_rate=0, num_replicates=n_loci)
+            # With no recombination, a locus's gene tree doesn't depend on its length, so all the
+            # loci are simulated together at the longest length. Each locus then gets mutations
+            # only on its own length (its first lengths[k] positions).
+            lengths = [int(length) for length in self.config['lengths']]
+            longest = max(lengths)
+            ts_iterator = msprime.sim_ancestry(sample_sets, demography=demography, random_seed = draws['ancestry seed'], sequence_length=longest, recombination_rate=0, num_replicates=n_loci)
             for k, ts in enumerate(ts_iterator):
 
                 # add mutations
-                mts = msprime.sim_mutations(ts, rate=draws['mutation rate'],
+                if lengths[k] < longest:
+                    rate = msprime.RateMap(position=[0, lengths[k], longest], rate=[draws['mutation rate'], 0])
+                else:
+                    rate = draws['mutation rate']
+                mts = msprime.sim_mutations(ts, rate=rate,
                                             model=self.config["substitution model"],
                                             random_seed=draws['mutation seeds'][k])
 
