@@ -37,13 +37,8 @@ class ModelConfigParser:
         config.read(self.configfile)
         config_dict = {}
 
-        try: # determine whether user supplied models
-            config_dict['user models'] = config["Model"]["user models"]
-        except:
-            config_dict['user models'] = None
-        if config_dict['user models'] == 'None':
-            config_dict['user models'] = None
-
+         # determine whether user supplied models
+        config_dict['user models'] = self._optional(config, "Model", "user models")
 
         try: # read all the keys
             if config_dict['user models'] is None:
@@ -73,11 +68,16 @@ class ModelConfigParser:
                 val in config['Simulations']["mutation rate"].split(",")]
             config_dict["substitution model"] = config["Simulations"]["substitution model"]
             config_dict["popfile"] = config["Data"]["popfile"]
-            if config["Data"]["alignments"] == "None":
-                with open(config["Data"]["vcf"], 'r') as f:
+            alignments = self._optional(config, "Data", "alignments")
+            if alignments is None:
+                vcf = self._optional(config, "Data", "vcf")
+                if vcf is None:
+                    raise ValueError("Error in model config: the [Data] section needs alignments "
+                                     "(a folder of fasta files) or vcf (a vcf file).")
+                with open(vcf, 'r') as f:
                     config_dict["vcf"] = f.readlines()
             else:
-                config_dict["fasta folder"] = config["Data"]["alignments"]
+                config_dict["fasta folder"] = alignments
         except KeyError as e:
             raise KeyError(f"Error in model config: Missing key in configuration file: {e}") from e
         except dendropy.utility.error.DataParseError as e:
@@ -90,14 +90,16 @@ class ModelConfigParser:
 
         try: # get special information
             # get population sampling info
-            pop_df = pd.read_csv(config_dict["popfile"], delimiter='\t')
+            pop_df = pd.read_csv(config_dict["popfile"], delimiter='\t', dtype=str)
+            pop_df.columns = pop_df.columns.str.strip()
+            pop_df = pop_df.apply(lambda column: column.str.strip())   # remove spaces around names'
             if not all(col in pop_df.columns for col in ['individual', 'population']):
                 raise Exception("Error: popfile must have header row with columns: [\"individual\", \"population\"]")
             config_dict["original population dictionary"] = pop_df.set_index('individual')\
                 ['population'].to_dict()
             config_dict["sampling dict"] = OrderedDict(pop_df['population'].value_counts().to_dict())
 
-            if config["Data"]["alignments"] == "None":
+            if "vcf" in config_dict:
                 data_source = "vcf"
                 config_dict["population dictionary"] = {}
                 for key,value in config_dict["original population dictionary"].items():
@@ -162,6 +164,13 @@ class ModelConfigParser:
                         raise ValueError("Error due to using variable population size priors when setting constant Ne to True")
 
         return config_dict
+
+    def _optional(self, config, section, key):
+        """A setting that can be left out or set to None (in any case): its value, or None."""
+        value = config.get(section, key, fallback=None)
+        if value is None or value.strip().lower() in ('', 'none'):
+            return None
+        return value.strip()
 
     def _vcf_lengths(self, vcf, data):
         """The length of each contig that has data in the VCF, in the order they first appear.
