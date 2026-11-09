@@ -162,6 +162,36 @@ class ModelConfigParser:
 
         return config_dict
 
+    def _check_species_trees(self, trees, constant_ne):
+        """Check the priors written on each species tree: every node needs ne=min-max, and every
+        internal node needs a name and div=min-max, with whole numbers and the smaller value
+        first. With constant Ne, every node must have the same ne prior."""
+
+        for number, tree in enumerate(trees, 1):
+            ne_priors = set()
+            for node in tree.postorder_node_iter():
+                name = node.taxon.label if node.is_leaf() else node.label
+                if not name:
+                    raise ValueError(f"In species tree {number}, an internal node has no name. "
+                                     f"Every population needs a name, e.g. (A,B)AB.")
+                for key in (['ne'] if node.is_leaf() else ['ne', 'div']):
+                    value = node.annotations.get_value(key)
+                    match = re.fullmatch(r"\s*(\d+)\s*-\s*(\d+)\s*", str(value).strip("'"))
+                    if value is None or not match:
+                        raise ValueError(f"In species tree {number}, {name} needs {key}=min-max with whole "
+                                         f"numbers, e.g. [&{key}=10000-50000]. Found: {value}.")
+                    low, high = int(match.group(1)), int(match.group(2))
+                    if low > high:
+                        raise ValueError(f"In species tree {number}, the {key} prior of {name} is "
+                                         f"{low}-{high}. Put the smaller value first.")
+                    if key == 'ne':
+                        ne_priors.add((low, high))
+            if constant_ne and len(ne_priors) > 1:
+                shown = ', '.join(f"{low}-{high}" for low, high in sorted(ne_priors))
+                raise ValueError(f"constant Ne is True, but species tree {number} has different ne "
+                                 f"priors ({shown}). With constant Ne, every population needs the same "
+                                 f"ne prior.")
+
     def _optional(self, config, section, key):
         """A setting that can be left out or set to None (in any case): its value, or None."""
         value = config.get(section, key, fallback=None)
