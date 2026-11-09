@@ -6,6 +6,7 @@ import re
 import dendropy # ModelConfigParser
 import pandas as pd # ModelConfigParser
 from collections import OrderedDict
+import logging
 
 class ModelConfigParser:
 
@@ -128,7 +129,15 @@ class ModelConfigParser:
                 config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
                     path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
                         ) for x in fasta_list]
+                self._warn_about_ambiguity_codes(config_dict['fastas'])
                 config_dict['lengths'] = [x.max_sequence_size for x in config_dict['fastas']]
+
+                # each sequence is one haplotype, two per diploid individual
+                odd = {population: size for population, size in config_dict["sampling dict"].items() if size % 2}
+                if odd:
+                    raise ValueError(f"popai simulates diploid individuals, so each population needs an even number "
+                                     f"of sequences in the fasta files (two phased haplotypes per individual). "
+                                     f"Odd: {', '.join(f'{p} ({n})' for p, n in odd.items())}.")
 
                 # get number variable sites
                 individuals = self._get_individuals(config_dict['fastas'])
@@ -293,6 +302,19 @@ class ModelConfigParser:
                              f"lines to the VCF header, or add 'length = ...' to the [Data] section "
                              f"of the config file.")
         return lengths
+
+    def _warn_about_ambiguity_codes(self, fastas):
+        """Warn if the alignments contain IUPAC ambiguity codes, which are usually a sign of
+        sequences from diploid individuals, with heterozygous sites as ambiguity codes."""
+        count = sum(len(re.findall(r"[RYKMSWBDHV]", str(sequence).upper()))
+                    for alignment in fastas for sequence in alignment.values())
+        if count:
+            logging.getLogger(__name__).warning(
+                "The alignments contain %s IUPAC ambiguity codes (such as R or Y). popai treats each "
+                "sequence in a fasta file as one haplotype, and reads ambiguity codes as missing data. "
+                "If your sequences are diploid individuals, with heterozygous sites written as ambiguity "
+                "codes, the empirical data won't match the simulations: use phased haplotypes (two "
+                "sequences per individual) or a VCF instead.", count)
 
     def _get_individuals(self, fastas):
 

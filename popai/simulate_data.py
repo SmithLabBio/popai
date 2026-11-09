@@ -98,12 +98,8 @@ class DataSimulator:
         return all_arrays
 
     def process_demography(self, ix, demography, draws):
-        if self.user:
-            matrix, sizes = self._simulate_demography_user(demography, draws)
-        else:
-            matrix, sizes = self._simulate_demography(demography, self.config['species tree'][self.sp_tree_index[ix]], draws)
-
-        return matrix, sizes
+        tree = None if self.user else self.config['species tree'][self.sp_tree_index[ix]]
+        return self._simulate_demography(demography, tree, draws)
 
     def _draw_random_values(self):
         """Draw the random values for one replicate: its mutation rate, and the seeds for its
@@ -432,177 +428,61 @@ class DataSimulator:
 
         return sfs_2d
 
-    def _organize_matrix(self, array_dict, simulating_dict, sp_tree):
+    def _sample_sets(self, demography, tree):
+        """One msprime SampleSet per population in the sampling dict, in that order, with one
+        diploid individual per two haplotypes. Each population's individuals come from the
+        population itself or, if it has merged with others, from the population it merged into.
+        Because the sample sets are in sampling-dict order, the rows of the genotype matrix
+        (two per individual) are too."""
 
-        ordered_array_dict = OrderedDict()
-        for key,value in self.config["sampling dict"].items():
-            # check if key in array dict
-            if key in array_dict.keys():
-                ordered_array_dict[key] = array_dict[key]
-                if ordered_array_dict[key].shape[0] == 0:
-                    sys.exit()
-            else:
-                # find match
-                found = False
-                searchvalue = key
-                while found == False:
-                    for node in sp_tree.preorder_node_iter():
-                        if not node.label == None:
-                            spname = node.label
-                        else:
-                            spname = node.taxon.label
-                        if spname == searchvalue:
-                            parent = node.parent_node.label
-                            if parent in array_dict.keys():
-                                ordered_array_dict[key] = array_dict[parent][0:self.config['sampling dict'][key],:]
-                                array_dict[parent] =  array_dict[parent][self.config['sampling dict'][key]:,:]
-                                found = True
-                            else:
-                                searchvalue=parent
+        names = {population.name for population in demography.populations}
+        merged_into = {derived: event.ancestral for event in demography.events
+                       if hasattr(event, 'derived') and event.time == 0 for derived in event.derived}
 
-
-        array_list = []
-        for key,value in ordered_array_dict.items():
-            array_list.append(value)                            
-
-        array = np.vstack(array_list)
-        return(array)
-
-    def _organize_matrix_user(self, array_dict, simulating_dict, demography):
-
-
-        ordered_array_dict = OrderedDict()
-        for key,value in self.config["sampling dict"].items():
-            
-            # check if key in array dict
-            if key in array_dict.keys():
-                ordered_array_dict[key] = array_dict[key]
-                if ordered_array_dict[key].shape[0] == 0:
-                    sys.exit()
-            else:
-                # find match
-                found = False
-                searchvalue = key
-                while found == False:
-                    for event in demography.events:
-                        if hasattr(event, 'ancestral'):
-                            if searchvalue in event.derived:
-                                parent = event.ancestral
-                                if parent in array_dict.keys():
-                                    ordered_array_dict[key] = array_dict[parent][0:self.config['sampling dict'][key],:]
-                                    array_dict[parent] =  array_dict[parent][self.config['sampling dict'][key]:,:]
-                                    found = True
-                                else:
-                                    searchvalue=parent
-
-
-        array_list = []
-        for key,value in ordered_array_dict.items():
-            array_list.append(value)                            
-
-        array = np.vstack(array_list)
-
-        return(array)
-
-    def _get_simulating_dict(self, tree):
-        simulating_dict = OrderedDict()
-        population_count = len(self.config['sampling dict'])
-        count=0
-        while len(simulating_dict) != population_count:
-            populations = [x.name for x in self.models[count][0].populations]
-            simulating_dict = {population: 0 for population in populations}
-            for species in tree.leaf_nodes():
-                if species.taxon.label not in populations:
-                    search = True
-                    searchnode = species
-                    while search:
-                        if searchnode.parent_node.label in populations:
-                            simulating_dict[searchnode.parent_node.label] += \
-                                self.downsampling[species.taxon.label] / 2
-                            search = False
-                        else:
-                            searchnode = searchnode.parent_node
-                else:
-                    simulating_dict[species.taxon.label] += \
-                        self.downsampling[species.taxon.label]/2
-            simulating_dict = {key: value for key, value in simulating_dict.items() if value != 0}
-
-            count+=1
-        return simulating_dict
+        sample_sets = []
+        for population, size in self.config['sampling dict'].items():
+            source = population
+            # species tree models leave out populations that are merged: use the closest ancestor in the model
+            if source not in names and tree is not None:
+                node = tree.find_node_with_taxon_label(source)
+                while node is not None and (node.taxon.label if node.is_leaf() else node.label) not in names:
+                    node = node.parent_node
+                if node is not None:
+                    source = node.taxon.label if node.is_leaf() else node.label
+            # user models merge populations with splits at time 0: use the population they merge into
+            while source in merged_into:
+                source = merged_into[source]
+            if source not in names:
+                raise ValueError(f"The population {population} in the popfile isn't in the model "
+                                 f"(populations: {', '.join(sorted(names))}).")
+            if size % 2:
+                raise ValueError(f"Population {population} has {size} haplotypes. popai simulates diploid "
+                                 f"individuals, so every population needs an even number of haplotypes.")
+            sample_sets.append(msprime.SampleSet(size // 2, population=source, ploidy=2))
+        return sample_sets
 
     def _simulate_demography(self, demography, tree, draws):
+        """Simulate one replicate: its loci, with the haplotypes (rows) in sampling-dict order.
+        tree is the replicate's species tree, or None for user models."""
 
-        # get dictionary for simulations
-        simulating_dict = self._get_simulating_dict_model(demography=demography, tree=tree)
+        sample_sets = self._sample_sets(demography, tree)
+        n_loci = len(self.config['lengths'])
 
-        # keys mapping pops to ids
-        id_map = OrderedDict()
-        for key in simulating_dict:
-            for population in demography.populations:
-                id_map[population.name]=population.id 
+        # use median length instead
+        median_length = int(np.median(self.config['lengths']))
 
         # list for storing arrays from this parameterization
-        parameter_arrays = []
-
-        # use median length instead
-        median_length = int(np.median(self.config['lengths']))
-
-        # iterate over fragments and perform simulations
-        #for k,length in enumerate(self.config['lengths']):
-
-            ## simulate ancestries
-            #ts = msprime.sim_ancestry(simulating_dict, demography=demography,
-            #                            random_seed = fragment_seeds[k], sequence_length=length,
-            #                            recombination_rate=0)
-        ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = draws['ancestry seed'], sequence_length=median_length, recombination_rate=0, num_replicates=len(self.config['lengths']))
-        for k, ts in enumerate(ts_iterator):
-            # add mutations
-            mts = msprime.sim_mutations(ts, rate=draws['mutation rate'],
-                                        model=self.config["substitution model"],
-                                        random_seed=draws['mutation seeds'][k])
-
-            # get array
-            array_dict = OrderedDict()
-            for key in simulating_dict.keys():
-                array_dict[key] = mts.genotype_matrix(samples=mts.samples(id_map[key])).transpose()
-
-            # organize matrix
-            array = self._organize_matrix(array_dict, simulating_dict, sp_tree=tree)
-            array = minor_encoding(array)
-
-            parameter_arrays.append(array)
-
-        # combine the parameter_ts arrays across fragments
-        dataset_array = np.column_stack(parameter_arrays)
-
-        return dataset_array, dataset_array.shape[1]
-
-    def _simulate_demography_user(self, demography, draws):
-
-        # get dictionary for simulations
-        simulating_dict = self._get_simulating_dict_demo(demography=demography)
-
-        # keys mapping pops to ids
-        id_map = OrderedDict()
-        for key in simulating_dict:
-            for population in demography.populations:
-                id_map[population.name]=population.id 
-
-        # use median length instead
-        median_length = int(np.median(self.config['lengths']))
-
-        # iterate over fragments and perform simulations
         parameter_arrays = []
 
         if self.infinite:
 
             num_sites=0
             mts=[]
-            while num_sites < len(self.config['lengths']):
-                ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = draws['ancestry seed'], discrete_genome=False, num_replicates=len(self.config['lengths'])*10)
+            while num_sites < n_loci:
+                ts_iterator = msprime.sim_ancestry(sample_sets, demography=demography, random_seed = draws['ancestry seed'], discrete_genome=False, num_replicates=n_loci*10)
 
                 for k, ts in enumerate(ts_iterator):
-                    if num_sites < len(self.config['lengths']):
+                    if num_sites < n_loci:
 
                         # add mutations
                         mt = msprime.sim_mutations(ts, rate=draws['mutation rate'],
@@ -616,137 +496,23 @@ class DataSimulator:
                     else:
                         break
 
-            # Initialize dictionary of lists
-            array_dict = OrderedDict()
-            for key in simulating_dict.keys():
-                array_dict[key] = []
+            # the first site of each locus
+            array = np.concatenate([mts_item.genotype_matrix().transpose()[:, [0]] for mts_item in mts], axis=1)
+            parameter_arrays.append(minor_encoding(array))
 
-            # Loop over each mts object in the list
-            count_test = 0
-            for mts_item in mts:
-                for key in simulating_dict.keys():
-                    array = mts_item.genotype_matrix(samples=mts_item.samples(id_map[key])).transpose()
-                    if array.shape[1] > 1:
-                        array = array[:, [0]]
-                    array_dict[key].append(array)
-
-            # concatenate arrays
-            for key in array_dict.keys():
-                array_dict[key] = np.concatenate(array_dict[key], axis=1)
-
-            ## organize matrix
-            array = self._organize_matrix_user(array_dict, simulating_dict, demography)
-            array = minor_encoding(array)
-
-            parameter_arrays.append(array)
-
-        else:   
-            ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = draws['ancestry seed'], sequence_length=median_length, recombination_rate=0, num_replicates=len(self.config['lengths']))
+        else:
+            ts_iterator = msprime.sim_ancestry(sample_sets, demography=demography, random_seed = draws['ancestry seed'], sequence_length=median_length, recombination_rate=0, num_replicates=n_loci)
             for k, ts in enumerate(ts_iterator):
-
 
                 # add mutations
                 mts = msprime.sim_mutations(ts, rate=draws['mutation rate'],
-                                                  model=self.config["substitution model"],
-                                                  random_seed=draws['mutation seeds'][k])
-                # get array
-                array_dict = OrderedDict()
-                for key in simulating_dict.keys():
-                    array_dict[key] = mts.genotype_matrix(samples=mts.samples(id_map[key])).transpose()
+                                            model=self.config["substitution model"],
+                                            random_seed=draws['mutation seeds'][k])
 
-                ## organize matrix
-                array = self._organize_matrix_user(array_dict, simulating_dict, demography)
-                array = minor_encoding(array)
-
-
-                parameter_arrays.append(array)
+                # rows are haplotypes, in sampling-dict order; columns are sites
+                parameter_arrays.append(minor_encoding(mts.genotype_matrix().transpose()))
 
         # combine the parameter_ts arrays across fragments
         dataset_array = np.column_stack(parameter_arrays)
 
         return dataset_array, dataset_array.shape[1]
-
-    def _get_simulating_dict_demo(self, demography):
-        # get sampling dict
-        this_sampling_dict = OrderedDict()
-        initially_active = []
-        sampled_inactive = []
-        all_relevant_descendents = []
-        all_descendents = []
-        
-        for population in demography.populations:
-            if population.initially_active is None:
-                initially_active.append(population.name)
-            elif population.initially_active == False and population.default_sampling_time == 0.0:
-                sampled_inactive.append(population.name)
-
-
-        for population in sampled_inactive:
-            
-            # check to see if ancestor is in sampled_inactive
-            for event in demography.events:
-                if hasattr(event, 'ancestral'):
-                    if population in event.derived:
-                        this_ancestor = event.ancestral
-            
-            
-            
-            to_check = [population]
-            relevant_descendants = []
-            while len(to_check) > 0:
-                for item in to_check:
-                    for event in demography.events:
-                        if hasattr(event, 'ancestral'):
-                            if event.ancestral == item:
-                                to_check.extend(event.derived)
-                                to_check.remove(item)
-                                relevant_descendants.extend([x for x in to_check if x in initially_active])
-                                all_descendents.extend([x for x in to_check])
-                                to_check = [x for x in to_check if x not in initially_active]
-            
-
-            if this_ancestor == population or this_ancestor not in sampled_inactive:
-                this_sampling_dict[population] = 0
-                for item in relevant_descendants:         
-                    this_sampling_dict[population] += self.config['sampling dict'][item]
-                all_relevant_descendents.extend(relevant_descendants)
-        
-
-        revised_sampling_dictionary = OrderedDict()
-
-        initially_active = [x for x in initially_active if not x in all_relevant_descendents]
-
-        for population in initially_active:
-            this_sampling_dict[population] = self.config['sampling dict'][population]
-
-        for key,value in this_sampling_dict.items():
-            if key not in all_descendents:
-                if value % 2 != 0:
-                    raise Exception("Remember we simulate diploid individuals. If you have an odd number of samples, something has gone wrong.")
-                revised_sampling_dictionary[key] = value // 2
-        
-
-        return(revised_sampling_dictionary)
-
-    def _get_simulating_dict_model(self, demography, tree):
-
-        # figure out how to sample individuals
-        simulating_dict = OrderedDict()
-        populations = [x.name for x in demography.populations]
-        simulating_dict = {population: 0 for population in populations}
-        for species in tree.leaf_nodes():
-            if species.taxon.label not in populations:
-                search = True
-                searchnode = species
-                while search:
-                    if searchnode.parent_node.label in populations:
-                        simulating_dict[searchnode.parent_node.label] += \
-                            self.config['sampling dict'][species.taxon.label] / 2
-                        search = False
-                    else:
-                        searchnode = searchnode.parent_node
-            else:
-                simulating_dict[species.taxon.label] += \
-                    self.config['sampling dict'][species.taxon.label]/2
-        simulating_dict = OrderedDict({key: value for key, value in simulating_dict.items() if value != 0})
-        return(simulating_dict)
