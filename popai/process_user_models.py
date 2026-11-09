@@ -200,6 +200,8 @@ class ModelReader:
             shown = f"[{','.join(end.strip() for end in ends)}]" if len(ends) > 1 else ends[0].strip()
             problem = f"Error in {model}: the {key} of {what} is {shown}"
 
+            if len({end.strip().endswith('Nm') for end in ends}) > 1:
+                raise ValueError(f"{problem}. Both ends of a range must be rates, or both Nm values.")
             if len(numbers) == 2 and numbers[0] > numbers[1]:
                 raise ValueError(f"{problem}. Put the smaller value first.")
             if key == 'size' and min(numbers) <= 0:
@@ -574,7 +576,7 @@ class ModelReader:
             if pdf is not None:
                 pdf.close()
 
-     def _split_parameters(self, item, text, populations, model):
+    def _split_parameters(self, item, text, populations, model):
         """Read one event, e.g. split{time=[10000,20000], descendants=[A,B], ancestor=AB},
         into {'event': 'split', 'time': ['10000', '20000'], 'descendants': ['A', 'B'],
         'ancestor': 'AB'}. Checks that the event type exists, that it has exactly the
