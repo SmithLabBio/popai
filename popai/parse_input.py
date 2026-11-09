@@ -49,24 +49,23 @@ class ModelConfigParser:
                 migration_paths = config['Model']['migration matrix'].split(";")
                 config_dict['migration df']=[pd.read_csv(x\
                     , index_col=0) for x in migration_paths]
-                config_dict['max migration events']=int(config['Model']['max migration events'])
-                try:
-                    config_dict["migration rate"] = [float(val.strip("U(").strip(")")) \
-                        for val in config['Model']["migration rate"].split(",")]
-                except:
-                    config_dict["migration rate"] = [val.strip("U(").strip(")") \
-                        for val in config['Model']["migration rate"].split(",")]
+                config_dict['max migration events'] = self._whole_number(config, 'Model', 'max migration events', 0)
+                config_dict["migration rate"] = self._uniform_prior(
+                    config['Model']["migration rate"], "migration rate", allow_nm=True)
                 config_dict["symmetric"] = config.getboolean("Model", "symmetric")
                 config_dict["secondary contact"] = config.getboolean("Model", "secondary contact")
                 config_dict["divergence with gene flow"] = config.getboolean(
                     "Model", "divergence with gene flow")
                 config_dict["constant Ne"] = config.getboolean(
                     "Model", "constant Ne")
-            config_dict['replicates']=int(config['Other']['replicates'])
-            config_dict["seed"] = int(config["Other"]["seed"])
-            config_dict["mutation rate"] = [float(val.strip("U(").strip(")")) for \
-                val in config['Simulations']["mutation rate"].split(",")]
-            config_dict["substitution model"] = config["Simulations"]["substitution model"]
+            config_dict['replicates'] = self._whole_number(config, 'Other', 'replicates', 1)
+            config_dict["seed"] = self._whole_number(config, 'Other', 'seed', 0)
+            config_dict["mutation rate"] = self._uniform_prior(
+                config['Simulations']["mutation rate"], "mutation rate")
+            config_dict["substitution model"] = config["Simulations"]["substitution model"].strip()
+            if config_dict["substitution model"].lower() not in ('jc69', 'binary'):
+                raise ValueError(f"The substitution model is '{config_dict['substitution model']}'. "
+                                 f"Use JC69 or binary.")
             config_dict["popfile"] = config["Data"]["popfile"]
             alignments = self._optional(config, "Data", "alignments")
             if alignments is None:
@@ -160,6 +159,9 @@ class ModelConfigParser:
         if config_dict['user models'] is None:
             self._check_species_trees(config_dict['species tree'], config_dict['constant Ne'])
 
+            self._check_migration_tables(config_dict['species tree'], config_dict['migration df'],
+                                         migration_paths)
+
         return config_dict
 
     def _check_species_trees(self, trees, constant_ne):
@@ -191,6 +193,66 @@ class ModelConfigParser:
                 raise ValueError(f"constant Ne is True, but species tree {number} has different ne "
                                  f"priors ({shown}). With constant Ne, every population needs the same "
                                  f"ne prior.")
+
+    def _check_migration_tables(self, trees, tables, paths):
+        """Each species tree needs its own migration table (in the same order, separated by ;
+        in 'migration matrix'), naming the same populations as the tree, with T or F in every
+        entry. Spaces around the names are removed."""
+
+        if len(tables) != len(trees):
+            raise ValueError(f"There are {len(trees)} species trees but {len(tables)} migration tables. "
+                             f"Give one table per tree, separated by ; in 'migration matrix'.")
+        for number, (tree, table, path) in enumerate(zip(trees, tables, paths), 1):
+            populations = {node.taxon.label if node.is_leaf() else node.label
+                           for node in tree.postorder_node_iter()}
+            table.index = table.index.astype(str).str.strip()
+            table.columns = table.columns.astype(str).str.strip()
+            for what, names in (("rows", table.index), ("columns", table.columns)):
+                if set(names) != populations:
+                    raise ValueError(f"The {what} of the migration table {path.strip()} are {', '.join(names)}, "
+                                     f"but species tree {number} has the populations "
+                                     f"{', '.join(sorted(populations))}. They must match.")
+            bad = [value for value in table.to_numpy().ravel()
+                   if str(value).strip().upper() not in ('T', 'F', 'TRUE', 'FALSE')]
+            if bad:
+                raise ValueError(f"The migration table {path.strip()} should only contain T or F, "
+                                 f"but it has {bad[0]}.")
+
+    def _whole_number(self, config, section, key, minimum):
+        """A setting that must be a whole number of at least minimum."""
+        text = config[section][key]
+        try:
+            value = int(text)
+        except ValueError:
+            raise ValueError(f"'{key}' in [{section}] is '{text}', but it must be a whole number.") from None
+        if value < minimum:
+            raise ValueError(f"'{key}' in [{section}] is {value}, but it must be at least {minimum}.")
+        return value
+
+    def _uniform_prior(self, text, setting, allow_nm=False):
+        """Read a prior written U(min, max). Returns [min, max] as numbers or, for migration
+        rates given as numbers of migrants, as text such as ['1Nm', '2Nm']."""
+
+        example = "U(1e-5, 1e-4) or U(0.5Nm, 2Nm)" if allow_nm else "U(5e-9, 5e-8)"
+        match = re.fullmatch(r"\s*U\s*\(\s*([^,()]+?)\s*,\s*([^,()]+?)\s*\)\s*", text)
+        if not match:
+            raise ValueError(f"The {setting} prior is '{text}'. Write it as {example}.")
+        ends = [match.group(1), match.group(2)]
+
+        is_nm = [end.endswith('Nm') for end in ends]
+        if any(is_nm) and not allow_nm:
+            raise ValueError(f"The {setting} prior is '{text}'. Nm values are only allowed for migration rates.")
+        if is_nm[0] != is_nm[1]:
+            raise ValueError(f"The {setting} prior is '{text}'. Both values must be rates, or both Nm values.")
+        try:
+            numbers = [float(end[:-2] if nm else end) for end, nm in zip(ends, is_nm)]
+        except ValueError:
+            raise ValueError(f"The {setting} prior is '{text}'. Write it as {example}.") from None
+        if numbers[0] > numbers[1]:
+            raise ValueError(f"The {setting} prior is '{text}'. Put the smaller value first.")
+        if numbers[0] < 0:
+            raise ValueError(f"The {setting} prior is '{text}', but it can't be negative.")
+        return ends if is_nm[0] else numbers
 
     def _optional(self, config, section, key):
         """A setting that can be left out or set to None (in any case): its value, or None."""
