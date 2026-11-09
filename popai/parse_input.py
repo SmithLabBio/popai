@@ -296,7 +296,7 @@ class ModelConfigParser:
 
     def _get_individuals(self, fastas):
 
-          """The sample names in the fasta files, with any quotes removed."""
+        """The sample names in the fasta files, with any quotes removed."""
         individuals = []
         for item in fastas:
             individuals.extend([str(x) for x in item.taxon_namespace])
