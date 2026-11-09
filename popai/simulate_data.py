@@ -17,6 +17,7 @@ from popai.utils import minor_encoding
 from tqdm import tqdm
 import pickle
 from collections import defaultdict
+from popai.process_empirical import _apply_maxsites
 
 class DataSimulator:
 
@@ -28,7 +29,7 @@ class DataSimulator:
         self.config = config
         self.cores = cores
         self.downsampling = downsampling
-        self.max_sites = max_sites
+        self.max_sites = np.inf if max_sites is None else max_sites   # None: keep every SNP
         self.user = user
         self.sp_tree_index = sp_tree_index
         self.output = output
@@ -92,22 +93,7 @@ class DataSimulator:
 
         for model, values in all_arrays.items():
             for i, matrix in enumerate(values):
-                if len(matrix) > 0:
-                    if matrix.shape[1] > self.max_sites:
-                        sampled_indices = np.random.choice(matrix.shape[1], size=self.max_sites, replace=False)
-                        sampled_indices.sort()
-                        all_arrays[model][i] = matrix[:, sampled_indices]
-                    elif matrix.shape[1] < self.max_sites:
-                        num_missing_columns = self.max_sites - matrix.shape[1]
-                        missing_columns = np.full((matrix.shape[0], num_missing_columns), -1)
-                        modified_matrix = np.concatenate((matrix, missing_columns), axis=1)
-                        all_arrays[model][i] = modified_matrix
-                else:
-                    num_missing_columns = self.max_sites - 0
-                    modified_matrix = np.full((sum(self.config["sampling dict"].values()),
-                                               num_missing_columns), -1)
-                    all_arrays[model][i] = modified_matrix
-                
+                all_arrays[model][i] = _apply_maxsites(matrix, self.max_sites)
 
         return all_arrays
 
@@ -181,21 +167,8 @@ class DataSimulator:
             self.logger.info("Simulation execution time: %s seconds.", execution_time)
     
             for matrix_ix in range(len(all_arrays)):
-                matrix = all_arrays[matrix_ix]
-                if len(matrix) > 0:
-                    if matrix.shape[1] > self.max_sites:
-                        modified_matrix = matrix[:, :self.max_sites]
-                        #all_arrays[matrix_ix] = matrix[:, :self.max_sites]
-                    elif matrix.shape[1] < self.max_sites:
-                        num_missing_columns = self.max_sites - matrix.shape[1]
-                        missing_columns = np.full((matrix.shape[0], num_missing_columns), -1)
-                        modified_matrix = np.concatenate((matrix, missing_columns), axis=1)
-                        #all_arrays[matrix_ix]  = modified_matrix
-                else:
-                    num_missing_columns = self.max_sites - 0
-                    modified_matrix = np.full((sum(self.config["sampling dict"].values()),
-                                               num_missing_columns), -1)
-                    #all_arrays[matrix_ix]  = modified_matrix
+                # keep the first max_sites SNPs, or pad with missing data (-1), as for empirical data
+                modified_matrix = _apply_maxsites(all_arrays[matrix_ix], self.max_sites)
 
                 # sort matrix
                 pop_sizes = self.config["sampling dict"].values()
