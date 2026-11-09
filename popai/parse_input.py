@@ -45,7 +45,7 @@ class ModelConfigParser:
                 config_dict['species tree'] = dendropy.TreeList.get(
                     path=config['Model']['species tree file'], schema="nexus")
                 if len(config_dict["species tree"]) == 0:
-                    raise ValueError("Error in species tree.")
+                    raise ValueError(f"The species tree file {config['Model']['species tree file']} has no trees.")
                 migration_paths = config['Model']['migration matrix'].split(";")
                 config_dict['migration df']=[pd.read_csv(x\
                     , index_col=0) for x in migration_paths]
@@ -84,9 +84,6 @@ class ModelConfigParser:
             raise ValueError(f"Error parsing tree: {e}") from e
         except pd.errors.ParserError as e:
             raise ValueError(f"Error in migration table: {e}") from e
-        except Exception as e:
-            raise RuntimeError(f"Unexpected error occurred: {e}") from e
-
 
         try: # get special information
             # get population sampling info
@@ -94,7 +91,13 @@ class ModelConfigParser:
             pop_df.columns = pop_df.columns.str.strip()
             pop_df = pop_df.apply(lambda column: column.str.strip())   # remove spaces around names'
             if not all(col in pop_df.columns for col in ['individual', 'population']):
-                raise Exception("Error: popfile must have header row with columns: [\"individual\", \"population\"]")
+                raise ValueError(f"The popfile must be tab-separated, with a header row naming the columns "
+                                 f"individual and population. Found the columns: {', '.join(pop_df.columns)}.")
+            if not isinstance(pop_df.index, pd.RangeIndex):
+                raise ValueError("Some lines in the popfile have more than two columns. Each line should "
+                                 "be an individual and its population, separated by a tab.")
+            if pop_df[['individual', 'population']].isna().any().any():
+                raise ValueError("Some lines in the popfile are missing an individual or a population.")
             config_dict["original population dictionary"] = pop_df.set_index('individual')\
                 ['population'].to_dict()
             config_dict["sampling dict"] = OrderedDict(pop_df['population'].value_counts().to_dict())
@@ -122,7 +125,9 @@ class ModelConfigParser:
 
                 # get fastas and lengths
                 fasta_list = sorted(os.listdir(config_dict["fasta folder"]))
-                fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta')]
+                fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta') or x.endswith('.fas')]
+                if not fasta_list:
+                    raise ValueError(f"There are no .fa, .fas, or .fasta files in {config_dict['fasta folder']}.")
                 config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
                     path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
                         ) for x in fasta_list]
@@ -138,19 +143,20 @@ class ModelConfigParser:
             # Only in popfile
             unique_popfile_ids = popfile_id_set - alignment_id_set
             if unique_popfile_ids:
-                raise Exception(f"Error: popfile sample ids: [{','.join(unique_popfile_ids)}] not in {data_source} file.") 
-
+                raise ValueError(f"These samples are in the popfile but not in the {data_source} file: "
+                                 f"{', '.join(sorted(unique_popfile_ids))}.")
             # Only in alignment
             unique_alignment_ids = alignment_id_set - popfile_id_set
             if unique_alignment_ids:
-                raise Exception(f"Error: {data_source} sample ids: [{','.join(unique_alignment_ids)}] not in popfile.") 
-
+                raise ValueError(f"These samples are in the {data_source} file but not in the popfile: "
+                                 f"{', '.join(sorted(unique_alignment_ids))}.")
 
         except dendropy.utility.error.DataParseError as e:
-            raise ValueError(f"Error parsing tree: {e}") from e
-        except Exception as e:
-            raise RuntimeError(f"Unexpected error occurred: {e}") from e
-
+            raise ValueError(f"Error reading a fasta file: {e}") from e
+        except pd.errors.ParserError as e:
+            raise ValueError(f"Error reading the popfile (it should be tab-separated, with two "
+                             f"columns): {e}") from e
+        
         if config_dict['user models'] is None:
             if config_dict['constant Ne']:
                 for tree in config_dict['species tree']:
