@@ -114,7 +114,7 @@ class DataSimulator:
             'mutation seeds': self.rng.integers(1, 2**32, size=n_loci),
         }
         if self.infinite:
-            draws['infinite seeds'] = self.rng.integers(1, 2**32, size=n_loci * 10)
+            draws['infinite seed'] = self.rng.integers(1, 2**32)   # starts this replicate's own stream of seeds
         return draws
 
     def simulate_ancestry_parallel(self):
@@ -476,29 +476,29 @@ class DataSimulator:
 
         if self.infinite:
 
-            num_sites=0
-            mts=[]
-            while num_sites < n_loci:
-                ts_iterator = msprime.sim_ancestry(sample_sets, demography=demography, random_seed = draws['ancestry seed'], discrete_genome=False, num_replicates=n_loci*10)
+            # one SNP from each of n_loci unlinked loci: simulate loci in batches, each batch and
+            # each locus with a new seed, and keep the first site of each locus that has a mutation
+            seeds = np.random.default_rng(draws['infinite seed'])
+            columns = []
+            batches = 0
+            while len(columns) < n_loci:
+                batches += 1
+                if batches > 1000:
+                    raise RuntimeError(f"With --infinite, only {len(columns)} of {n_loci} simulated loci had a "
+                                       f"mutation after simulating {1000 * n_loci} loci. The mutation rate "
+                                       f"({draws['mutation rate']:.3g}) may be too low.")
+                ts_iterator = msprime.sim_ancestry(sample_sets, demography=demography, random_seed=seeds.integers(1, 2**32),
+                                                   discrete_genome=False, num_replicates=n_loci)
+                for ts in ts_iterator:
+                    mts = msprime.sim_mutations(ts, rate=draws['mutation rate'], discrete_genome=False,
+                                                model=msprime.BinaryMutationModel(),
+                                                random_seed=seeds.integers(1, 2**32))
+                    if mts.num_sites > 0:
+                        columns.append(mts.genotype_matrix().transpose()[:, [0]])
+                        if len(columns) == n_loci:
+                            break
 
-                for k, ts in enumerate(ts_iterator):
-                    if num_sites < n_loci:
-
-                        # add mutations
-                        mt = msprime.sim_mutations(ts, rate=draws['mutation rate'],
-                                                            discrete_genome=False,
-                                                            model=msprime.BinaryMutationModel(),
-                                                            random_seed = draws['infinite seeds'][k])
-                        if mt.num_mutations > 0:
-                            mts.append(mt)
-                            num_sites+=1
-
-                    else:
-                        break
-
-            # the first site of each locus
-            array = np.concatenate([mts_item.genotype_matrix().transpose()[:, [0]] for mts_item in mts], axis=1)
-            parameter_arrays.append(minor_encoding(array))
+            parameter_arrays.append(minor_encoding(np.concatenate(columns, axis=1)))
 
         else:
             ts_iterator = msprime.sim_ancestry(sample_sets, demography=demography, random_seed = draws['ancestry seed'], sequence_length=median_length, recombination_rate=0, num_replicates=n_loci)
