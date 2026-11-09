@@ -2,6 +2,7 @@
 
 import configparser # ModelConfigParser
 import os
+import re
 import dendropy # ModelConfigParser
 import pandas as pd # ModelConfigParser
 from collections import OrderedDict
@@ -106,21 +107,8 @@ class ModelConfigParser:
                 for key,value in config_dict["sampling dict"].items():
                     config_dict["sampling dict"][key] = value*2
 
-                # get lengths
-                lengths = [x for x in config_dict["vcf"] if "length" in x]
-                lengths = [int(x.split("=")[3].split(">")[0]) for x in lengths]
-                if not len(lengths) > 0:
-                    contigs = [x for x in config_dict["vcf"] if not "#" in x] # strip header
-                    contigs = [x.split('\t')[0] for x in contigs]
-                    contigs = set(contigs)
-                    try:
-                        lengths = [int(config["Data"]["length"]) for x in range(len(contigs))]
-                        config_dict['lengths'] = lengths
-                    except KeyError as e:
-                        raise KeyError(f"Error in model config: Missing key in configuration file: {e}") from e
-                config_dict['lengths'] = lengths
-
-                    # TODO: add error handling if length is not there.
+                # length of each contig that has data
+                config_dict['lengths'] = self._vcf_lengths(config_dict["vcf"], config["Data"])
 
                 # get individuals
                 individuals = [x for x in config_dict["vcf"] if x.startswith("#CHROM")][0]
@@ -131,7 +119,7 @@ class ModelConfigParser:
                 config_dict["population dictionary"] = config_dict["original population dictionary"]
 
                 # get fastas and lengths
-                fasta_list = os.listdir(config_dict["fasta folder"])
+                fasta_list = sorted(os.listdir(config_dict["fasta folder"]))
                 fasta_list = [x for x in fasta_list if x.endswith('.fa') or x.endswith('.fasta')]
                 config_dict['fastas'] = [dendropy.DnaCharacterMatrix.get(
                     path=os.path.join(config_dict["fasta folder"], x), schema="fasta", \
@@ -174,6 +162,41 @@ class ModelConfigParser:
                         raise ValueError("Error due to using variable population size priors when setting constant Ne to True")
 
         return config_dict
+
+    def _vcf_lengths(self, vcf, data):
+        """The length of each contig that has data in the VCF, in the order they first appear.
+        Lengths come from the ##contig header lines (##contig=<ID=1,length=1000>); a contig
+        without one uses 'length' from the [Data] section of the config file."""
+
+        # lengths given in the header
+        header_lengths = {}
+        for line in vcf:
+            if not line.startswith('##'):
+                break   # the header is over
+            if line.startswith('##contig'):
+                contig = re.search(r"[<,]ID=([^,>]+)", line)
+                length = re.search(r"[<,]length=(\d+)", line)
+                if contig and length:
+                    header_lengths[contig.group(1)] = int(length.group(1))
+
+        # contigs with data, in the order they first appear
+        contigs = list(dict.fromkeys(line.split('\t')[0] for line in vcf
+                                     if line.strip() and not line.startswith('#')))
+
+        lengths, missing = [], []
+        for contig in contigs:
+            if contig in header_lengths:
+                lengths.append(header_lengths[contig])
+            elif 'length' in data:
+                lengths.append(int(data['length']))
+            else:
+                missing.append(contig)
+        if missing:
+            shown = ', '.join(missing[:10]) + (', ...' if len(missing) > 10 else '')
+            raise ValueError(f"The VCF has no length for contig(s) {shown}. Add ##contig=<ID=...,length=...> "
+                             f"lines to the VCF header, or add 'length = ...' to the [Data] section "
+                             f"of the config file.")
+        return lengths
 
     def _get_individuals(self, fastas):
 
