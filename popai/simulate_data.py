@@ -70,10 +70,7 @@ class DataSimulator:
             if ix % 100 == 0:
                 print(f"Beginning simulation {ix} of {len(self.models)}.")
 
-            if self.user == True:
-                matrix, sizes = self._simulate_demography_user(demography)
-            else:
-                matrix, sizes = self._simulate_demography(demography,  self.config['species tree'][self.sp_tree_index[ix]])
+            matrix, sizes = self.process_demography(ix, demography, self._draw_random_values())
 
             if self.labels[ix] in all_arrays:
                 all_arrays[self.labels[ix]].append(matrix)
@@ -114,13 +111,29 @@ class DataSimulator:
 
         return all_arrays
 
-    def process_demography(self, ix, demography):
+    def process_demography(self, ix, demography, draws):
         if self.user:
-            matrix, sizes = self._simulate_demography_user(demography)
+            matrix, sizes = self._simulate_demography_user(demography, draws)
         else:
-            matrix, sizes = self._simulate_demography(demography, self.config['species tree'][self.sp_tree_index[ix]])
+            matrix, sizes = self._simulate_demography(demography, self.config['species tree'][self.sp_tree_index[ix]], draws)
 
         return matrix, sizes
+
+    def _draw_random_values(self):
+        """Draw the random values for one replicate: its mutation rate, and the seeds for its
+        ancestry and mutation simulations. These must be drawn in the main process: each worker
+        process gets its own copy of self.rng, in the same state, so draws made inside the
+        workers would be the same for every replicate."""
+        n_loci = len(self.config['lengths'])
+        draws = {
+            'mutation rate': self.rng.uniform(low=self.config["mutation rate"][0],
+                                              high=self.config["mutation rate"][1]),
+            'ancestry seed': self.rng.integers(1, 2**32),
+            'mutation seeds': self.rng.integers(1, 2**32, size=n_loci),
+        }
+        if self.infinite:
+            draws['infinite seeds'] = self.rng.integers(1, 2**32, size=n_loci * 10)
+        return draws
 
     def simulate_ancestry_parallel(self):
 
@@ -135,6 +148,10 @@ class DataSimulator:
         # list for storing sizes
         for key, value in grouped_demographies.items():
 
+            # draw each replicate's random values here, in the main process (see _draw_random_values).
+            # They are drawn even for models skipped by the checkpoint, so later models get the same values.
+            draws = [self._draw_random_values() for _ in value]
+
             # checkpoint
             if self.checkpoint and os.path.exists(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(key))):
                 print("Output for model %s already exists. Skipping model." % str(key))
@@ -142,23 +159,22 @@ class DataSimulator:
 
             start_time = time.time()  # Record the start time
 
-            # dictionary for storing arrays and list for storing sizes.
-            all_arrays = []
-            all_sizes = []
-    
+            # lists for storing arrays and sizes, in the order of the replicates
+            all_arrays = [None] * len(value)
+            all_sizes = [None] * len(value)
+
             with ProcessPoolExecutor(max_workers=self.cores) as executor:
-                # Submit tasks
+                # Submit tasks, remembering each one's position in the list of replicates
                 futures = {
-                    executor.submit(self.process_demography, ix, demography): ix
-                    for ix, demography in value
+                    executor.submit(self.process_demography, ix, demography, draw): position
+                    for position, ((ix, demography), draw) in enumerate(zip(value, draws))
                 }
-    
-                # Collect results
+
+                # Collect results as they finish, putting each in its replicate's position
                 for future in tqdm(as_completed(futures), total=len(value), desc=f"Processing simulations (Model {str(key)})"):
-                    matrix, sizes = future.result()
-                    all_arrays.append(matrix)
-                    all_sizes.append(sizes)
-    
+                    position = futures[future]
+                    all_arrays[position], all_sizes[position] = future.result()
+
             end_time = time.time()  # Record the end time
             execution_time = end_time - start_time  # Calculate the execution time
     
@@ -210,8 +226,8 @@ class DataSimulator:
 
 
             # shorten arrays that are too short, and pad arrays that are too long.
-            median_size = int(np.ceil(np.median(sizes)))
-    
+            median_size = int(np.ceil(np.median(all_sizes)))
+
             self.logger.info("Median simulated data has %s SNPs."\
                              " If this is very different than the number of SNPs in your empirical data, you may want to change some priors.", 
                              median_size)
@@ -562,7 +578,7 @@ class DataSimulator:
             count+=1
         return simulating_dict
 
-    def _simulate_demography(self, demography, tree):
+    def _simulate_demography(self, demography, tree, draws):
 
         # get dictionary for simulations
         simulating_dict = self._get_simulating_dict_model(demography=demography, tree=tree)
@@ -573,18 +589,8 @@ class DataSimulator:
             for population in demography.populations:
                 id_map[population.name]=population.id 
 
-        # draw mutation rates from priors
-        mutation_rates = self.rng.uniform(low=self.config["mutation rate"][0],
-                                              high=self.config["mutation rate"][1],
-                                              size=1)[0]
-        mutation_rates = np.round(mutation_rates, decimals=20)
-
         # list for storing arrays from this parameterization
         parameter_arrays = []
-
-        # get seeds for simulating data for each fragment
-        fragment_seeds_1 = self.rng.integers(2**32, size=len(self.config['lengths']))
-        fragment_seeds_2 = self.rng.integers(2**32, size=1)[0]
 
         # use median length instead
         median_length = int(np.median(self.config['lengths']))
@@ -596,12 +602,12 @@ class DataSimulator:
             #ts = msprime.sim_ancestry(simulating_dict, demography=demography,
             #                            random_seed = fragment_seeds[k], sequence_length=length,
             #                            recombination_rate=0)
-        ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = fragment_seeds_2, sequence_length=median_length, recombination_rate=0, num_replicates=len(self.config['lengths']))
+        ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = draws['ancestry seed'], sequence_length=median_length, recombination_rate=0, num_replicates=len(self.config['lengths']))
         for k, ts in enumerate(ts_iterator):
             # add mutations
-            mts = msprime.sim_mutations(ts, rate=mutation_rates,
+            mts = msprime.sim_mutations(ts, rate=draws['mutation rate'],
                                         model=self.config["substitution model"],
-                                        random_seed=fragment_seeds_1[k])
+                                        random_seed=draws['mutation seeds'][k])
 
             # get array
             array_dict = OrderedDict()
@@ -619,7 +625,7 @@ class DataSimulator:
 
         return dataset_array, dataset_array.shape[1]
 
-    def _simulate_demography_user(self, demography):
+    def _simulate_demography_user(self, demography, draws):
 
         # get dictionary for simulations
         simulating_dict = self._get_simulating_dict_demo(demography=demography)
@@ -629,17 +635,6 @@ class DataSimulator:
         for key in simulating_dict:
             for population in demography.populations:
                 id_map[population.name]=population.id 
-
-        # draw mutation rates from priors
-        mutation_rates = self.rng.uniform(low=self.config["mutation rate"][0],
-                                              high=self.config["mutation rate"][1],
-                                              size=1)[0]
-        mutation_rates = np.round(mutation_rates, decimals=20)
-
-        # get seeds for simulating data for each fragment
-        fragment_seeds_1 = self.rng.integers(2**32, size=len(self.config['lengths']))
-        fragment_seeds_2 = self.rng.integers(2**32, size=1)[0]
-        fragment_seeds_3 = self.rng.integers(2**32, size=len(self.config['lengths'])*10)
 
         # use median length instead
         median_length = int(np.median(self.config['lengths']))
@@ -652,16 +647,16 @@ class DataSimulator:
             num_sites=0
             mts=[]
             while num_sites < len(self.config['lengths']):
-                ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = fragment_seeds_2, discrete_genome=False, num_replicates=len(self.config['lengths'])*10)
+                ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = draws['ancestry seed'], discrete_genome=False, num_replicates=len(self.config['lengths'])*10)
 
                 for k, ts in enumerate(ts_iterator):
                     if num_sites < len(self.config['lengths']):
 
                         # add mutations
-                        mt = msprime.sim_mutations(ts, rate=mutation_rates,
+                        mt = msprime.sim_mutations(ts, rate=draws['mutation rate'],
                                                             discrete_genome=False,
                                                             model=msprime.BinaryMutationModel(),
-                                                            random_seed = fragment_seeds_3[k])
+                                                            random_seed = draws['infinite seeds'][k])
                         if mt.num_mutations > 0:
                             mts.append(mt)
                             num_sites+=1
@@ -694,15 +689,14 @@ class DataSimulator:
             parameter_arrays.append(array)
 
         else:   
-            ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = fragment_seeds_2, sequence_length=median_length, recombination_rate=0, num_replicates=len(self.config['lengths']))
+            ts_iterator = msprime.sim_ancestry(simulating_dict, demography=demography, random_seed = draws['ancestry seed'], sequence_length=median_length, recombination_rate=0, num_replicates=len(self.config['lengths']))
             for k, ts in enumerate(ts_iterator):
 
 
                 # add mutations
-                mts = msprime.sim_mutations(ts, rate=mutation_rates,
-                                                model=self.config["substitution model"],
-                                                random_seed=fragment_seeds_1[k])
-
+                mts = msprime.sim_mutations(ts, rate=draws['mutation rate'],
+                                                  model=self.config["substitution model"],
+                                                  random_seed=draws['mutation seeds'][k])
                 # get array
                 array_dict = OrderedDict()
                 for key in simulating_dict.keys():
