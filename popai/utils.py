@@ -1,6 +1,19 @@
 import numpy as np
 
 
+
+def sort_haplotypes(arr, population_sizes):
+    """Sort the rows (haplotypes) within each population by how similar they are to that
+    population's first row (Euclidean distance, most similar first; ties keep their order).
+    The rows are in population order, with population_sizes[i] rows for population i.
+    Simulated and empirical arrays are both sorted this way before they are used as CNN input."""
+    groups = np.split(arr, np.cumsum(list(population_sizes))[:-1])
+    sorted_groups = []
+    for group in groups:
+        distances = np.linalg.norm(group - group[0:1], axis=1)
+        sorted_groups.append(group[np.argsort(distances, kind='stable')])
+    return np.vstack(sorted_groups)
+
 def minor_encoding(arr):
     """Recode each site (column) so its most common allele is 0, the next most common 1,
     and so on. Ties go to the allele that appears first in the column. Missing data (-1)

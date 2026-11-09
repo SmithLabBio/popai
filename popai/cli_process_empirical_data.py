@@ -4,6 +4,7 @@ import os
 import pickle
 import numpy as np
 from popai import parse_input, process_empirical
+from popai.utils import sort_haplotypes
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for processing empirical data.')
@@ -56,8 +57,9 @@ def main():
         empirical_2d_sfs = data_processor.numpy_to_2d_sfs(empirical_array, downsampling=downsampling_dict, replicates = args.reps)
         empirical_msfs, average_snps = data_processor.numpy_to_msfs(empirical_array, downsampling=downsampling_dict, replicates = args.reps, nbins=args.nbins)
 
-        # save numpy array
-        np.save(file=os.path.join(args.output, 'empirical.npy'), arr=empirical_array)
+        # save numpy array, with the rows sorted within each population as the simulated arrays are
+        np.save(file=os.path.join(args.output, 'empirical.npy'),
+                arr=sort_haplotypes(empirical_array, config_values['sampling dict'].values()))
 
         # make plots of empirical sfs
         data_processor.plot_2dsfs(empirical_2d_sfs, output_directory=os.path.join(args.output))

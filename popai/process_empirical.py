@@ -35,7 +35,6 @@ class DataProcessor:
         # is missing data for that alignment
         rows = []
         for sample in self._samples_in_order("population dictionary"):
-            print(f"Processing sample {sample}...")
             row = []
             for alignment in self.config["fastas"]:
                 if sample in alignment:
@@ -123,7 +122,6 @@ class DataProcessor:
         for _ in range(replicates):
             # downsample each population once per replicate; count the higher-coded allele
             counts = self._downsampled_counts(sites, downsampling)
-            print(counts)
             sfs_2d = {}
             for pop1, pop2 in pairs:
                 total = downsampling[pop1] + downsampling[pop2]
