@@ -3,9 +3,10 @@
 test_empirical_parser_v2.py builds its configs by hand. These tests instead read the
 small data files in tests/ through ModelConfigParser, so they also check how the
 parser loads the popfile, FASTA folder and VCF, orders populations in the sampling
-dict, and turns VCF samples into haplotypes.
+dict (in the order they first appear in the popfile), and turns VCF samples into
+haplotypes.
 
-Run with:  python -m pytest tests/test_empirical_parser_config.py
+Run with:  python -m pytest tests/test_empirical_parser.py
 """
 
 import logging
@@ -65,28 +66,28 @@ def nonzero_cells(msfs, sizes):
 
 
 # ---------------------------------------------------------------------------
-# The mini datasets: 6 haplotypes, pop2 (4) listed before pop1 (2)
+# The mini datasets: 6 haplotypes, pop1 (2) then pop2 (4)
 # ---------------------------------------------------------------------------
 # FASTA (populations_mini.txt): n0, n1 in pop1; n2-n5 in pop2, one sequence each.
 # VCF (populations_mini_vcf.txt): n0 in pop1; n1, n2 in pop2, two haplotypes each.
-# The sampling dict comes from value_counts(), so the larger population, pop2,
-# comes first, and rows are pop2's haplotypes, then pop1's.
+# The sampling dict lists populations in the order they first appear in the popfile
+# (pop1, then pop2), so rows are pop1's haplotypes, then pop2's.
 #
-# Variable sites, rows n2 n3 n4 n5 | n0 n1 (FASTA) or n1a n1b n2a n2b | n0a n0b (VCF),
+# Variable sites, rows n0 n1 | n2 n3 n4 n5 (FASTA) or n0a n0b | n1a n1b n2a n2b (VCF),
 # recoded so 0 is the most common allele (ties: the allele seen first):
-#   site 1: FASTA  - A A A | T T   -> -1 0 0 0 1 1   (n2 has a gap)
-#           VCF    . . 1 1 | 0 0   -> -1 -1 0 0 1 1 (n1 missing)
-#   site 2: T T T T | C T          ->  0 0 0 0 1 0
-#   site 3: T C C C | T T  (3-3)   ->  0 1 1 1 0 0
-#   site 4: T T G G | T T          ->  0 0 1 1 0 0
-FASTA_ARRAY = np.array([[-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 1], [0, 0, 1, 1],
-                        [1, 1, 0, 0], [1, 0, 0, 0]])
-VCF_ARRAY = np.array([[-1, 0, 0, 0], [-1, 0, 1, 0], [0, 0, 1, 1], [0, 0, 1, 1],
-                      [1, 1, 0, 0], [1, 0, 0, 0]])
-# The multiallelic versions replace site 1 with G A A A | T T (FASTA) or 2 1 1 1 | 0 0
+#   site 1: FASTA  T T | - A A A   ->  1 1 -1 0 0 0  (n2 has a gap)
+#           VCF    0 0 | . . 1 1   ->  0 0 -1 -1 1 1 (n1 missing; a 2-2 tie, 0 seen first)
+#   site 2: C T | T T T T          ->  1 0 0 0 0 0
+#   site 3: T T | T C C C  (3-3)   ->  0 0 0 1 1 1
+#   site 4: T T | T T G G          ->  0 0 0 0 1 1
+FASTA_ARRAY = np.array([[1, 1, 0, 0], [1, 0, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0],
+                        [0, 0, 1, 1], [0, 0, 1, 1]])
+VCF_ARRAY = np.array([[0, 1, 0, 0], [0, 0, 0, 0], [-1, 0, 0, 0], [-1, 0, 1, 0],
+                      [1, 0, 1, 1], [1, 0, 1, 1]])
+# The multiallelic versions replace site 1 with T T | G A A A (FASTA) or 0 0 | 2 1 1 1
 # (VCF): three alleles, recoded A/1 -> 0, T/0 -> 1, G/2 -> 2.
-MULTIALLELIC_ARRAY = np.array([[2, 0, 0, 0], [0, 0, 1, 0], [0, 0, 1, 1], [0, 0, 1, 1],
-                               [1, 1, 0, 0], [1, 0, 0, 0]])
+MULTIALLELIC_ARRAY = np.array([[1, 1, 0, 0], [1, 0, 0, 0], [2, 0, 0, 0], [0, 0, 1, 0],
+                               [0, 0, 1, 1], [0, 0, 1, 1]])
 
 MINI = {
     "fasta": dict(popfile="populations_mini.txt", alignments="mini_dataset"),
@@ -110,15 +111,15 @@ def to_numpy(config):
 
 def test_fasta_config(tmp_path):
     config = parse(tmp_path, **MINI["fasta"])
-    assert config["sampling dict"] == OrderedDict([("pop2", 4), ("pop1", 2)])
-    assert list(config["sampling dict"]) == ["pop2", "pop1"]
+    assert config["sampling dict"] == OrderedDict([("pop1", 2), ("pop2", 4)])
+    assert list(config["sampling dict"]) == ["pop1", "pop2"]
     assert config["population dictionary"] == {
         "n0": "pop1", "n1": "pop1", "n2": "pop2", "n3": "pop2", "n4": "pop2", "n5": "pop2"}
 
 
 def test_vcf_config_counts_two_haplotypes_per_sample(tmp_path):
     config = parse(tmp_path, **MINI["vcf"])
-    assert list(config["sampling dict"].items()) == [("pop2", 4), ("pop1", 2)]
+    assert list(config["sampling dict"].items()) == [("pop1", 2), ("pop2", 4)]
     assert config["population dictionary"] == {
         "n0_a": "pop1", "n0_b": "pop1", "n1_a": "pop2", "n1_b": "pop2",
         "n2_a": "pop2", "n2_b": "pop2"}
@@ -134,14 +135,14 @@ def test_mini_dataset_array(tmp_path, dataset):
 def test_mini_dataset_sfs_without_downsampling(tmp_path, dataset):
     # Site 1 never counts: it has missing data in pop2 (so it can't give 4 alleles) or,
     # in the multiallelic data, three alleles. The other sites, as minor-allele counts
-    # in pop2_pop1 (site 3 is a tie, so allele 0 is counted): 0_1, 1_2, 2_0.
+    # in pop1_pop2 (site 3 is a tie, so allele 0 is counted): 1_0, 2_1, 0_2.
     dp, arr = to_numpy(parse(tmp_path, **MINI[dataset]))
     downsampling = {"pop1": 2, "pop2": 4}
     msfs, _ = dp.numpy_to_msfs(arr, downsampling)
-    assert nonzero_cells(msfs[0], [4, 2]) == {"0_1": 1, "1_2": 1, "2_0": 1}
+    assert nonzero_cells(msfs[0], [2, 4]) == {"1_0": 1, "2_1": 1, "0_2": 1}
     sfs_2d = dp.numpy_to_2d_sfs(arr, downsampling)[0]
-    assert list(sfs_2d) == [("pop2", "pop1")]
-    assert sfs_2d[("pop2", "pop1")].sum() == 3
+    assert list(sfs_2d) == [("pop1", "pop2")]
+    assert sfs_2d[("pop1", "pop2")].sum() == 3
 
 
 # ---------------------------------------------------------------------------
@@ -158,8 +159,8 @@ def three_populations(tmp_path_factory):
 
 def test_three_populations_config_and_array(three_populations):
     config, _, arr = three_populations
-    # 12 A, 10 C and 8 B individuals, ordered largest first
-    assert list(config["sampling dict"].items()) == [("A", 12), ("C", 10), ("B", 8)]
+    # 12 A, 8 B and 10 C individuals, in the order they appear in the popfile
+    assert list(config["sampling dict"].items()) == [("A", 12), ("B", 8), ("C", 10)]
     assert len(config["fastas"]) == 10
     assert arr.shape == (30, 1038)
 
@@ -167,9 +168,9 @@ def test_three_populations_config_and_array(three_populations):
 def test_three_populations_downsampling_options(three_populations):
     _, dp, arr = three_populations
     options = dp.find_downsampling(arr)
-    assert (8, 6, 6) in options   # sizes for A, C, B
+    assert (8, 6, 6) in options   # sizes for A, B, C
     assert all(all(size % 2 == 0 for size in key) for key in options)
-    assert options[(12, 10, 8)] <= options[(8, 6, 6)] <= arr.shape[1]
+    assert options[(12, 8, 10)] <= options[(8, 6, 6)] <= arr.shape[1]
 
 
 def test_three_populations_sfs(three_populations):
@@ -178,7 +179,7 @@ def test_three_populations_sfs(three_populations):
     sfs_2d = dp.numpy_to_2d_sfs(arr, downsampling, replicates=2)
     assert len(sfs_2d) == 2
     assert {key: s.shape for key, s in sfs_2d[0].items()} == {
-        ("A", "C"): (9, 7), ("A", "B"): (9, 7), ("C", "B"): (7, 7)}
+        ("A", "B"): (9, 7), ("A", "C"): (9, 7), ("B", "C"): (7, 7)}
     msfs, sites = dp.numpy_to_msfs(arr, downsampling, replicates=2)
     assert len(msfs) == 2 and msfs[0].shape == (9 * 7 * 7,)
     assert 0 < sites <= arr.shape[1]

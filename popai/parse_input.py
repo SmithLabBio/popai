@@ -44,7 +44,7 @@ class ModelConfigParser:
                     path=config['Model']['species tree file'], schema="nexus")
                 if len(config_dict["species tree"]) == 0:
                     raise ValueError(f"The species tree file {config['Model']['species tree file']} has no trees.")
-                migration_paths = config['Model']['migration matrix'].split(";")
+                migration_paths = [path.strip() for path in config["Model"]["migration matrix"].split(";")]
                 config_dict['migration df']=[pd.read_csv(x\
                     , index_col=0) for x in migration_paths]
                 config_dict['max migration events'] = self._whole_number(config, 'Model', 'max migration events', 0)
