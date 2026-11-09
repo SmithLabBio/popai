@@ -158,16 +158,7 @@ class ModelConfigParser:
                              f"columns): {e}") from e
         
         if config_dict['user models'] is None:
-            if config_dict['constant Ne']:
-                for tree in config_dict['species tree']:
-                    mins = []
-                    maxs = []
-                    for node in tree.postorder_node_iter():
-                        min_ne, max_ne = map(int, node.annotations['ne'].value.strip("'").split("-"))
-                        mins.append(min_ne)
-                        maxs.append(max_ne)
-                    if len(set(mins)) > 1 or len(set(maxs)) > 1:
-                        raise ValueError("Error due to using variable population size priors when setting constant Ne to True")
+            self._check_species_trees(config_dict['species tree'], config_dict['constant Ne'])
 
         return config_dict
 
