@@ -1,6 +1,6 @@
-##############################
+#################################
 Tutorial 3: User-specified models
-##############################
+#################################
 
 If the default model set does not fit a user's goals, then they can design their own model set. Models are specified as described `here <https://popai.readthedocs.io/en/latest/usage/usermodels.html>`_.
 

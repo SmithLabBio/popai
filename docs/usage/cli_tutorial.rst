@@ -1,17 +1,12 @@
-##############################
-Tutorial 1a: Running popai through the command line
-##############################
+##################################################
+Tutorial 1: Running popai through the command line
+##################################################
 
 ==========================================
 Step 1: Install popai
 ==========================================
 
-Use pip to install popai::
-
-    git clone https://github.com/SmithLabBio/popai.git
-    cd popai/popai
-    pip install .
-    cd ../../
+Install popai as described in `Installing with pip <https://popai.readthedocs.io/en/latest/usage/installation.html>`_.
 
 ==========================================
 Step 2: Prepare Input
@@ -26,6 +21,8 @@ Create a directory in which to run the tutorial, and copy these data to that dir
     mkdir tutorial_1
     cd tutorial_1
     cp -r /path/to/downloaded/data/tutorial_1_data ./
+
+This tutorial uses the FASTA alignments in tutorial_1_data/alignments. The same data are also in tutorial_1_data as a VCF (alignments/alignment.vcf, with the pop file populations_vcf.txt). To use a VCF instead, see the VCF section of `Input Data <https://popai.readthedocs.io/en/latest/usage/parsinginput.html>`_.
 
 ==========================================
 Step 3: Processing Empirical data

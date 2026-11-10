@@ -1,6 +1,6 @@
-##############################
-Tutorial 2: Multiple population trees.
-##############################
+#####################################
+Tutorial 2: Multiple population trees
+#####################################
 
 If there is uncertainty regarding relationships between populations, the user can include multiple species trees in their species tree input file, as seen `here <https://github.com/SmithLabBio/popai/tree/main/tutorial_data/tutorial_2_data/species.nex>`_.
 
