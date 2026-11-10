@@ -1,15 +1,12 @@
 """This file contains the Classes and Functions for simulating a test dataset."""
 import msprime
 import os
-import pyslim
 import numpy as np
-import dendropy
-import sys
 
 class TestDataGenerator:
 
-    """Parse user input from the configuration file."""
-
+    """Simulate a test dataset (FASTA alignments and/or a VCF) under one msprime demography."""
+    
     def __init__(self, model, sampling_dictionary, substitution_model, fragments, min_length, max_length, seed, outdir, mutation_rate):
         self.model = model
         self.sampling_dictionary=sampling_dictionary
@@ -102,19 +99,21 @@ class TestDataGenerator:
                             new_line += "\t"
                         all_vcf_data.append(new_line)
                 
-        with open(os.path.join(self.outdir, 'alignment.vcf'), 'w') as f:
-            for line in vcf_header:
-                f.write(line)
-                f.write("\n")
-            for line in vcf_header_2:
-                f.write(line)
-                f.write("\n")
-            for line in vcf_header_3:
-                f.write(line)
-                f.write("\n")
-            for line in all_vcf_data:
-                f.write(line)
-                f.write("\n")
+        # write the VCF once, after all the fragments
+        if "vcf" in format:
+            with open(os.path.join(self.outdir, 'alignment.vcf'), 'w') as f:
+                for line in vcf_header:
+                    f.write(line)
+                    f.write("\n")
+                for line in vcf_header_2:
+                    f.write(line)
+                    f.write("\n")
+                for line in vcf_header_3:
+                    f.write(line)
+                    f.write("\n")
+                for line in all_vcf_data:
+                    f.write(line)
+                    f.write("\n")
 
 
     def _fasta_to_dict(self, fasta_string):
