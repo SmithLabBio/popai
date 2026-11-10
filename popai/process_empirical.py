@@ -6,7 +6,7 @@ import io
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from popai.utils import minor_encoding
+from popai.utils import minor_encoding, population_blocks, two_d_sfs, multi_sfs
 
 class DataProcessor:
 
@@ -92,7 +92,7 @@ class DataProcessor:
         with at least that many called alleles in every population."""
 
         sizes = list(self.config['sampling dict'].values())
-        pairs = [(block != -1).sum(axis=0) // 2 for block in self._population_blocks(encoded_alignment)]
+        pairs = [(block != -1).sum(axis=0) // 2 for block in population_blocks(encoded_alignment, self.config['sampling dict'].values())]
 
         # sites_with[k1, k2, ...]: number of sites with at least 2*k1 called alleles in the
         # first population, 2*k2 in the second, and so on
@@ -110,38 +110,10 @@ class DataProcessor:
 
     def numpy_to_2d_sfs(self, encoded_alignment, downsampling, replicates = 1):
 
-        """Convert numpy array to 2d SFS."""
+          """Convert numpy array to 2d SFS."""
 
-        _check_even(downsampling)
-        populations = list(self.config["sampling dict"].keys())
-        pairs = [(pop1, pop2) for i, pop1 in enumerate(populations)
-                 for pop2 in populations[i + 1:]]
-        sites = self._usable_sites(encoded_alignment, downsampling)
-
-        sfs_list = []
-        for _ in range(replicates):
-            # downsample each population once per replicate; count the higher-coded allele
-            counts = self._downsampled_counts(sites, downsampling)
-            sfs_2d = {}
-            for pop1, pop2 in pairs:
-                total = downsampling[pop1] + downsampling[pop2]
-                count1, count2 = counts[pop1], counts[pop2]
-                both = count1 + count2
-
-                # keep sites with two alleles in these populations; count the minor allele,
-                # choosing at random when the two are equally common
-                variable = (both > 0) & (both < total)
-                tie = 2 * both == total
-                use_other = (2 * both > total) | (tie & (self.rng.random(len(both)) < 0.5))
-                count1 = np.where(use_other, downsampling[pop1] - count1, count1)[variable]
-                count2 = np.where(use_other, downsampling[pop2] - count2, count2)[variable]
-
-                sfs = np.zeros((downsampling[pop1] + 1, downsampling[pop2] + 1))
-                np.add.at(sfs, (count1, count2), 1)
-                sfs_2d[(pop1, pop2)] = sfs
-            sfs_list.append(sfs_2d)
-
-        return sfs_list
+          _check_even(downsampling)
+          return two_d_sfs(encoded_alignment, downsampling, self.config["sampling dict"], self.rng, replicates)
 
     def plot_2dsfs(self, sfs_list, output_directory):
         """Plot average 2 dimensional Site frequency spectra."""
@@ -157,59 +129,21 @@ class DataProcessor:
 
     def numpy_to_msfs(self, encoded_alignment, downsampling, replicates = 1, nbins=None):
 
-        """Convert numpy array to multidimensional site frequency spectra"""
+          """Convert numpy array to multidimensional site frequency spectra"""
 
-        _check_even(downsampling)
-        populations = list(self.config["sampling dict"].keys())
-        sizes = [downsampling[population] for population in populations]
-        total = sum(sizes)
+          _check_even(downsampling)
+          all_sfs = multi_sfs(encoded_alignment, downsampling, self.config["sampling dict"], self.rng,
+                              replicates, nbins)
 
-        # with binning, each count maps to the smallest bin edge at or above it
-        # (edges per population: floor(size / nbins * (x + 1)) for x = 0 .. nbins - 1)
-        if nbins is None:
-            to_cell = [np.arange(size + 1) for size in sizes]
-            shape = [size + 1 for size in sizes]
-        else:
-            to_cell, shape = [], []
-            for size in sizes:
-                edges = np.unique([int(np.floor(size / nbins * (x + 1))) for x in range(nbins)])
-                to_cell.append(np.searchsorted(edges, np.arange(size + 1)))
-                shape.append(len(edges))
+          average_sites = int(np.ceil(np.mean([np.sum(x) for x in all_sfs])))
+          self.logger.info("We used an average of %s sites to construct the mSFS.", average_sites)
 
-        sites = self._usable_sites(encoded_alignment, downsampling)
-
-        all_sfs = []
-        for _ in range(replicates):
-            counts = self._downsampled_counts(sites, downsampling)
-            both = sum(counts.values())
-
-            # keep sites that still have two alleles, and count the minor allele after
-            # downsampling (ties: the lower-coded allele, as in simulate_data)
-            variable = (both > 0) & (both < total)
-            use_other = 2 * both >= total
-            cells = [to_cell[ix][np.where(use_other, size - counts[population],
-                                          counts[population])[variable]]
-                     for ix, (population, size) in enumerate(zip(populations, sizes))]
-            flat = np.ravel_multi_index(cells, shape)
-            all_sfs.append(np.bincount(flat, minlength=int(np.prod(shape))).astype(np.int64))
-
-        average_sites = int(np.ceil(np.mean([np.sum(x) for x in all_sfs])))
-        self.logger.info("We used an average of %s sites to construct the mSFS.", average_sites)
-
-        return(all_sfs, average_sites)
+          return(all_sfs, average_sites)
 
     def _samples_in_order(self, dictionary):
         """Samples grouped by population, in sampling dict order."""
         return [sample for population in self.config["sampling dict"]
                 for sample, value in self.config[dictionary].items() if value == population]
-
-    def _population_blocks(self, encoded_alignment):
-        """The rows of each population, in sampling dict order."""
-        blocks, start = [], 0
-        for size in self.config["sampling dict"].values():
-            blocks.append(encoded_alignment[start:start + size])
-            start += size
-        return blocks
 
     def _finish_array(self, encoded_alignments, maxsites):
         """Drop invariant sites, recode alleles by frequency, and apply maxsites."""
@@ -218,33 +152,6 @@ class DataProcessor:
         self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
                          encoded_array.shape[1], filtered_array.shape[1])
         return filtered_array
-
-    def _usable_sites(self, encoded_alignment, downsampling):
-        """Sites with exactly two alleles (ignoring missing data) and enough called
-        alleles in every population to downsample to the requested sizes."""
-        enough = np.logical_and.reduce([
-            (block != -1).sum(axis=0) >= downsampling[population]
-            for population, block in zip(self.config["sampling dict"],
-                                         self._population_blocks(encoded_alignment))])
-        observed = encoded_alignment != -1
-        low = np.where(observed, encoded_alignment, np.iinfo(encoded_alignment.dtype).max).min(axis=0)
-        high = np.where(observed, encoded_alignment, -1).max(axis=0)
-        two_alleles = (low < high) & ((encoded_alignment == low) | (encoded_alignment == high)
-                                      | ~observed).all(axis=0)
-        keep = enough & two_alleles
-        return encoded_alignment[:, keep], high[keep]
-
-    def _downsampled_counts(self, sites, downsampling):
-        """For each population, sample the requested number of called alleles at every
-        site without replacement, and count the higher-coded allele among them."""
-        alignment, high = sites
-        counts = {}
-        for population, block in zip(self.config["sampling dict"], self._population_blocks(alignment)):
-            keys = self.rng.random(block.shape)
-            keys[block == -1] = 2.0                    # missing alleles sort last
-            chosen = np.argsort(keys, axis=0)[:downsampling[population]]
-            counts[population] = (np.take_along_axis(block, chosen, axis=0) == high).sum(axis=0)
-        return counts
 
 def _check_even(downsampling):
     if not all(value % 2 == 0 for value in downsampling.values()):

@@ -13,7 +13,7 @@ import pyslim
 import dendropy
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
-from popai.utils import minor_encoding, sort_haplotypes
+from popai.utils import minor_encoding, sort_haplotypes, two_d_sfs, multi_sfs
 from tqdm import tqdm
 import pickle
 from collections import defaultdict
@@ -37,10 +37,6 @@ class DataSimulator:
         self.infinite = infinite
         if self.infinite:
             self.max_sites = len(self.config['lengths'])
-
-        # to prevent pickling issues
-        if 'fastas' in self.config:
-            del self.config['fastas']
 
         if user == False and sp_tree_index == False:
             raise ValueError("Error in simulation command. You must either provide a species tree index list (output when constructing models), or use user-specified models.")
@@ -97,7 +93,7 @@ class DataSimulator:
 
         return all_arrays
 
-     def process_demography(self, demography, tree, draws):
+    def process_demography(self, demography, tree, draws):
         return self._simulate_demography(demography, tree, draws)
 
     def _tree(self, ix):
@@ -197,191 +193,50 @@ class DataSimulator:
             
             del all_arrays, all_sizes
 
-    def mutations_to_sfs(self, numpy_array_dict, nbins=None):
+    def mutations_to_sfs(self, numpy_array_dict=None, nbins=None):
 
-        """Convert numpy arrays to multidimensional site frequency spectra"""
+          """Build a multidimensional SFS from each simulated array, with the same code as for the
+          empirical data (popai.utils.multi_sfs). numpy_array_dict isn't used: the arrays are read
+          from the files simulate_ancestry_parallel wrote."""
 
-        all_sfs = {}
+          all_sfs = {}
+          for i in dict.fromkeys(self.labels):   # each model once, in the order of the labels
 
-        for i in set(self.labels):
-            
-            # read in array
-            with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
-                arrays = pickle.load(f)
+              # read in array
+              with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
+                  arrays = pickle.load(f)
 
-            # create sfs
-            all_sfs[str(i)] = []
+              # one downsampled SFS per simulated replicate
+              all_sfs[str(i)] = [multi_sfs(replicate, self.downsampling, self.config["sampling dict"],
+                                           self.rng, nbins=nbins)[0] for replicate in arrays]
 
-            # get indices for samples
-            reordered_downsampling = {key: self.downsampling[key] \
-                                  for key in self.config["sampling dict"]}
+              # write to file
+              with open(os.path.join(self.output, 'simulated_mSFS_%s.pickle' % str(i)), 'wb') as f:
+                  pickle.dump(all_sfs[str(i)], f)
 
-            current = 0
-            ds_sampling_indices = {}
-            for key, value in reordered_downsampling.items():
-                ds_sampling_indices[key] = [current, value + current]
-                current = current+value
-            current = 0
-            sampling_indices = {}
-            for key, value in self.config["sampling dict"].items():
-                sampling_indices[key] = [current, value + current]
-                current = current+value
-
-
-
-            for replicate in arrays:
-                replicate = replicate[:, ~(replicate >= 2).any(axis=0)]
-                # sample from arrays
-                population_arrays = []
-                for key, value in self.config["sampling dict"].items():
-                    current_array = replicate[sampling_indices[key][0]:sampling_indices[key][1]]
-                    subsampled_array =  current_array[self.rng.choice(current_array.shape[0], ds_sampling_indices[key][1] - ds_sampling_indices[key][0], replace=False)]
-                    population_arrays.append(subsampled_array)
-                downsampled_array = np.vstack(population_arrays)
-
-                # Generate all possible combinations of counts per population
-                combos = product(*(range(count + 1) for count in reordered_downsampling.values()))
-                rep_sfs_dict = OrderedDict({'_'.join(map(str, combo)): 0 for combo in combos})
-
-                for site in range(downsampled_array.shape[1]):
-
-                    site_data = list(downsampled_array[:,site])
-
-                    if len(set(site_data)) == 2:
-
-                        # get minor allele
-                        minor_allele = min(set(site_data), key=site_data.count)
-                        # find poulation counts
-                        counts_per_population = {}
-                        for population in self.config['sampling dict'].keys():
-                            site_data_pop = site_data[ds_sampling_indices[population][0]:
-                                                      ds_sampling_indices[population][1]]
-                            counts_per_population[population] = Counter(site_data_pop)[minor_allele]
-                        string_for_count = [str(x) for x in list(counts_per_population.values())]
-                        combo_key = '_'.join(string_for_count)
-                        rep_sfs_dict[combo_key]+=1
-
-                # convert SFS to binned
-                if not nbins is None:
-                    thresholds = []
-                    for value in reordered_downsampling.values():
-                        thresholds.append([int(np.floor(value/nbins*(x+1))) for x in range(nbins)])
-                    threshold_combos = list(product(*thresholds))
-                    binned_rep_sfs_dict = OrderedDict({'_'.join(map(str, combo)): \
-                                           0 for combo in threshold_combos})
-
-                    for key, value in rep_sfs_dict.items():
-                        new_string = ''
-                        for count, entry in enumerate(key.split('_')):
-                            minthresh = min([x for x in thresholds[count] if int(entry) <= x])
-                            new_string+=str(minthresh)
-                            new_string+='_'
-                        new_string = new_string.strip('_')
-                        binned_rep_sfs_dict[new_string] += value
-                    rep_sfs_dict = binned_rep_sfs_dict
-
-                rep_sfs_dict = [value for value in rep_sfs_dict.values()]
-                all_sfs[str(i)].append(np.array(rep_sfs_dict))
-            
-            # write to file
-            with open(os.path.join(self.output, 'simulated_mSFS_%s.pickle' % str(i)), 'wb') as f:
-                pickle.dump(all_sfs[str(i)], f)
-
-
-        return all_sfs
+          return all_sfs
 
     def mutations_to_2d_sfs(self):
-        """Translate simulated mutations into 2d site frequency spectra"""
+          """Build 2D SFS from each simulated array, with the same code as for the empirical
+          data (popai.utils.two_d_sfs)."""
 
-        all_sfs = {}
+          all_sfs = {}
+          for i in dict.fromkeys(self.labels):   # each model once, in the order of the labels
 
+              # read in array
+              with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
+                  arrays = pickle.load(f)
 
-        for i in set(self.labels):
-            # read in array
-            with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(i)), 'rb') as f:
-                arrays = pickle.load(f)
+              # one downsampled set of 2D SFS per simulated replicate
+              all_sfs[str(i)] = [two_d_sfs(replicate, self.downsampling, self.config["sampling dict"],
+                                           self.rng)[0] for replicate in arrays]
 
-            # create sfs
-            all_sfs[str(i)] = []
-            all_arrays = [] 
+              # write to file: for each replicate, an array of its 2D SFS (one per population pair)
+              all_arrays = [np.array(list(sfs_2d.values()), dtype=object) for sfs_2d in all_sfs[str(i)]]
+              with open(os.path.join(self.output, 'simulated_2dSFS_%s.pickle' % str(i)), 'wb') as f:
+                  pickle.dump(all_arrays, f)
 
-            # get indices for samples
-            reordered_downsampling = {key: self.downsampling[key] \
-                                  for key in self.config["sampling dict"]}
-
-            current = 0
-            ds_sampling_indices = {}
-            for key, value in reordered_downsampling.items():
-                ds_sampling_indices[key] = [current, value + current]
-                current = current+value
-
-            current = 0
-            sampling_indices = {}
-            for key, value in self.config["sampling dict"].items():
-                sampling_indices[key] = [current, value + current]
-                current = current+value
-
-            for replicate in arrays:
-                replicate = replicate[:, ~(replicate >= 2).any(axis=0)]
-                # sample from arrays
-                population_arrays = []
-                for key, value in self.config["sampling dict"].items():
-                    current_array = replicate[sampling_indices[key][0]:sampling_indices[key][1]]
-                    subsampled_array =  current_array[self.rng.choice(current_array.shape[0], ds_sampling_indices[key][1] - ds_sampling_indices[key][0], replace=False)]
-                    population_arrays.append(subsampled_array)
-                downsampled_array = np.vstack(population_arrays)
-
-
-                # generate the empty arrays
-                sfs_2d = self._create_numpy_2d_arrays()
-
-                for site in range(downsampled_array.shape[1]): # iterate over sites
-
-                    site_data = list(downsampled_array[:,site]) # get the data for that site
-
-                    if len(set(site_data)) > 1: # if it is > 1, keep going
-
-                        for key, value in sfs_2d.items(): # iterate over population pairs
-
-                            # get the site data for those two populations
-                            site_data_pop1 = site_data[ds_sampling_indices[key[0]][0]:
-                                                   ds_sampling_indices[key[0]][1]]
-                            site_data_pop2 = site_data[ds_sampling_indices[key[1]][0]:
-                                                   ds_sampling_indices[key[1]][1]]
-                            all_site_data = site_data_pop1+site_data_pop2
-
-                            # check that this site has two variants in these populations
-                            if len(set(all_site_data)) == 2:
-
-                                # get minor allele
-                                counter = Counter(all_site_data)
-                                min_count = min(counter.values())
-                                least_common_numbers = [num for num, cnt in counter.items() if cnt == min_count]
-                                minor_allele = self.rng.choice(least_common_numbers)
-
-                                
-                                # find counts in each population
-                                pop1_count = Counter(site_data_pop1)[minor_allele]
-                                pop2_count = Counter(site_data_pop2)[minor_allele]
-
-                                # add to the sfs
-                                sfs_2d[key][pop1_count, pop2_count] += 1
-
-                all_sfs[str(i)].append(sfs_2d)
-
-                # Convert dictionary to array for storage
-                arrays = []
-                for sfs in sfs_2d.values(): 
-                    arrays.append(sfs)
-                all_arrays.append(np.array(arrays, dtype=object))
-
-            
-            # write to file
-            with open(os.path.join(self.output, 'simulated_2dSFS_%s.pickle' % str(i)), 'wb') as f:
-                # pickle.dump(all_sfs[str(i)], f)
-                pickle.dump(all_arrays, f)
-
-        return all_sfs
+          return all_sfs
 
     def plot_2dsfs(self, sfs_list, output_directory=None):
         """Plot average 2 dimensional Site frequency spectra."""
@@ -422,25 +277,6 @@ class DataSimulator:
                     plt.title(f'{model} - {comparison}')
                     plt.savefig(outfile)
                     plt.close()
-        
-
-    def _create_numpy_2d_arrays(self):
-
-        # create empty dictionary to store arrays
-        sfs_2d = {}
-
-        # get a list of populations
-        populations = list(self.config['sampling dict'].keys())
-
-        # iterate over each pair of populations
-        for i, pop1 in enumerate(populations):
-            for j, pop2 in enumerate(populations):
-                if i < j:
-                    # create an empty 2D numpy array with the correct shape
-                    array_shape = (self.downsampling[pop1]+1, self.downsampling[pop2]+1)
-                    sfs_2d[(pop1, pop2)] = np.zeros(array_shape)
-
-        return sfs_2d
 
     def _sample_sets(self, demography, tree):
         """One msprime SampleSet per population in the sampling dict, in that order, with one
