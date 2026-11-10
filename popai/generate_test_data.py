@@ -61,8 +61,7 @@ class TestDataGenerator:
                 if missing_ind > 0:
                     new_fasta_dict = {}
                     for item,value in fasta_dict.items():
-                        prob_missing = np.random.uniform(0,1)
-                        if prob_missing > missing_ind:
+                        if self.rng.random() > missing_ind:
                             new_fasta_dict[item] = value
                     fasta_dict = new_fasta_dict
 
@@ -101,8 +100,7 @@ class TestDataGenerator:
                             elif colix == 8:
                                 to_write = "GT:DP"
                             elif colix > 8:
-                                prob_missing = np.random.uniform(0,1)
-                                if prob_missing < missing:
+                                if missing > 0 and self.rng.random() < missing:
                                     to_write = ".|.:0"
                                 else:
                                     to_write = f"{genotype}:20"
