@@ -102,27 +102,13 @@ class PopaiTrainingData:
 
 
 def custom_collate_fn(batch):
-    """
-    Custom collate function that processes each population pair separately,
-    returning a list of tensors, one for each population pair.
-    """
-    data, labels = zip(*batch)  # Unzip data and labels
-    
-    # Initialize lists to hold the data for each population pair
-    data_batch_population_pairs = [[] for _ in range(len(data[0]))] 
-
-    # Process each item in the batch
-    for item in data:
-        for i in range(len(data[0])):  
-            # Convert the sub-item (numpy array) to a tensor
-            normalized_array = item[i] / np.sum(item[i])  # Normalize so that elements sum to 1
-            data_batch_population_pairs[i].append(convert_to_tensor(normalized_array, dtype=float32))
-
-    # Convert labels to tensors
-    labels_batch = [convert_to_tensor(label, dtype=float32) for label in labels]
-
-    return data_batch_population_pairs, labels_batch
-
+    """Batch the 2D SFS for the CNN. Each population pair has its own shape, so stack each pair
+    on its own: x is a tuple with one array per pair, (batch, rows, columns), each SFS
+    normalized to sum to 1; y is the one-hot labels, (batch, n_classes)."""
+    data, labels = zip(*batch)
+    pairs = tuple(np.stack([item[i] / np.sum(item[i]) for item in data]).astype(np.float32)
+                  for i in range(len(data[0])))
+    return pairs, np.stack(labels).astype(np.float32)
 
 
 

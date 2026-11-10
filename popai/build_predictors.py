@@ -23,7 +23,7 @@ class RandomForestsSFS:
 
     def __init__(self, config, simulations):
         self.config = config
-        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, type='1d')
+        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations)
         self.rng = np.random.default_rng(self.config['seed'])
 
     def build_rf_sfs(self, ntrees=500):
@@ -217,21 +217,34 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
         model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
 
         for epoch in range(epochs):
+            # train_on_batch and test_on_batch give each batch's own loss and accuracy: average
+            # them over the epoch, weighting each batch by its number of datasets
+            train = {'loss': 0.0, 'accuracy': 0.0}
+            n_train = 0
             for batch_data, batch_labels in data.train_loader:
                 inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
                 labels = tf.convert_to_tensor(batch_labels, dtype=tf.float32)
+                results = model.train_on_batch(inputs, labels, return_dict=True)
+                for key in train:
+                    train[key] += float(results[key]) * len(batch_labels)
+                n_train += len(batch_labels)
 
-                model.train_on_batch(inputs, labels)
-
+            val = {'loss': 0.0, 'accuracy': 0.0}
+            n_val = 0
             for val_batch_data, val_batch_labels in data.test_loader:
                 val_inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in val_batch_data]
                 val_labels = tf.convert_to_tensor(val_batch_labels, dtype=tf.float32)
-                model.test_on_batch(val_inputs, val_labels)
-        model.save(os.path.join(outdir, f"{label}.keras"))
+                results = model.test_on_batch(val_inputs, val_labels, return_dict=True)
+                for key in val:
+                    val[key] += float(results[key]) * len(val_batch_labels)
+                n_val += len(val_batch_labels)
 
+            print(f"Epoch {epoch + 1}/{epochs} - loss: {train['loss'] / n_train:.4f} - accuracy: {train['accuracy'] / n_train:.4f}"
+                  f" - val_loss: {val['loss'] / n_val:.4f} - val_accuracy: {val['accuracy'] / n_val:.4f}", flush=True)
+        model.save(os.path.join(outdir, f"{label}.keras"))
     else:
         model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
-        model.fit(data.train_loader, epochs=epochs, batch_size=batch_size, validation_data=data.test_loader)
+        model.fit(data.train_loader, epochs=epochs, batch_size=batch_size, validation_data=data.test_loader, shuffle=False)
         model.save(os.path.join(outdir, f"{label}.keras"))
 
     # extract and save features
