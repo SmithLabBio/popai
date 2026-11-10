@@ -37,10 +37,10 @@ The command line tool *process_empirical_data* can be used to process empirical 
     Command-line interface for processing empirical data.
 
     options:
-        -h, --help            show this help message and exit
-        --config CONFIG       Path to config file.
-        --preview             Preview number of SNPs used for different down-projections
-        --downsampling DOWNSAMPLING
+      -h, --help            show this help message and exit
+      --config CONFIG       Path to config file.
+      --preview             Preview number of SNPs used for different down-projections
+      --downsampling DOWNSAMPLING
                             Downsampling dict as a literal string, giving the number of haplotypes to
                             use from each population (e.g., {'A': 10, 'B': 10, 'C': 6}). Each must be
                             even.
