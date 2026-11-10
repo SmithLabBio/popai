@@ -106,9 +106,9 @@ def custom_collate_fn(batch):
     on its own: x is a tuple with one array per pair, (batch, rows, columns), each SFS
     normalized to sum to 1; y is the one-hot labels, (batch, n_classes)."""
     data, labels = zip(*batch)
-    pairs = tuple(np.stack([item[i] / np.sum(item[i]) for item in data]).astype(np.float32)
+    pairs = tuple(torch.from_numpy(np.stack([item[i] / np.sum(item[i]) for item in data]).astype(np.float32))
                   for i in range(len(data[0])))
-    return pairs, np.stack(labels).astype(np.float32)
+    return pairs, torch.from_numpy(np.stack(labels).astype(np.float32))
 
 
 

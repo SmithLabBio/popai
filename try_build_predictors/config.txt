@@ -1,0 +1,21 @@
+[Model]
+species tree file = ./tests/species_tree.nex
+migration matrix = ./tests/migration.txt
+symmetric = True
+secondary contact = True
+divergence with gene flow = False
+max migration events = 1
+migration rate = U(1e-5, 1e-4)
+constant Ne = True
+
+[Other]
+seed = 1234
+replicates = 20
+
+[Simulations]
+mutation rate = U(1e-8, 1e-7)
+substitution model = JC69
+
+[Data]
+alignments = ./tests/alignments
+popfile = ./tests/populations.txt
