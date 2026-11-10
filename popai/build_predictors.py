@@ -345,15 +345,15 @@ def test_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str)
     else:
         y_hat = model.predict(data.test_loader)
         y_pred = np.argmax(y_hat, axis=1).tolist()
-    cm, cm_plot = plot_confusion_matrix(y_true, y_pred, labels=[str(i) for i in y_true]) 
+    names = [str(number) for number in data.dataset.model_numbers]   # model numbers, from the file names
+    cm, cm_plot = plot_confusion_matrix(y_true, y_pred, labels=list(range(data.dataset.n_classes)), names=names)
     cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
-    # Write to a TSV file
+    cm_plot.close()
+    # Write to a TSV file: rows are the true models, columns the predicted models
     with open(os.path.join(outdir, f"{label}_confusion.tsv"), "w") as f:
-        # Write header
-        f.write("\t" + "\t".join(map(str, y_true)) + "\n")
-        # Write rows
-        for i, row in zip(y_true, cm):
-            f.write(str(i) + "\t" + "\t".join(map(str, row)) + "\n")
+        f.write("\t" + "\t".join(names) + "\n")
+        for name, row in zip(names, cm):
+            f.write(name + "\t" + "\t".join(map(str, row)) + "\n")
 
 def extract_features(model, dataset, label):
     """
@@ -459,14 +459,13 @@ def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir
     outputpca = os.path.join(out_dir, f"{label}_pca.png")
     plot_pca(train_features, np.argmax(train_labels, axis=1), new_features, outputpca)
 
-def plot_confusion_matrix(y_true, y_pred, labels):
-    conf_matrix = confusion_matrix(y_true, y_pred)
+def plot_confusion_matrix(y_true, y_pred, labels, names=None):
+    """Confusion matrix of y_true (rows) against y_pred (columns), with one row and column for
+    each entry of labels, in that order. names label the rows and columns (default: labels)."""
+    names = labels if names is None else names
+    conf_matrix = confusion_matrix(y_true, y_pred, labels=labels)
     plt.figure(figsize=(8, 6))
-    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')#, xticklabels=labels, yticklabels=labels) # TODO: Fix this. 
-    plt.title("Confusion Matrix")
-    plt.xlabel("Predicted Labels")
-    plt.ylabel("True Labels")
-    return conf_matrix, plt
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=names, yticklabels=names)
 
 def check_valid_labels(labels):
     unique_labels = list(set(labels))
