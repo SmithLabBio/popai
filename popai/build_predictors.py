@@ -575,8 +575,8 @@ def plot_pca(train_features, train_labels, new_features, pcafile):
 
     # Create a color map for the labels
     unique_labels = np.unique(train_labels)
-    colors = plt.cm.get_cmap("Dark2", len(unique_labels))  # Using the Dark2 color map
-
+    colors = plt.colormaps["Dark2"].resampled(len(unique_labels))  # Using the Dark2 color map
+    
     # Plot training features
     plt.figure(figsize=(8, 6))
     for i, label in enumerate(unique_labels):
@@ -595,6 +595,7 @@ def plot_pca(train_features, train_labels, new_features, pcafile):
 
     # Save the plot to the specified file
     plt.savefig(pcafile)
+    plt.close()
 
 def batch_generator(loader):
     for batch_data, batch_labels in loader:
