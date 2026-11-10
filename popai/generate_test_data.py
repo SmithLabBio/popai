@@ -20,7 +20,11 @@ class TestDataGenerator:
         self.outdir=outdir
         self.seed=seed
         self.mutation_rate = mutation_rate
-
+        # only JC69, as in parse_input: msprime's HKY and GTR need parameters (kappa, relative
+        # rates), which popai can't take yet (see the to-do list)
+        if substitution_model.lower() != "jc69":
+            raise ValueError(f"Substitution model must be JC69, not {substitution_model}.")
+        self.mutation_model = msprime.JC69()
         self.rng = np.random.default_rng(self.seed)
     
     def simulate(self, missing=0.0, missing_ind=0.0, format=["fasta"]):
@@ -41,20 +45,11 @@ class TestDataGenerator:
         for fragment in enumerate(lengths):
             
             # generate a reference
-            if self.substitution_model == 'jc69' or self.substitution_model == "JC69":
-                mymutmodel = msprime.JC69()
-            elif self.substitution_model == "hky" or self.substitution_model == "HKY":
-                mymutmodel = msprime.HKY()
-            elif self.substitution_model == "gtr" or self.substitution_model == "GTR":
-                mymutmodel == msprime.GTR()
-            else:
-                raise("Error: Incorrect specification of substitution model.")
-            reference_sequence = self.rng.choice(mymutmodel.alleles, p=mymutmodel.root_distribution, size=fragment[1])
+            reference_sequence = self.rng.choice(self.mutation_model.alleles, p=self.mutation_model.root_distribution, size=fragment[1])
             reference_sequence = ''.join(reference_sequence)
             
             ts = msprime.sim_ancestry(self.sampling_dictionary, demography=self.model, random_seed = ancestry_seeds[fragment[0]], sequence_length=fragment[1])
-            mts = msprime.sim_mutations(ts, rate=self.mutation_rate, model=self.substitution_model, random_seed = ancestry_seeds[fragment[0]])
-
+            mts = msprime.sim_mutations(ts, rate=self.mutation_rate, model=self.mutation_model, random_seed = ancestry_seeds[fragment[0]])
             if "fasta" in format:
                 fasta_string = mts.as_fasta(reference_sequence=reference_sequence)
                 fasta_dict = self._fasta_to_dict(fasta_string)
