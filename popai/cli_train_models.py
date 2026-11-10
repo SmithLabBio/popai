@@ -62,14 +62,8 @@ def main():
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
-    # set whether user
-    if config_values['user models'] is None:
-        user = False
-    else:
-        user = True
-
     if args.rf: # Random Forest
-        random_forest_sfs_predictor = RandomForestsSFS(config_values, args.simulations, user=user)
+        random_forest_sfs_predictor = RandomForestsSFS(config_values, args.simulations)
         random_forest_sfs_model, random_forest_sfs_cm, random_forest_sfs_cm_plot = random_forest_sfs_predictor.build_rf_sfs(ntrees=args.rf['ntrees'])
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)

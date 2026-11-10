@@ -23,9 +23,9 @@ from keras.saving import register_keras_serializable
 class RandomForestsSFS:
     """Build a RF predictor that takes the SFS as input."""
 
-    def __init__(self, config, simulations, user=False):
+    def __init__(self, config, simulations):
         self.config = config
-        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, user, type='1d')
+        self.arraydict, self.sfs, self.labels, self.label_to_int, self.int_to_label, self.nclasses = read_data(simulations, type='1d')
         self.rng = np.random.default_rng(self.config['seed'])
 
     def build_rf_sfs(self, ntrees=500):
@@ -480,73 +480,28 @@ def check_valid_labels(labels):
             return False
     return True
 
-def read_data(simulations, user, type):
-
+def read_data(simulations):
+    """The simulated mSFS, one row per replicate, and their one-hot labels. Reads every
+    simulated_mSFS_<number>.pickle in simulations (named <number> or model_<number>); the
+    numbers become classes 0 .. n-1 in numerical order, as in dataset.py."""
+    paths = glob.glob(os.path.join(simulations, "simulated_mSFS_*.pickle"))
+    if not paths:
+        raise FileNotFoundError(f"No simulated_mSFS_*.pickle files in {simulations}.")
     arraydict = {}
-    sfs = []
-    labels = []
+    for path in paths:
+        model_number = int(path.split('_')[-1].split('.')[0])
+        with open(path, 'rb') as f:
+            arraydict[model_number] = pickle.load(f)
 
-    # read in the data
-    pickle_list = os.listdir(simulations)
-    if type=='1d':
-        pickle_list = [x for x in pickle_list if ('_mSFS' in x and x.endswith('.pickle'))]
-    elif type=='2d':
-        pickle_list = [x for x in pickle_list if ('_2dSFS' in x and x.endswith('.pickle'))]
-    elif type=='npy':
-        pickle_list = [x for x in pickle_list if ('_arrays' in x and x.endswith('.pickle'))]
-    pickle_list = sorted(pickle_list, key=lambda x: int(x.split('_')[-1].split('.')[0]))
-    for item in pickle_list:
-        modno = item.split('_')[-1].split('.')[0]
-        if type=='1d':
-            if user==True:
-                with open(os.path.join(simulations, 'simulated_mSFS_model_%s.pickle' % str(modno)), 'rb') as f:
-                    arraydict[str(modno)] = pickle.load(f)
-            else:
-                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
-                    arraydict[str(modno)] = pickle.load(f)
-        elif type=='2d':
-            if user==True:
-                with open(os.path.join(simulations, 'simulated_2dSFS_model_%s.pickle' % str(modno)), 'rb') as f:
-                    arraydict[str(modno)] = pickle.load(f)
-            else:
-                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
-                    arraydict[str(modno)] = pickle.load(f)
-        elif type=='npy':
-            if user==True:
-                with open(os.path.join(simulations, 'simulated_arrays_model_%s.pickle' % str(modno)), 'rb') as f:
-                    arraydict[str(modno)] = pickle.load(f)
-            else:
-                with open(os.path.join(simulations, 'simulated_mSFS_%s.pickle' % str(modno)), 'rb') as f:
-                    arraydict[str(modno)] = pickle.load(f)
+    model_numbers = sorted(arraydict)
+    label_to_int = {number: i for i, number in enumerate(model_numbers)}
+    int_to_label = {i: number for number, i in label_to_int.items()}
 
-    for key,value in arraydict.items():
-        for thearray in value:
-            sfs.append(thearray)
-            labels.append(key)
-    nclasses = len(set(labels))
-    if user:
-        try:
-            labels = [int(x.split('_')[-1]) for x in labels]
-        except:
-            raise ValueError(f"Model names must be 'Model_x', where x are integers ranging from 0 to n-1, where n is the number of models.")
-    else:
-        labels = [int(x) for x in labels]
+    sfs = np.array([replicate for number in model_numbers for replicate in arraydict[number]])
+    labels = [label_to_int[number] for number in model_numbers for _ in arraydict[number]]
+    labels = keras.utils.to_categorical(labels, num_classes=len(model_numbers))
 
-    # Create a mapping from original labels to continuous integers
-    unique_labels = sorted(set(labels))
-    label_to_int = {label: i for i, label in enumerate(unique_labels)}
-    int_to_label = {i: label for label, i in label_to_int.items()}
-    
-    # Convert labels to continuous integers
-    labels = [label_to_int[label] for label in labels]
-    
-    # One-hot encode the labels
-    labels = keras.utils.to_categorical(labels)
-
-    # array
-    sfs = np.array(sfs)
-
-    return arraydict, sfs, labels, label_to_int, int_to_label, nclasses
+    return arraydict, sfs, labels, label_to_int, int_to_label, len(model_numbers)
 
 def get_labels(dir:str, pattern:str):
     pattern_path = os.path.join(dir, pattern)

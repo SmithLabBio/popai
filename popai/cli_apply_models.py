@@ -38,11 +38,6 @@ def main():
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
 
-    if config_values['user models'] is None:
-        user = False
-    else:
-        user = True
-
     # read empirical data into correct format
     msfs_files = os.listdir(args.empirical)
     msfs_files = [x for x in msfs_files if x.endswith('_DSFS.obs')]
@@ -73,7 +68,7 @@ def main():
 
     if args.rf:
         # apply Random Forest model
-        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, args.simulations, user=user)
+        random_forest_sfs_predictor = build_predictors.RandomForestsSFS(config_values, args.simulations)
         with open(os.path.join(args.models, 'rf.model.pickle'), 'rb') as f:
             random_forest_sfs_model = pickle.load(f)
         results_rf = random_forest_sfs_predictor.predict(random_forest_sfs_model, msfs)
