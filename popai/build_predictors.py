@@ -213,40 +213,10 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
 
     optimizer = Adam(learning_rate = learning_rate)
 
-    if label=="cnn":
-        model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
-
-        for epoch in range(epochs):
-            # train_on_batch and test_on_batch give each batch's own loss and accuracy: average
-            # them over the epoch, weighting each batch by its number of datasets
-            train = {'loss': 0.0, 'accuracy': 0.0}
-            n_train = 0
-            for batch_data, batch_labels in data.train_loader:
-                inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
-                labels = tf.convert_to_tensor(batch_labels, dtype=tf.float32)
-                results = model.train_on_batch(inputs, labels, return_dict=True)
-                for key in train:
-                    train[key] += float(results[key]) * len(batch_labels)
-                n_train += len(batch_labels)
-
-            val = {'loss': 0.0, 'accuracy': 0.0}
-            n_val = 0
-            for val_batch_data, val_batch_labels in data.test_loader:
-                val_inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in val_batch_data]
-                val_labels = tf.convert_to_tensor(val_batch_labels, dtype=tf.float32)
-                results = model.test_on_batch(val_inputs, val_labels, return_dict=True)
-                for key in val:
-                    val[key] += float(results[key]) * len(val_batch_labels)
-                n_val += len(val_batch_labels)
-
-            print(f"Epoch {epoch + 1}/{epochs} - loss: {train['loss'] / n_train:.4f} - accuracy: {train['accuracy'] / n_train:.4f}"
-                  f" - val_loss: {val['loss'] / n_val:.4f} - val_accuracy: {val['accuracy'] / n_val:.4f}", flush=True)
-        model.save(os.path.join(outdir, f"{label}.keras"))
-    else:
-        model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
-        model.fit(data.train_loader, epochs=epochs, batch_size=batch_size, validation_data=data.test_loader, shuffle=False)
-        model.save(os.path.join(outdir, f"{label}.keras"))
-
+    model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
+    model.fit(data.train_loader, epochs=epochs, validation_data=data.test_loader, shuffle=False)
+    model.save(os.path.join(outdir, f"{label}.keras"))
+    
     # extract and save features
     extracted_features, all_labels = extract_features(model, data.train_loader, label)
     features_path = os.path.join(outdir, f"{label}_features.npy")
@@ -263,16 +233,8 @@ def test_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str)
     label: label to prepend to output file
     """
     y_true = [data.dataset.labels[i] for i in data.test_dataset.indices]
-    if label=="cnn":
-        y_pred = []
-        for batch_data, _ in data.test_loader:
-            inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]  # Convert the population pair batch data
-            y_hat = model.predict(inputs)  # Predict for the batch
-            y_pred_batch = np.argmax(y_hat, axis=1).tolist()  # Convert to predicted labels
-            y_pred.extend(y_pred_batch)
-    else:
-        y_hat = model.predict(data.test_loader)
-        y_pred = np.argmax(y_hat, axis=1).tolist()
+    y_hat = model.predict(data.test_loader)
+    y_pred = np.argmax(y_hat, axis=1).tolist()
     names = [str(number) for number in data.dataset.model_numbers]   # model numbers, from the file names
     cm, cm_plot = plot_confusion_matrix(y_true, y_pred, labels=list(range(data.dataset.n_classes)), names=names)
     cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
