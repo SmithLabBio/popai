@@ -13,32 +13,27 @@ import torch
 
 
 class PopaiDataset(Dataset):
+    """All the simulated datasets, read into memory once."""
     def __init__(self, paths:List[str]):
         self.paths = paths
-        self.path_ixs = [] # Lookup for path index for __getitem__ index
-        self.sim_ixs = [] # Lookup for simulation index for __getitem__ index
+        self.data = []      # every replicate of every model, in file order
         self.labels = []
-        for i in range(0, len(paths)):
-            modno = paths[i].split('_')[-1].split('.')[0]
-            with open(paths[i], "rb") as fh:
-                p = pickle.load(fh)
-                for j in range(0, len(p)):
-                    self.labels.append(int(modno))
-                    self.path_ixs.append(i)
-                    self.sim_ixs.append(j)
+        for path in paths:
+            modno = path.split('_')[-1].split('.')[0]
+            with open(path, "rb") as fh:
+                replicates = pickle.load(fh)
+            self.data.extend(replicates)
+            self.labels.extend([int(modno)] * len(replicates))
         self.model_numbers = sorted(set(self.labels))     # e.g. [1, 2, 3] for model_1 .. model_3
         self.labels = [self.model_numbers.index(label) for label in self.labels]   # classes 0 .. n-1
         self.n_classes = len(self.model_numbers)
         self.encoded_labels = to_categorical(self.labels, num_classes=self.n_classes)
 
     def __len__(self):
-        return len(self.path_ixs)
+        return len(self.data)
 
     def __getitem__(self, ix):
-        path = self.paths[self.path_ixs[ix]]
-        with open(path, "rb") as fh:
-            data = pickle.load(fh)
-        return data[self.sim_ixs[ix]], self.encoded_labels[ix] 
+        return self.data[ix], self.encoded_labels[ix]
 
 class PopaiDatasetLowMem(Dataset):
     def __init__(self, paths:List[str]):
