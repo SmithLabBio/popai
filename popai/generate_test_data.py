@@ -69,14 +69,8 @@ class TestDataGenerator:
             
             if "vcf" in format:
 
-                samples = mts.samples()
-                for sample_id, h in zip(samples, mts.haplotypes(samples=samples)):
-                    pop = mts.node(sample_id).population
-                    #print(mts.node(sample_id))
-                    #print(f"Sample {sample_id:<2} ({ts.population(pop).metadata['name']:^5}): {h}")
-                
-                vcf_lines = mts.as_vcf().split("\n")
-                
+                vcf_lines = mts.as_vcf(position_transform=lambda x: 1 + np.asarray(x)).split("\n")   # VCF positions start at 1
+
                 if vcf_header == None:
                     vcf_header = vcf_lines[0:3]
                     vcf_header[1] = "##source=popai"
@@ -108,19 +102,19 @@ class TestDataGenerator:
                             new_line += "\t"
                         all_vcf_data.append(new_line)
                 
-                with open(os.path.join(self.outdir, 'alignment.vcf'), 'w') as f:
-                    for line in vcf_header:
-                        f.write(line)
-                        f.write("\n")
-                    for line in vcf_header_2:
-                        f.write(line)
-                        f.write("\n")
-                    for line in vcf_header_3:
-                        f.write(line)
-                        f.write("\n")
-                    for line in all_vcf_data:
-                        f.write(line)
-                        f.write("\n")
+        with open(os.path.join(self.outdir, 'alignment.vcf'), 'w') as f:
+            for line in vcf_header:
+                f.write(line)
+                f.write("\n")
+            for line in vcf_header_2:
+                f.write(line)
+                f.write("\n")
+            for line in vcf_header_3:
+                f.write(line)
+                f.write("\n")
+            for line in all_vcf_data:
+                f.write(line)
+                f.write("\n")
 
 
     def _fasta_to_dict(self, fasta_string):
