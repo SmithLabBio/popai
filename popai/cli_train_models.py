@@ -9,47 +9,32 @@ from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, RandomForestsSF
 from tensorflow import keras
 import json
 
-class ParseEpochsBatchSize(argparse.Action):
-    def __init__(self, option_strings, dest, nargs=None, **kwargs):
-        super().__init__(option_strings, dest, nargs, **kwargs)
+def _key_value_action(defaults):
+    """An argparse action for options like --cnn "epochs=20:batch_size=32": key=value settings
+    separated by ':', each key one of those in defaults. The types and default values come from
+    defaults. The option on its own uses the defaults."""
+    kinds = {int: "a whole number", float: "a number"}
+    class KeyValueAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            settings = dict(defaults)
+            for item in (values.split(':') if values else []):
+                key, _, value = item.partition('=')
+                key = key.strip()
+                if key not in defaults or not value.strip():
+                    parser.error(f"{option_string}: can't read '{item}'. Give any of "
+                                 f"{':'.join(f'{name}=...' for name in defaults)}, separated by ':'.")
+                kind = type(defaults[key])
+                try:
+                    settings[key] = kind(value)
+                except ValueError:
+                    parser.error(f"{option_string}: {key} must be {kinds[kind]}, not '{value}'.")
+                if settings[key] <= 0:
+                    parser.error(f"{option_string}: {key} must be more than 0.")
+            setattr(namespace, self.dest, settings)
+    return KeyValueAction
 
-    def __call__(self, parser, namespace, values, option_string=None):
-        # Default epochs and batch_size
-        epochs = 10
-        batch_size = 10
-        learning_rate = 0.001
-        
-        if values:
-            try:
-                # Split the string by ':' and extract key-value pairs
-                params = dict(param.split('=') for param in values.split(':'))
-                epochs = int(params.get('epochs', epochs))
-                batch_size = int(params.get('batch_size', batch_size))
-                learning_rate = float(params.get('learning_rate', learning_rate))
-            except ValueError:
-                raise argparse.ArgumentTypeError(f"Invalid format for {option_string}. Expected 'epochs=XX:batch_size=YY'.")
-        
-        # Set the parsed values
-        setattr(namespace, self.dest, {'epochs': epochs, 'batch_size': batch_size, 'learning_rate': learning_rate})
-
-class ParseTrees(argparse.Action):
-    def __init__(self, option_strings, dest, nargs=None, **kwargs):
-        super().__init__(option_strings, dest, nargs, **kwargs)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        # Default epochs and batch_size
-        ntrees=500
-        
-        if values:
-            try:
-                # Split the string by ':' and extract key-value pairs
-                params = dict(param.split('=') for param in values.split(':'))
-                ntrees = int(params.get('ntrees', ntrees))
-            except ValueError:
-                raise argparse.ArgumentTypeError(f"Invalid format for {option_string}. Expected 'trees=XX'.")
-        
-        # Set the parsed values
-        setattr(namespace, self.dest, {'ntrees': ntrees})
+NETWORK_SETTINGS = {'epochs': 10, 'batch_size': 10, 'learning_rate': 0.001}
+RF_SETTINGS = {'ntrees': 500}
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for my_package')
@@ -60,11 +45,10 @@ def main():
     parser.add_argument('--low-memory', action='store_true', default=False, 
             help="Reads training datasets into memory as needed during training rather than all at once. Slows training due to increased file reads.")
 
-
-    parser.add_argument('--cnn', action=ParseEpochsBatchSize, nargs="?", help='Train CNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
-    parser.add_argument('--fcnn', action=ParseEpochsBatchSize, nargs="?", help='Train FCNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
-    parser.add_argument('--cnnnpy', action=ParseEpochsBatchSize, nargs="?", help='Train CNN classifier of alignments. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
-    parser.add_argument('--rf', action=ParseTrees, nargs="?", help='Train RF classifier of SFS. Optionally specify "ntrees=XX".')
+    parser.add_argument('--cnn', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train CNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
+    parser.add_argument('--fcnn', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train FCNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
+    parser.add_argument('--cnnnpy', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train CNN classifier of alignments. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
+    parser.add_argument('--rf', action=_key_value_action(RF_SETTINGS), nargs="?", help='Train RF classifier of SFS. Optionally specify "ntrees=XX".')
 
     args = parser.parse_args()
 
