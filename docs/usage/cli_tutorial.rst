@@ -156,10 +156,11 @@ Step 5: Train networks
 ==========================================
 
 Now, we are ready to train the predictors implemented in popai. popai includes four:
-    1. A Random Forest classifier that takes as input the multidimensional SFS (mSFS) (--rf).
-    2. A Fully Connected Neural Network that takes as input the mSFS (--fcnn).
-    3. A Convolutional Neural Network that takes as input the jSFS between all pairs of populations (--cnn).
-    4. A Convolutional Neural Network that takes as input the alignments (--cnnnpy). This one needs --maxsites in Step 4, so that every simulated dataset is the same size.
+
+1. A Random Forest classifier that takes as input the multidimensional SFS (mSFS) (``--rf``).
+2. A Fully Connected Neural Network that takes as input the mSFS (``--fcnn``).
+3. A Convolutional Neural Network that takes as input the jSFS between all pairs of populations (``--cnn``).
+4. A Convolutional Neural Network that takes as input the alignments (``--cnnnpy``). This one needs ``--maxsites`` in Step 4, so that every simulated dataset is the same size.
 
 To train them, we will use the command-line tool *train_models*. It takes the following arguments::
 
@@ -172,7 +173,7 @@ To train them, we will use the command-line tool *train_models*. It takes the fo
       -h, --help            show this help message and exit
       --config CONFIG       Path to config file.
       --simulations SIMULATIONS
-                           Path to the output folder of simulate_data.
+                            Path to the output folder of simulate_data.
       --output OUTPUT       Path to output folder for the trained predictors.
       --force               Overwrite existing results.
       --low-memory          Read the simulated datasets from disk as they are needed, instead of
@@ -188,9 +189,9 @@ To train them, we will use the command-line tool *train_models*. It takes the fo
 
 Notes on the arguments:
 
-* --simulations is the output directory from Step 4.
-* Train any of the four predictors by giving its option. Each option can also take settings, separated by :, in any order. For example, --fcnn "epochs=20:batch_size=32" trains the FCNN for 20 epochs, with batches of 32 datasets, and the default learning rate. A setting popai doesn't recognize stops *train_models* with an error.
-* --low-memory reads each simulated dataset from disk when it is needed, instead of reading them all into memory at the start. Use it if the simulations don't fit in memory. Training is slower.
+* ``--simulations`` is the output directory from Step 4.
+* Train any of the four predictors by giving its option. Each option can also take settings, separated by ``:``, in any order. For example, ``--fcnn "epochs=20:batch_size=32"`` trains the FCNN for 20 epochs, with batches of 32 datasets, and the default learning rate. A setting popai doesn't recognize stops *train_models* with an error.
+* ``--low-memory`` reads each simulated dataset from disk when it is needed, instead of reading them all into memory at the start. Use it if the simulations don't fit in memory. Training is slower.
 
 Train all four predictors with their default settings:
 
@@ -213,8 +214,8 @@ Step 6: Apply networks
 Finally, we can apply the predictors to our empirical data using the command-line tool *apply_models*. It takes the following arguments::
 
     usage: apply_models [-h] [--config CONFIG] [--models MODELS] [--empirical EMPIRICAL]
-    [--output OUTPUT] [--force] [--rf] [--fcnn] [--cnn] [--cnnnpy]
-    [--simulations SIMULATIONS]
+                        [--output OUTPUT] [--force] [--rf] [--fcnn] [--cnn] [--cnnnpy]
+                        [--simulations SIMULATIONS]
 
     Apply trained predictors to the empirical data.
 
@@ -234,14 +235,14 @@ Finally, we can apply the predictors to our empirical data using the command-lin
                             Path to the output folder of simulate_data (the predictors were trained on
                             these; used to name the models).
 
-Give the output directories from Step 5, Step 3 and Step 4 for --models, --empirical and --simulations, and the predictors you trained in Step 5:
+Give the output directories from Step 5, Step 3 and Step 4 for ``--models``, ``--empirical`` and ``--simulations``, and the predictors you trained in Step 5:
 
 .. code-block:: python
 
-    apply_models --config tutorial_1_data/config.txt --models trained_models/ --empirical empirical/ --simulations simulated/ --output results/ --rf --fcnn --cnn --cnnnpy 
+    apply_models --config tutorial_1_data/config.txt --models trained_models/ --empirical empirical/ --simulations simulated/ --output results/ --rf --fcnn --cnn --cnnnpy
 
 In the output directory, you should see:
 
-* <predictor>_predictions.txt: tables of the predicted probability of each model. The SFS predictors (rf, fcnn and cnn) give one row for each replicate SFS from Step 3 (--reps), and cnn_npy gives one row for the alignments.
+* <predictor>_predictions.txt: tables of the predicted probability of each model. The SFS predictors (rf, fcnn and cnn) give one row for each replicate SFS from Step 3 (``--reps``), and cnn_npy gives one row for the alignments.
 * <network>_empirical_features.npy: the features of the empirical data, as in Step 5.
 * <network>_pca.png: a principal component analysis of the features of the simulated datasets, colored by model, with the empirical data marked with red crosses. If the empirical data fall far from all of the simulated datasets, none of the models may fit the data well.

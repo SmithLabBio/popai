@@ -150,64 +150,94 @@ In the output directory, you should see:
 Step 4: Train networks
 ==========================================
 
-Now, we are ready to train the networks implemented in popai. popai includes three network architectures:
-    1. A Random Forest classifier that takes as input the bins of the multidimensional SFS (mSFS).
-    2. A Fully Connected Neural Network that takes as input the bins of the multidimensional SFS (mSFS).
-    3. A Convolutional Neural Network that takes as input the jSFS between all pairs of populations.
+Now, we are ready to train the predictors implemented in popai. popai includes four:
 
-To train networks, we will use the command-line tool *train_models*. It takes the following arguments::
+1. A Random Forest classifier that takes as input the multidimensional SFS (mSFS) (``--rf``).
+2. A Fully Connected Neural Network that takes as input the mSFS (``--fcnn``).
+3. A Convolutional Neural Network that takes as input the jSFS between all pairs of populations (``--cnn``).
+4. A Convolutional Neural Network that takes as input the alignments (``--cnnnpy``). This one needs ``--maxsites`` in Step 3, so that every simulated dataset is the same size.
 
-    usage: train_models [-h] [--config CONFIG] [--simulations SIMULATIONS] [--output OUTPUT] [--force] [--rf] [--fcnn] [--cnn]
+To train them, we will use the command-line tool *train_models*. It takes the following arguments::
 
-    Command-line interface for my_package
+    usage: train_models [-h] [--config CONFIG] [--simulations SIMULATIONS] [--output OUTPUT] [--force]
+                        [--low-memory] [--cnn [CNN]] [--fcnn [FCNN]] [--cnnnpy [CNNNPY]] [--rf [RF]]
+
+    Train predictors on the simulated data.
 
     options:
       -h, --help            show this help message and exit
       --config CONFIG       Path to config file.
       --simulations SIMULATIONS
-                            Path to directory with simulated data.
-      --output OUTPUT       Path to output folder for storing SFS.
+                            Path to the output folder of simulate_data.
+      --output OUTPUT       Path to output folder for the trained predictors.
       --force               Overwrite existing results.
-      --rf                  Train RF classifier.
-      --fcnn                Train FCNN classifier.
-      --cnn                 Train CNN classifier.
+      --low-memory          Read the simulated datasets from disk as they are needed, instead of
+                            reading them all into memory at the start. Uses less memory, but trains
+                            more slowly.
+      --cnn [CNN]           Train CNN classifier of SFS. Optionally specify
+                            "epochs=XX:batch_size=YY:learning_rate=ZZ" (defaults: 10, 10, 0.001).
+      --fcnn [FCNN]         Train FCNN classifier of SFS. Optionally specify
+                            "epochs=XX:batch_size=YY:learning_rate=ZZ" (defaults: 10, 10, 0.001).
+      --cnnnpy [CNNNPY]     Train CNN classifier of alignments. Optionally specify
+                            "epochs=XX:batch_size=YY:learning_rate=ZZ" (defaults: 10, 10, 0.001).
+      --rf [RF]             Train RF classifier of SFS. Optionally specify "ntrees=XX" (default: 500).
 
-The argument *--simulations* takes as input the output directory from the previous step.
+Notes on the arguments:
+
+* ``--simulations`` is the output directory from Step 3.
+* Train any of the four predictors by giving its option. Each option can also take settings, separated by ``:``, in any order. For example, ``--fcnn "epochs=20:batch_size=32"`` trains the FCNN for 20 epochs, with batches of 32 datasets, and the default learning rate. A setting popai doesn't recognize stops *train_models* with an error.
+* ``--low-memory`` reads each simulated dataset from disk when it is needed, instead of reading them all into memory at the start. Use it if the simulations don't fit in memory. Training is slower.
+
+Train all four predictors with their default settings:
 
 .. code-block:: python
 
-    train_models --config tutorial_2_data/config.txt --simulations simulated/ --output trained_models --downsampling "{'A':20, 'B':20, 'C':20}" --rf --fcnn --cnn --cnnnpy
+    train_models --config tutorial_2_data/config.txt --simulations simulated/ --output trained_models/ --rf --fcnn --cnn --cnnnpy
 
-This will output to the output directory the trained.model files for the FCNN and the CNN, and a pickled object storing the RF Classifier. It will also output confusion matrices showing the performance of each approach on the validation data, for which we hold out 20% of our simulated datasets. 
+Each predictor is trained on 80% of the simulated datasets, and tested on the other 20%, with each model equally represented in both. *train_models* prints the out-of-bag error of the Random Forest, and the loss and accuracy of the networks after each epoch, on the training data and on the 20% held out (val_loss and val_accuracy). Training uses the seed in the configuration file, so the same configuration file and simulations give the same trained predictors.
+
+In the output directory, you should see:
+
+* rf.model.pickle, fcnn.keras, cnn.keras and cnn_npy.keras: the trained predictors.
+* <predictor>_confusion.png and <predictor>_confusion.tsv: confusion matrices for each predictor on the 20% of simulated datasets held out, with one row for each true model and one column for each predicted model.
+* <network>_features.npy and <network>_labels.npy: for each network, the features of the training datasets (the values in the layer before the output layer) and their models. *apply_models* uses these in Step 5.
 
 ==========================================
 Step 5: Apply networks
 ==========================================
 
-Finally, we can apply the networks to make classifications on our empirical data using the function *apply_models*. It takes the following arguments::
+Finally, we can apply the predictors to our empirical data using the command-line tool *apply_models*. It takes the following arguments::
 
-    usage: apply_models [-h] [--config CONFIG] [--models MODELS] [--empirical EMPIRICAL] [--output OUTPUT] [--force] [--rf] [--fcnn] [--cnn]
+    usage: apply_models [-h] [--config CONFIG] [--models MODELS] [--empirical EMPIRICAL]
+                        [--output OUTPUT] [--force] [--rf] [--fcnn] [--cnn] [--cnnnpy]
+                        [--simulations SIMULATIONS]
 
-    Command-line interface for my_package
+    Apply trained predictors to the empirical data.
 
     options:
       -h, --help            show this help message and exit
       --config CONFIG       Path to config file.
-      --models MODELS       Path to directory with trained models.
+      --models MODELS       Path to the output folder of train_models.
       --empirical EMPIRICAL
-                            Path to directory with empirical SFS.
-      --simulations         Path to simulated training data.
-      --output OUTPUT       Path to output folder for storing SFS.
+                            Path to the output folder of process_empirical_data.
+      --output OUTPUT       Path to output folder for the predictions.
       --force               Overwrite existing results.
-      --rf                  Train RF classifier.
-      --fcnn                Train FCNN classifier.
-      --cnn                 Train CNN classifier on jSFS
-      --cnnnpy              Train a CNN classifier on alignments.
+      --rf                  Apply RF classifier.
+      --fcnn                Apply FCNN classifier.
+      --cnn                 Apply CNN classifier on jSFS.
+      --cnnnpy              Apply CNN classifier on alignments.
+      --simulations SIMULATIONS
+                            Path to the output folder of simulate_data (the predictors were trained on
+                            these; used to name the models).
 
-Provide the output paths from Step 5 and Step 3 for the --models and --empirical arguments, respectively. 
+Give the output directories from Step 4, Step 2 and Step 3 for ``--models``, ``--empirical`` and ``--simulations``, and the predictors you trained in Step 4:
 
 .. code-block:: python
 
-    apply_models --config tutorial_2_data/config.txt --models trained_models/  --output results/ --empirical empirical/ --downsampling "{'A':20, 'B':20, 'C':20}" --rf --fcnn --cnn --cnnnpy --simulations simulated/
+    apply_models --config tutorial_2_data/config.txt --models trained_models/ --empirical empirical/ --simulations simulated/ --output results/ --rf --fcnn --cnn --cnnnpy
 
-This should save to the output directory tables showing the predicted probabilities for each model for each classifier.
+In the output directory, you should see:
+
+* <predictor>_predictions.txt: tables of the predicted probability of each model. The SFS predictors (rf, fcnn and cnn) give one row for each replicate SFS from Step 2 (``--reps``), and cnn_npy gives one row for the alignments.
+* <network>_empirical_features.npy: the features of the empirical data, as in Step 4.
+* <network>_pca.png: a principal component analysis of the features of the simulated datasets, colored by model, with the empirical data marked with red crosses. If the empirical data fall far from all of the simulated datasets, none of the models may fit the data well.
