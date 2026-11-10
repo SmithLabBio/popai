@@ -9,16 +9,18 @@ We recommend installing popai in its own environment, so that the packages it in
     conda create -n popai python=3.11
     conda activate popai
 
+Use ``python -m pip`` rather than ``pip``, so that popai is installed into the environment's own Python.
+
 To install popai::
 
     git clone https://github.com/SmithLabBio/popai.git
     cd popai/
-    pip install .
+    python -m pip install .
 
 OR::
 
-    pip install git+https://github.com/SmithLabBio/popai/
+    python -m pip install git+https://github.com/SmithLabBio/popai/
 
-This installs the latest versions of the packages popai uses. To install the exact versions popai was tested with instead, run this in the popai folder before ``pip install .``::
+This installs the latest versions of the packages popai uses. To install the exact versions popai was tested with instead (these need Python 3.11 to 3.13), run this in the popai folder before ``python -m pip install .``::
 
-    pip install -r requirements.txt
+    python -m pip install -r requirements.txt
