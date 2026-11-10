@@ -74,6 +74,7 @@ An `example set of alignments <https://github.com/SmithLabBio/popai/blob/main/tu
 Each sequence must be one phased haplotype, so a diploid individual has two sequences (see the Pop File section below). Bases are read as A, C, G or T, in upper or lower case. Anything else, including N, gaps and IUPAC ambiguity codes such as R or Y, is read as missing data.
 
 popai warns if the alignments contain ambiguity codes. These may mean that each sequence is a diploid individual, with heterozygous sites written as ambiguity codes. Phase such data into two haplotypes per individual before using popai.
+
 ------------
 VCF
 ------------
@@ -95,7 +96,11 @@ If your VCF does not contain information on contig lengths, you must supply the 
 
     length = 1000
 
-Each contig is simulated as a single locus with no recombination, so contigs should be short regions, such as RAD loci or genes. A VCF of whole chromosomes would have each chromosome simulated as a single gene tree.
+
+  Contigs with a length in the header use that length, and the rest use ``length``. If a contig has no length either way, popai stops and lists the contigs without one.
+
+  Each contig is simulated as a single locus with no recombination, so contigs should be short regions, such as RAD loci or genes. A VCF of whole chromosomes would have each chromosome simulated as a single gene tree.
+
 ------------
 Pop File
 ------------
@@ -110,6 +115,7 @@ The user will provide a path to a file assigning individuals to populations in t
 An `example population file <https://github.com/SmithLabBio/popai/blob/main/tutorial_data/tutorial_1_data/populations.txt>`_ is provided on GitHub.
 
 If you use fasta files, each sequence is one haplotype, so the "individuals" in the pop file are haplotypes: two for each diploid individual. Each population must have an even number of sequences, or popai stops with an error. If you use a VCF, "individuals" should correspond to individuals.
+
 Notes:
 
 * Spaces around names are ignored.
