@@ -4,21 +4,22 @@ setup(
     name='popai',
     version='1.0',
     packages=find_packages(),
+    python_requires='>=3.10',
     install_requires=[
-        'dendropy',
-        'pandas',
-        'msprime',
-        'numpy',
+        'dendropy>=4.6',
+        'pandas>=1.5',
+        'msprime>=1.3',
+        'numpy>=1.26',
         'demes',
         'demesdraw',
-        'matplotlib',
+        'matplotlib>3.6',
         'scikit-learn',
-        'keras',
+        'keras>3',
         'seaborn',
         'tabulate',
-        'tensorflow',
+        'tensorflow>=2.18',
         'tqdm',
-        'torch'
+        'torch>=2'
     ],
     entry_points={
         'console_scripts': [
