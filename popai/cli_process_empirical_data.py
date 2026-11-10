@@ -59,7 +59,7 @@ def main():
 
         # save numpy array, with the rows sorted within each population as the simulated arrays are
         np.save(file=os.path.join(args.output, 'empirical.npy'),
-                arr=sort_haplotypes(empirical_array, config_values['sampling dict'].values()))
+                arr=sort_haplotypes(empirical_array, config_values['sampling dict'].values())).astype(np.int8))
 
         # make plots of empirical sfs
         data_processor.plot_2dsfs(empirical_2d_sfs, output_directory=os.path.join(args.output))

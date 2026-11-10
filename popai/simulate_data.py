@@ -132,7 +132,7 @@ class DataSimulator:
                 modified_matrix = _apply_maxsites(all_arrays[matrix_ix], self.max_sites)
 
                 # sort the rows within each population (the empirical array is sorted the same way)
-                all_arrays[matrix_ix] = sort_haplotypes(modified_matrix, self.config["sampling dict"].values())
+                all_arrays[matrix_ix] = sort_haplotypes(modified_matrix, self.config["sampling dict"].values()).astype(np.int8)
 
             with open(os.path.join(self.output, 'simulated_arrays_%s.pickle' % str(key)), 'wb') as f:
                 pickle.dump(all_arrays, f)
