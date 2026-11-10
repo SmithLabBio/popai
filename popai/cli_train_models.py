@@ -1,8 +1,6 @@
 import argparse
-import ast
 import os
 import pickle
-import numpy as np
 from popai import parse_input
 from popai.dataset import PopaiTrainingData
 from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, RandomForestsSFS, train_model, test_model, write_confusion_tsv
@@ -36,18 +34,17 @@ NETWORK_SETTINGS = {'epochs': 10, 'batch_size': 10, 'learning_rate': 0.001}
 RF_SETTINGS = {'ntrees': 500}
 
 def main():
-    parser = argparse.ArgumentParser(description='Command-line interface for my_package')
+    parser = argparse.ArgumentParser(description='Train predictors on the simulated data.')
     parser.add_argument('--config', help='Path to config file.')
-    parser.add_argument('--simulations', help='Path to directory with simulated data.')
-    parser.add_argument('--output', help="Path to output folder for storing SFS.")
+    parser.add_argument('--simulations', help='Path to the output folder of simulate_data.')
+    parser.add_argument('--output', help="Path to output folder for the trained predictors.")
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
     parser.add_argument('--low-memory', action='store_true', default=False, 
-            help="Reads training datasets into memory as needed during training rather than all at once. Slows training due to increased file reads.")
-
-    parser.add_argument('--cnn', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train CNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
-    parser.add_argument('--fcnn', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train FCNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
-    parser.add_argument('--cnnnpy', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train CNN classifier of alignments. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ".')
-    parser.add_argument('--rf', action=_key_value_action(RF_SETTINGS), nargs="?", help='Train RF classifier of SFS. Optionally specify "ntrees=XX".')
+            help="Read the simulated datasets from disk as they are needed, instead of reading them all into memory at the start. Uses less memory, but trains more slowly.")
+    parser.add_argument('--cnn', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train CNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ" (defaults: 10, 10, 0.001).')
+    parser.add_argument('--fcnn', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train FCNN classifier of SFS. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ" (defaults: 10, 10, 0.001).')
+    parser.add_argument('--cnnnpy', action=_key_value_action(NETWORK_SETTINGS), nargs="?", help='Train CNN classifier of alignments. Optionally specify "epochs=XX:batch_size=YY:learning_rate=ZZ" (defaults: 10, 10, 0.001).')
+    parser.add_argument('--rf', action=_key_value_action(RF_SETTINGS), nargs="?", help='Train RF classifier of SFS. Optionally specify "ntrees=XX" (default: 500).')
 
     args = parser.parse_args()
 

@@ -8,18 +8,17 @@ from popai.build_predictors import predict
 from popai import parse_input, build_predictors
 
 def main():
-    parser = argparse.ArgumentParser(description='Command-line interface for my_package')
+    parser = argparse.ArgumentParser(description='Apply trained predictors to the empirical data.')
     parser.add_argument('--config', help='Path to config file.')
-    parser.add_argument('--models', help='Path to directory with trained models.')
-    parser.add_argument('--empirical', help='Path to directory with empirical SFS.')
-    parser.add_argument('--output', help="Path to output folder for storing SFS.")
+    parser.add_argument('--models', help='Path to the output folder of train_models.')
+    parser.add_argument('--empirical', help='Path to the output folder of process_empirical_data.')
+    parser.add_argument('--output', help="Path to output folder for the predictions.")
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
     parser.add_argument('--rf', action='store_true', help='Apply RF classifier.')
     parser.add_argument('--fcnn', action='store_true', help='Apply FCNN classifier.')
     parser.add_argument('--cnn', action='store_true', help='Apply CNN classifier on jSFS.')
     parser.add_argument('--cnnnpy', action='store_true', help='Apply CNN classifier on alignments.')
-    parser.add_argument('--simulations', help='Path to directory with simulated data.')
-
+    parser.add_argument('--simulations', help='Path to the output folder of simulate_data (the predictors were trained on these; used to name the models).')
     args = parser.parse_args()
 
     # check if output exists
