@@ -3,7 +3,7 @@ import os
 import pickle
 import numpy as np
 from popai.build_predictors import predict
-
+import logging
 
 from popai import parse_input, build_predictors
 
@@ -20,6 +20,8 @@ def main():
     parser.add_argument('--cnnnpy', action='store_true', help='Apply CNN classifier on alignments.')
     parser.add_argument('--simulations', help='Path to the output folder of simulate_data (the predictors were trained on these; used to name the models).')
     args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO)
 
     # check if output exists
     if os.path.exists(args.output) and not args.force:

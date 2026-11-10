@@ -5,6 +5,7 @@ from popai import parse_input
 from popai.dataset import PopaiTrainingData
 from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, RandomForestsSFS, train_model, test_model, write_confusion_tsv
 from tensorflow import keras
+import logging
 
 def _key_value_action(defaults):
     """An argparse action for options like --cnn "epochs=20:batch_size=32": key=value settings
@@ -47,6 +48,7 @@ def main():
     parser.add_argument('--rf', action=_key_value_action(RF_SETTINGS), nargs="?", help='Train RF classifier of SFS. Optionally specify "ntrees=XX" (default: 500).')
 
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
 
     # check if output exists
     if os.path.exists(args.output) and not args.force:

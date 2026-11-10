@@ -15,8 +15,6 @@ class DataProcessor:
     def __init__(self, config):
         self.config = config
 
-        # Configure logging
-        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
         # set seed
@@ -149,8 +147,13 @@ class DataProcessor:
         """Drop invariant sites, recode alleles by frequency, and apply maxsites."""
         encoded_array = minor_encoding(_remove_invariant_columns(encoded_alignments))
         filtered_array = _apply_maxsites(encoded_array, maxsites)
-        self.logger.info("""Empirical data has %s SNPs, but we are using %s SNPs""",
-                         encoded_array.shape[1], filtered_array.shape[1])
+        n_snps, n_used = encoded_array.shape[1], filtered_array.shape[1]
+        if n_used < n_snps:
+            self.logger.info("Empirical data has %s SNPs; using the first %s (maxsites).", n_snps, n_used)
+        elif n_used > n_snps:
+            self.logger.info("Empirical data has %s SNPs; padded with missing data to %s (maxsites).", n_snps, n_used)
+        else:
+            self.logger.info("Empirical data has %s SNPs.", n_snps)
         return filtered_array
 
 def _check_even(downsampling):

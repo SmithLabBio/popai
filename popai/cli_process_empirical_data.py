@@ -4,6 +4,7 @@ import os
 import numpy as np
 from popai import parse_input, process_empirical
 from popai.utils import sort_haplotypes
+import logging
 
 def main():
     parser = argparse.ArgumentParser(description='Command-line interface for processing empirical data.')
@@ -17,7 +18,9 @@ def main():
     parser.add_argument('--maxsites', type=int, help="Number of SNPs to keep from the empirical data: the first maxsites SNPs (default: keep all SNPs).", default = np.inf)
 
     args = parser.parse_args()
-    
+
+    logging.basicConfig(level=logging.INFO)
+
     # Parse the configuration file
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()

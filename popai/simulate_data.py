@@ -47,8 +47,6 @@ class DataSimulator:
 
         self.rng = np.random.default_rng(self.config['seed'])
 
-        # Configure logging
-        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
     def _tree(self, ix):

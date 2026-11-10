@@ -2,6 +2,7 @@ import argparse
 import ast
 import os
 from popai import parse_input, generate_models, simulate_data, process_user_models
+import logging
 
 def main():
     parser = argparse.ArgumentParser(description='Simulate data under the popai models, and build their SFS.')
@@ -17,6 +18,8 @@ def main():
     parser.add_argument('--checkpoint', action='store_true', help='Keep models whose simulations already exist in the output folder, and only simulate the rest.')
     parser.add_argument('--infinite', action='store_true', help='Simulate one SNP from each of a number of unlinked loci (the number of loci in the empirical data), under an infinite sites model.')
     args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO)
 
     # check if output exists
     if os.path.exists(args.output) and not args.force:
