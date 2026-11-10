@@ -1,8 +1,6 @@
 import argparse
 import ast
 import os
-import pickle
-import numpy as np
 from popai import parse_input, generate_models, simulate_data, process_user_models
 
 def main():
@@ -24,8 +22,7 @@ def main():
     if os.path.exists(args.output) and not args.force:
         raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
     # create output directory
-    os.system('mkdir -p %s' % args.output)
-
+    os.makedirs(args.output, exist_ok=True)
     
     # Parse the configuration file
     config_parser = parse_input.ModelConfigParser(args.config)
@@ -82,7 +79,7 @@ def main():
 
         # build SFS for simulate data
         sfs_2d = data_simulator.mutations_to_2d_sfs()
-        msfs = data_simulator.mutations_to_sfs(arrays, nbins=args.nbins)
+        data_simulator.mutations_to_sfs(arrays, nbins=args.nbins)
 
         data_simulator.plot_2dsfs(sfs_2d,output_directory=args.output)
 

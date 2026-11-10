@@ -3,11 +3,10 @@ import ast
 import os
 import pickle
 import numpy as np
-from popai import parse_input, build_predictors
+from popai import parse_input
 from popai.dataset import PopaiTrainingData
-from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, RandomForestsSFS, train_model, test_model
+from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, RandomForestsSFS, train_model, test_model, write_confusion_tsv
 from tensorflow import keras
-import json
 
 def _key_value_action(defaults):
     """An argparse action for options like --cnn "epochs=20:batch_size=32": key=value settings
@@ -56,8 +55,8 @@ def main():
     if os.path.exists(args.output) and not args.force:
         raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
     # create output directory
-    os.system('mkdir -p %s' % args.output)
-
+    os.makedirs(args.output, exist_ok=True)
+    
     # Parse the configuration file
     config_parser = parse_input.ModelConfigParser(args.config)
     config_values = config_parser.parse_config()
@@ -68,6 +67,9 @@ def main():
         with open(os.path.join(args.output, 'rf.model.pickle'), 'wb') as f:
             pickle.dump(random_forest_sfs_model, f)
         random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))
+        random_forest_sfs_cm_plot.close()
+        names = [str(number) for number in random_forest_sfs_predictor.int_to_label.values()]
+        write_confusion_tsv(random_forest_sfs_cm, names, os.path.join(args.output, 'rf_confusion.tsv'))
 
     if args.fcnn: # Fully conncted neural network with multidimensional SFS 
         keras.utils.set_random_seed(config_values["seed"])   # same starting weights every run

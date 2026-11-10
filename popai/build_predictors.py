@@ -239,11 +239,7 @@ def test_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str)
     cm, cm_plot = plot_confusion_matrix(y_true, y_pred, labels=list(range(data.dataset.n_classes)), names=names)
     cm_plot.savefig(os.path.join(outdir, f"{label}_confusion.png"))
     cm_plot.close()
-    # Write to a TSV file: rows are the true models, columns the predicted models
-    with open(os.path.join(outdir, f"{label}_confusion.tsv"), "w") as f:
-        f.write("\t" + "\t".join(names) + "\n")
-        for name, row in zip(names, cm):
-            f.write(name + "\t" + "\t".join(map(str, row)) + "\n")
+    write_confusion_tsv(cm, names, os.path.join(outdir, f"{label}_confusion.tsv"))
 
 def extract_features(model, dataset, label):
     """Features from the layer before the output layer of a trained model. dataset is a
@@ -316,6 +312,13 @@ def plot_confusion_matrix(y_true, y_pred, labels, names=None):
     plt.xlabel("Predicted Labels")
     plt.ylabel("True Labels")
     return conf_matrix, plt
+
+def write_confusion_tsv(conf_matrix, names, path):
+    """Write a confusion matrix as a TSV: rows are the true models, columns the predicted models."""
+    with open(path, "w") as f:
+        f.write("\t" + "\t".join(names) + "\n")
+        for name, row in zip(names, conf_matrix):
+            f.write(name + "\t" + "\t".join(map(str, row)) + "\n")
 
 def read_data(simulations):
     """The simulated mSFS, one row per replicate, and their one-hot labels. Reads every

@@ -1,7 +1,6 @@
 import argparse
 import ast
 import os
-import pickle
 import numpy as np
 from popai import parse_input, process_empirical
 from popai.utils import sort_haplotypes
@@ -27,7 +26,7 @@ def main():
     if os.path.exists(args.output) and not args.force:
         raise RuntimeError(f"Error: output directory, {args.output} already exists. Please specify a different directory, or use --force.")
     # create output directory
-    os.system('mkdir -p %s' % args.output)
+    os.makedirs(args.output, exist_ok=True)
 
     # Process empirical data
     data_processor = process_empirical.DataProcessor(config=config_values)
