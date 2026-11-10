@@ -44,17 +44,17 @@ The command line tool *process_empirical_data* can be used to process empirical 
     Command-line interface for processing empirical data.
 
     options:
-        -h, --help            show this help message and exit
-        --config CONFIG       Path to config file.
+      -h, --help            show this help message and exit
+      --config CONFIG       Path to config file.
         --preview             Preview number of SNPs used for different down-projections
-        --downsampling DOWNSAMPLING
+      --downsampling DOWNSAMPLING
                             Downsampling dict as a literal string, giving the number of haplotypes to
                             use from each population (e.g., {'A': 10, 'B': 10, 'C': 6}). Each must be
                             even.
-        --reps REPS           Number of replicate downsampled SFS to build.
-        --nbins NBINS         Number of bins for creating a binned mSFS (default: None, no binning).
-        --output OUTPUT       Path to output folder for storing SFS.
-        --force               Overwrite existing results.
+      --reps REPS           Number of replicate downsampled SFS to build.
+      --nbins NBINS         Number of bins for creating a binned mSFS (default: None, no binning).
+      --output OUTPUT       Path to output folder for storing SFS.
+      --force               Overwrite existing results.
       --maxsites MAXSITES   Number of SNPs to keep from the empirical data: the first maxsites SNPs
                             (default: keep all SNPs).
 
@@ -114,12 +114,12 @@ Next, we need to simulate data under the models of interest. We will do so using
                             processing the empirical data (default: None, no binning).
       --output OUTPUT       Path to output folder for storing the simulated data and SFS.
       --force               Overwrite existing results.
-     --maxsites MAXSITES   Number of SNPs to keep from each simulated dataset: the first maxsites
+      --maxsites MAXSITES   Number of SNPs to keep from each simulated dataset: the first maxsites
                             SNPs, padded with missing data if a dataset has fewer. Use the number of
                             SNPs in the empirical data. Needed for the CNN on arrays, which needs
                             every dataset to be the same size (default: keep all SNPs).
-       --cores CORES         Number of cores to use when simulating data.
-     --checkpoint          Keep models whose simulations already exist in the output folder, and only
+      --cores CORES         Number of cores to use when simulating data.
+      --checkpoint          Keep models whose simulations already exist in the output folder, and only
                             simulate the rest.
       --infinite            Simulate one SNP from each of a number of unlinked loci (the number of
                             loci in the empirical data), under an infinite sites model.
