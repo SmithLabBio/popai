@@ -10,12 +10,12 @@ def main():
     parser = argparse.ArgumentParser(description='Command-line interface for processing empirical data.')
     parser.add_argument('--config', help='Path to config file.')
     parser.add_argument('--preview', action='store_true', help='Preview number of SNPs used for different down-projections')
-    parser.add_argument('--downsampling', help="Input downsampling dict as literal string (e.g., {'A': 10, 'B': 10, 'C': 5} to downsample to 10 individuals in populations A and B and 5 in population C).")
+    parser.add_argument('--downsampling', help="Downsampling dict as a literal string, giving the number of haplotypes to use from each population (e.g., {'A': 10, 'B': 10, 'C': 6}). Each must be even.")
     parser.add_argument('--reps', type=int, help="Number of replicate downsampled SFS to build.", default=1)
-    parser.add_argument('--nbins', type=int, default=None, help='Number of bins for creating a binned SFS (default: None)')
+    parser.add_argument('--nbins', type=int, default=None, help='Number of bins for creating a binned mSFS (default: None, no binning).')
     parser.add_argument('--output', help="Path to output folder for storing SFS.")
     parser.add_argument('--force', action='store_true', help='Overwrite existing results.')
-    parser.add_argument('--maxsites', type=int, help="Max number of sites to use when building SFS from simulated", default = np.inf)
+    parser.add_argument('--maxsites', type=int, help="Number of SNPs to keep from the empirical data: the first maxsites SNPs (default: keep all SNPs).", default = np.inf)
 
     args = parser.parse_args()
     
