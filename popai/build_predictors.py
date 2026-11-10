@@ -299,7 +299,7 @@ def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir
 
     # pca
     outputpca = os.path.join(out_dir, f"{label}_pca.png")
-    plot_pca(train_features, np.argmax(train_labels, axis=1), new_features, outputpca)
+    plot_pca(train_features, np.array(labels)[np.argmax(train_labels, axis=1)], new_features, outputpca)
 
 def plot_confusion_matrix(y_true, y_pred, labels, names=None):
     """Confusion matrix of y_true (rows) against y_pred (columns), with one row and column for
