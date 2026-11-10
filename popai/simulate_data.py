@@ -1,22 +1,16 @@
 """This module contains all Classes for simulating datasets under specified models using msprime."""
 import logging
-import time # for testing only
-from collections import Counter, OrderedDict
-from itertools import product
+import time
 import os
 import msprime
 import numpy as np
 import matplotlib.pyplot as plt
 logging.getLogger('msprime').setLevel("WARNING")
-import sys
-import pyslim
-import dendropy
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
 from popai.utils import minor_encoding, sort_haplotypes, two_d_sfs, multi_sfs
 from tqdm import tqdm
 import pickle
-from collections import defaultdict
 from popai.process_empirical import _apply_maxsites
 
 class DataSimulator:
@@ -41,60 +35,21 @@ class DataSimulator:
         if user == False and sp_tree_index == False:
             raise ValueError("Error in simulation command. You must either provide a species tree index list (output when constructing models), or use user-specified models.")
 
-        # check that using even values
-        key_even = all(value % 2 == 0 for value in self.downsampling.values())
-        if not key_even:
-            raise ValueError("Error in downampling, all keys must be even.")
+        # downsampling: an even number for every population, from 2 up to its sample size
+        sampling = self.config['sampling dict']
+        if set(self.downsampling) != set(sampling):
+            raise ValueError(f"The downsampling dictionary must have one entry for each population: "
+                             f"{', '.join(sampling)}.")
+        for population, size in self.downsampling.items():
+            if size % 2 or not 0 < size <= sampling[population]:
+                raise ValueError(f"Downsampling {population} to {size}: each population must be downsampled "
+                                 f"to an even number, from 2 up to its {sampling[population]} haplotypes.")
 
         self.rng = np.random.default_rng(self.config['seed'])
 
         # Configure logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-
-    def simulate_ancestry(self):
-
-        """Perform ancestry simulations with msprime"""
-
-        start_time = time.time()  # Record the start time
-
-        # dictionary for storing arrays and list for storing sizes.
-        all_arrays = {}
-        all_sizes = []
-        
-        for ix, demography in enumerate(self.models):
-
-            if ix % 100 == 0:
-                print(f"Beginning simulation {ix} of {len(self.models)}.")
-
-            matrix, sizes = self.process_demography(demography, self._tree(ix), self._draw_random_values())
-
-            if self.labels[ix] in all_arrays:
-                all_arrays[self.labels[ix]].append(matrix)
-            else:
-                all_arrays[self.labels[ix]] = [matrix]
-            all_sizes.append(sizes)
-
-        end_time = time.time()  # Record the end time
-        execution_time = end_time - start_time  # Calculate the execution time
-
-        self.logger.info("Simulation execution time: %s seconds.", execution_time)
-
-        # shorten arrays that are too short, and pad arrays that are too long.
-        median_size = int(np.ceil(np.median(all_sizes)))
-
-        self.logger.info("Median simulated data has %s SNPs."\
-                         " If this is very different than the number of SNPs in your empirical data, you may want to change some priors.", 
-                         median_size)
-
-        for model, values in all_arrays.items():
-            for i, matrix in enumerate(values):
-                all_arrays[model][i] = _apply_maxsites(matrix, self.max_sites)
-
-        return all_arrays
-
-    def process_demography(self, demography, tree, draws):
-        return self._simulate_demography(demography, tree, draws)
 
     def _tree(self, ix):
         """The species tree for model ix, or None for user models."""
@@ -158,7 +113,7 @@ class DataSimulator:
             with ProcessPoolExecutor(max_workers=self.cores) as executor:
                 # Submit tasks, remembering each one's position in the list of replicates
                 futures = {
-                    executor.submit(self.process_demography, demography, self._tree(ix), draw): position
+                    executor.submit(self._simulate_demography, demography, self._tree(ix), draw): position
                     for position, ((ix, demography), draw) in enumerate(zip(value, draws))
                 }
 
@@ -183,7 +138,7 @@ class DataSimulator:
                 pickle.dump(all_arrays, f)
 
 
-            # shorten arrays that are too short, and pad arrays that are too long.
+            # the median number of SNPs, before max_sites
             median_size = int(np.ceil(np.median(all_sizes)))
 
             self.logger.info("Median simulated data has %s SNPs."\
@@ -239,43 +194,19 @@ class DataSimulator:
           return all_sfs
 
     def plot_2dsfs(self, sfs_list, output_directory=None):
-        """Plot average 2 dimensional Site frequency spectra."""
+        """Plot the average 2D SFS of each model, for each pair of populations: one png per model
+        and pair in output_directory, or on screen if output_directory is None."""
 
-        for item in sfs_list.keys():
-            
-            average_sfs = {}
-            
-            for model, replicates in sfs_list.items():
-                accumulation = {}
-                counts = {}
-                for replicate in replicates:
-                    for comparison, sfs in replicate.items():
-                        if comparison not in accumulation:
-                            accumulation[comparison] = np.zeros_like(sfs)
-                            counts[comparison] = 0
-                        accumulation[comparison] += sfs
-                        counts[comparison] += 1
-                
-                average_sfs[model] = {}
-                for comparison, total_sfs in accumulation.items():
-                    average_sfs[model][comparison] = total_sfs / counts[comparison]
-
-        if output_directory==None:
-            for model, comparisons in average_sfs.items():
-                for comparison, avg_sfs in comparisons.items():
-                    plt.imshow(avg_sfs, cmap='viridis', origin="lower")
-                    plt.colorbar()
-                    plt.title(f'{model} - {comparison}')
+        for model, replicates in sfs_list.items():
+            for comparison in replicates[0]:
+                average = np.mean([replicate[comparison] for replicate in replicates], axis=0)
+                plt.imshow(average, cmap='viridis', origin="lower")
+                plt.colorbar()
+                plt.title(f'{model} - {comparison}')
+                if output_directory is None:
                     plt.show()
-        else:
-            for model, comparisons in average_sfs.items():
-                for comparison, avg_sfs in comparisons.items():
-                    outfile  = os.path.join(output_directory, \
-                                            f"2D_SFS_{comparison}_{model}.png")
-                    plt.imshow(avg_sfs, cmap='viridis', origin="lower")
-                    plt.colorbar()
-                    plt.title(f'{model} - {comparison}')
-                    plt.savefig(outfile)
+                else:
+                    plt.savefig(os.path.join(output_directory, f"2D_SFS_{comparison}_{model}.png"))
                     plt.close()
 
     def _sample_sets(self, demography, tree):
