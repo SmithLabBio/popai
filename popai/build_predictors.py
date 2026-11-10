@@ -36,7 +36,8 @@ class RandomForestsSFS:
         x_train, x_test, y_train, y_test = train_test_split(self.sfs,
                 self.labels, test_size=0.2, random_state=train_test_seed, stratify=self.labels)
 
-        sfs_rf = RandomForestClassifier(n_estimators=ntrees, oob_score=True)
+        sfs_rf = RandomForestClassifier(n_estimators=ntrees, oob_score=True,
+                                          random_state=int(self.rng.integers(2**32)))
         sfs_rf.fit(x_train, y_train)
         print("Out-of-Bag (OOB) Error:", 1.0 - sfs_rf.oob_score_)
 

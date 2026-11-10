@@ -91,11 +91,13 @@ class PopaiTrainingData:
                 random_state=train_test_seed, stratify=self.dataset.labels)
         self.train_dataset = Subset(self.dataset, train_ixs)
         self.test_dataset =  Subset(self.dataset, test_ixs)
+        # shuffle the training data in the same order every run
+        shuffle_generator = torch.Generator().manual_seed(int(rng.integers(2**32)))
         if method == "cnn":
-            self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn)
+            self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate_fn, generator=shuffle_generator)
             self.test_loader =  DataLoader(self.test_dataset,  batch_size=batch_size, shuffle=False, collate_fn=custom_collate_fn)
         else:
-            self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True)
+            self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True, generator=shuffle_generator)
             self.test_loader =  DataLoader(self.test_dataset,  batch_size=batch_size, shuffle=False)
 
 
