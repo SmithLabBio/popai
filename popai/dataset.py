@@ -26,8 +26,10 @@ class PopaiDataset(Dataset):
                     self.labels.append(int(modno))
                     self.path_ixs.append(i)
                     self.sim_ixs.append(j)
-        self.n_classes = len(set(self.labels))
-        self.encoded_labels = to_categorical(self.labels)
+        self.model_numbers = sorted(set(self.labels))     # e.g. [1, 2, 3] for model_1 .. model_3
+        self.labels = [self.model_numbers.index(label) for label in self.labels]   # classes 0 .. n-1
+        self.n_classes = len(self.model_numbers)
+        self.encoded_labels = to_categorical(self.labels, num_classes=self.n_classes)
 
     def __len__(self):
         return len(self.path_ixs)
@@ -52,8 +54,10 @@ class PopaiDatasetLowMem(Dataset):
                     self.labels.append(int(modno))
                     self.path_ixs.append(i)
                     self.sim_ixs.append(j)
-        self.n_classes = len(set(self.labels))
-        self.encoded_labels = to_categorical(self.labels)
+        self.model_numbers = sorted(set(self.labels))     # e.g. [1, 2, 3] for model_1 .. model_3
+        self.labels = [self.model_numbers.index(label) for label in self.labels]   # classes 0 .. n-1
+        self.n_classes = len(self.model_numbers)
+        self.encoded_labels = to_categorical(self.labels, num_classes=self.n_classes)
 
     def __len__(self):
         return len(self.path_ixs)
