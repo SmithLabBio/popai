@@ -1,5 +1,5 @@
 """Build predictive models."""
-from sklearn.model_selection import train_test_split, cross_val_predict, cross_val_score
+  from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix
 import numpy as np
@@ -11,11 +11,9 @@ import os
 import pickle
 import tensorflow as tf
 from tensorflow import keras
-#from memory_profiler import profile
-from popai.dataset import PopaiTrainingData
+from popai.dataset import PopaiTrainingData, human_sort_key
 from typing import Dict
 import glob
-import re
 from torch.utils.data import DataLoader
 from tensorflow.keras.optimizers import Adam
 from keras.saving import register_keras_serializable
@@ -169,90 +167,6 @@ class CnnNpy(keras.Model):
         n_classes = config.pop("n_classes")
         return (cls(n_sites, sampling_dict, n_classes, **config))
 
-
-class CnnNpy_old(keras.Model):
-    """
-    CNN taking SNP alignment as input.
-    """
-    def __init__(self, n_sites: int, sampling_dict: Dict[str,int], n_classes: int, name=None, 
-                 **kwargs):
-        super().__init__(name=name, **kwargs)
-        self.n_sites = n_sites
-        self.sampling_dict = sampling_dict
-        self.n_classes = n_classes
-        self.conv0_layers = []
-        self.conv1_layers = []
-        self.rows = []
-        for key, num_rows in sampling_dict.items():
-            self.rows.append(num_rows)
-            #conv_a_layer = keras.layers.Conv2D(10, (3, 1), strides=(1,1), activation="relu", padding="same")
-            #conv_layer = keras.layers.Conv2D(10, (int(num_rows/2), 1), strides=(int(num_rows/2), 1), 
-            #        activation="relu", padding="valid")
-            conv_a_layer = keras.layers.Conv2D(10, (3, 3), strides=(1,1), activation="relu", padding="same")
-            #conv_layer = keras.layers.Conv2D(10, (3,3), strides=(1, 1), 
-            #        activation="relu", padding="valid")
-            self.conv0_layers.append(conv_a_layer)
-            #self.conv1_layers.append(conv_layer)
-        self.conv2 = keras.layers.Conv2D(10, (len(sampling_dict), 1), activation="relu", 
-                                         padding="valid")
-        self.flat = keras.layers.Flatten()
-        self.dense1 = keras.layers.Dense(100, activation='relu')
-        self.drop = keras.layers.Dropout(0.1)
-        self.dense2 = keras.layers.Dense(50, activation='relu')
-        self.dense3 = keras.layers.Dense(n_classes, activation="softmax")
-
-        self.pooling = keras.layers.AveragePooling2D(pool_size=(2, 1), strides=(2, 1), padding="valid")
-        self.pool2 = keras.layers.AveragePooling2D(pool_size=(1,2), strides=(1,2), padding="valid")
-        self.globalpool = keras.layers.GlobalAveragePooling2D()
-
-    def call(self, x, return_intermediate=False):
-        x = tf.cast(tf.expand_dims(x, axis=-1), dtype=tf.float64) # Reshape input and cast to float dtype
-        outputs = []
-        start_ix = 0
-        for i in range(len(self.rows)):
-            num_rows = self.rows[i]
-            end_ix = start_ix + num_rows 
-            out = self.conv0_layers[i](x[:,start_ix:end_ix,:,:])
-            #print(f"Conv 0 2D layer {i} output shape:", out.shape)
-            out = self.pooling(out)
-            #print(f"Pool layer {i} output shape:", out.shape)
-            #out = self.conv1_layers[i](out)
-            #print(f"Conv 1 2D layer {i} output shape:", out.shape)
-            outputs.append(out)
-        out = keras.layers.concatenate(outputs, axis=1)
-        #out = self.conv2(out)
-        #print(f"Conv 2 2D layer output shape:", out.shape)
-        #out = self.pool2(out)
-        #print(f"Pool layer output shape:", out.shape)
-        #out = self.globalpool(out)
-        #print(f"Global pooling output shape:", out.shape)
-        out = self.flat(out)
-        out = self.dense1(out)
-        out = self.drop(out)
-        out = self.dense2(out)
-        if return_intermediate:
-            return out  # Return feature map before further processing
- 
-        out = self.dense3(out)
-        return out
-
-    def get_config(self):
-        # For saving model
-        config = super().get_config()
-        config.update(dict(
-            n_sites=self.n_sites, 
-            sampling_dict=self.sampling_dict,
-            n_classes=self.n_classes))
-        return config
-
-    @classmethod
-    def from_config(cls, config):
-        # For reading model from file
-        n_sites = config.pop("n_sites")
-        sampling_dict = config.pop("sampling_dict")
-        n_classes = config.pop("n_classes")
-        return (cls(n_sites, sampling_dict, n_classes, **config))
-
 @register_keras_serializable(package="Custom")
 class NeuralNetSFS(keras.Model):
     """
@@ -303,13 +217,13 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
         model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
 
         for epoch in range(epochs):
-            for batch_data, batch_labels in batch_generator(data.train_loader):
+            for batch_data, batch_labels in data.train_loader:
                 inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
                 labels = tf.convert_to_tensor(batch_labels, dtype=tf.float32)
 
                 model.train_on_batch(inputs, labels)
 
-            for val_batch_data, val_batch_labels in batch_generator(data.test_loader):
+            for val_batch_data, val_batch_labels in data.test_loader:
                 val_inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in val_batch_data]
                 val_labels = tf.convert_to_tensor(val_batch_labels, dtype=tf.float32)
                 model.test_on_batch(val_inputs, val_labels)
@@ -357,41 +271,16 @@ def test_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str)
             f.write(name + "\t" + "\t".join(map(str, row)) + "\n")
 
 def extract_features(model, dataset, label):
-    """
-    Extract features from a dataset using the trained model.
-
-    model: Trained Keras model
-    dataset: DataLoader or other iterable dataset
-
-    Returns:
-        - features (numpy array)
-        - labels (numpy array) (if available, otherwise None)
-    """
+    """Features from the layer before the output layer of a trained model. dataset is a
+    DataLoader (returns the features and the one-hot labels, batch by batch) or one batch of
+    inputs (returns the features)."""
     if isinstance(dataset, DataLoader):
-        extracted_features = []
-        all_labels = []
-
-        if label=="cnn": # TODO: FIX THIS
-            for x_batch, y_batch in dataset:
-                features = model(x_batch, return_intermediate=True)
-                extracted_features.append(features.numpy())
-                all_labels.append(y_batch)
-        else:
-            for x_batch, y_batch in dataset:
-                features = model(x_batch, return_intermediate=True)
-                extracted_features.append(features.numpy())
-                all_labels.append(y_batch)
-        extracted_features = np.concatenate(extracted_features, axis=0)
-        all_labels = np.concatenate(all_labels, axis=0)
-
-        return extracted_features, all_labels
-    else:
-        if label=="cnn":
-            extracted_features = model(dataset, return_intermediate=True)
-        
-        else:
-            extracted_features = model(dataset, return_intermediate=True)
-        return extracted_features.numpy()
+        extracted_features, all_labels = [], []
+        for x_batch, y_batch in dataset:
+            extracted_features.append(model(x_batch, return_intermediate=True).numpy())
+            all_labels.append(y_batch)
+        return np.concatenate(extracted_features, axis=0), np.concatenate(all_labels, axis=0)
+    return model(dataset, return_intermediate=True).numpy()
 
 def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir:str, path:str, train_features:str, train_labels:str):
     """
@@ -472,14 +361,6 @@ def plot_confusion_matrix(y_true, y_pred, labels, names=None):
     plt.ylabel("True Labels")
     return conf_matrix, plt
 
-def check_valid_labels(labels):
-    unique_labels = list(set(labels))
-    unique_labels.sort()
-    for i in range(len(unique_labels)):
-        if unique_labels[i] !=i:
-            return False
-    return True
-
 def read_data(simulations):
     """The simulated mSFS, one row per replicate, and their one-hot labels. Reads every
     simulated_mSFS_<number>.pickle in simulations (named <number> or model_<number>); the
@@ -552,16 +433,3 @@ def plot_pca(train_features, train_labels, new_features, pcafile):
     # Save the plot to the specified file
     plt.savefig(pcafile)
     plt.close()
-
-def batch_generator(loader):
-    for batch_data, batch_labels in loader:
-        yield (batch_data, batch_labels)
-
-
-
-def human_sort_key(s):
-    """
-    Key function for human sorting.
-    Splits the string into parts and converts numeric parts to integers.
-    """
-    return [int(part) if part.isdigit() else part for part in re.split('([0-9]+)', s)]
