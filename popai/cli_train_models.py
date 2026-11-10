@@ -6,6 +6,7 @@ import numpy as np
 from popai import parse_input, build_predictors
 from popai.dataset import PopaiTrainingData
 from popai.build_predictors import CnnSFS, CnnNpy, NeuralNetSFS, RandomForestsSFS, train_model, test_model
+from tensorflow import keras
 import json
 
 class ParseEpochsBatchSize(argparse.Action):
@@ -91,6 +92,7 @@ def main():
         random_forest_sfs_cm_plot.savefig(os.path.join(args.output, 'rf_confusion.png'))
 
     if args.fcnn: # Fully conncted neural network with multidimensional SFS 
+        keras.utils.set_random_seed(config_values["seed"])   # same starting weights every run
         data = PopaiTrainingData(args.simulations, "simulated_mSFS_*.pickle",
                 config_values["seed"], args.low_memory, batch_size=args.fcnn['batch_size'])
         model = NeuralNetSFS(data.dataset.n_classes)
@@ -98,6 +100,7 @@ def main():
         test_model(model, data, args.output, "fcnn")
 
     if args.cnn: # CNN with 2D SFS
+        keras.utils.set_random_seed(config_values["seed"])   # same starting weights every run
         data = PopaiTrainingData(args.simulations, "simulated_2dSFS_*.pickle",
                 config_values["seed"], args.low_memory, batch_size=args.cnn['batch_size'], method='cnn')
         n_pairs = data.dataset[0][0].shape[0]
@@ -106,6 +109,7 @@ def main():
         test_model(model, data, args.output, "cnn")
 
     if args.cnnnpy: # CNN with SNP alignment
+        keras.utils.set_random_seed(config_values["seed"])   # same starting weights every run
         data = PopaiTrainingData(args.simulations, "simulated_arrays_*.pickle",
                 config_values["seed"], args.low_memory, batch_size=args.cnnnpy['batch_size'])
         n_sites = data.dataset[0][0].shape[1]
