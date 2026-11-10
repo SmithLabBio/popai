@@ -216,7 +216,7 @@ def train_model(model:keras.Model, data:PopaiTrainingData, outdir:str, label:str
     model.compile(optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"])
     model.fit(data.train_loader, epochs=epochs, validation_data=data.test_loader, shuffle=False)
     model.save(os.path.join(outdir, f"{label}.keras"))
-    
+
     # extract and save features
     extracted_features, all_labels = extract_features(model, data.train_loader, label)
     features_path = os.path.join(outdir, f"{label}_features.npy")
@@ -275,23 +275,14 @@ def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir
 
     model = keras.models.load_model(os.path.join(model_dir, model_file))
 
-    if label=="cnn":
+    if label == "cnn":
+        # one array per population pair, (replicates, rows, columns), each SFS normalized to
+        # sum to 1, as custom_collate_fn in dataset.py does for the simulated 2D SFS
+        data = [np.stack([replicate[i] / np.sum(replicate[i]) for replicate in data]).astype(np.float32)
+                for i in range(len(data[0]))]
 
-        pred = []
-        for batch_data in data:
-            inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
-            for item in range(len(inputs)):
-                inputs[item] =  inputs[item] / np.sum(inputs[item])  # Normalize so that elements sum to 1
-            inputs = [tf.expand_dims(pair, axis=0) for pair in inputs]
-            pred.extend(model.predict(inputs))
-        replicate_numbers = ["Replicate {}".format(i+1) for i in range(len(pred))]
-
-
-
-    else:
-        pred = model.predict(data)
-        replicate_numbers = ["Replicate {}".format(i+1) for i in range(pred.shape[0])]
-
+    pred = model.predict(data)
+    replicate_numbers = ["Replicate {}".format(i+1) for i in range(pred.shape[0])]
 
     labels = get_labels(sim_dir, path)
     headers = [f"Model {i}" for i in labels]
@@ -301,18 +292,8 @@ def predict(model_dir:str, model_file:str, data, out_dir:str, label:str, sim_dir
     with open(os.path.join(out_dir, f"{label}_predictions.txt"), 'w') as fh:
         fh.write(tabulated)
 
-    # feature extraction
-    if label=="cnn":
-        new_features = []
-        for batch_data in data:
-            inputs = [tf.convert_to_tensor(pair, dtype=tf.float32) for pair in batch_data]
-            for item in range(len(inputs)):
-                inputs[item] =  inputs[item] / np.sum(inputs[item])  # Normalize so that elements sum to 1
-            inputs = [tf.expand_dims(pair, axis=0) for pair in inputs]
-            new_features.append(extract_features(model, inputs, label))
-        new_features = np.concatenate(new_features, axis=0)
-    else:
-        new_features= extract_features(model, data, label)
+    new_features = extract_features(model, data, label)
+
     new_features_path = os.path.join(out_dir, f"{label}_empirical_features.npy")
     np.save(new_features_path, new_features)
 
