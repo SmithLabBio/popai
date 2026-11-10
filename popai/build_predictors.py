@@ -466,6 +466,10 @@ def plot_confusion_matrix(y_true, y_pred, labels, names=None):
     conf_matrix = confusion_matrix(y_true, y_pred, labels=labels)
     plt.figure(figsize=(8, 6))
     sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=names, yticklabels=names)
+    plt.title("Confusion Matrix")
+    plt.xlabel("Predicted Labels")
+    plt.ylabel("True Labels")
+    return conf_matrix, plt
 
 def check_valid_labels(labels):
     unique_labels = list(set(labels))

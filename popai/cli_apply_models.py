@@ -56,26 +56,17 @@ def main():
         msfs.append(this_sfs)
     
     jsfs = []
-    jsfs_files = os.listdir(args.empirical)
-    jsfs_files = [x for x in jsfs_files if x.endswith('.jsfs')]
     populations = list(config_values["sampling dict"].keys())
-
-    for i in range(len(msfs)):
+    for replicate in range(len(msfs)):
         current_dict = []
-        current_files = [x for x in jsfs_files if f"rep{i}" in x]
         for i, pop1 in enumerate(populations):
-            for j, pop2 in enumerate(populations):
-                if i < j:
-                    target = [x for x in current_files if f"{pop1}_{pop2}_rep" in x]
-                    with open(os.path.join(args.empirical, target[0]), 'r') as f:
-                        next(f)
-                        next(f)
-                        data = []
-                        for line in f:
-                            values = line.strip().split()[1:]
-                            data.append([float(value) for value in values])
-                        array = np.array(data)
-                    current_dict.append(array)
+            for pop2 in populations[i + 1:]:
+                # the file process_empirical_data wrote for this pair and replicate
+                with open(os.path.join(args.empirical, f"{pop1}_{pop2}_rep{replicate}.jsfs"), 'r') as f:
+                    next(f)
+                    next(f)
+                    data = [[float(value) for value in line.strip().split()[1:]] for line in f]
+                current_dict.append(np.array(data))
         jsfs.append(current_dict)
     empirical_array = np.load(os.path.join(args.empirical,"empirical.npy"))
 
