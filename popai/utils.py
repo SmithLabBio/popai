@@ -129,9 +129,10 @@ def multi_sfs(arr, downsampling, sampling_dict, rng, replicates=1, nbins=None):
         both = sum(counts.values())
 
         # keep sites that still have two alleles, and count the minor allele after
-        # downsampling (ties: the lower-coded allele)
+        # downsampling (ties: random)
         variable = (both > 0) & (both < total)
-        use_other = 2 * both >= total
+        tie = 2 * both == total
+        use_other = (2 * both > total) | (tie & (rng.random(len(both)) < 0.5))
         cells = [to_cell[ix][np.where(use_other, size - counts[population],
                                       counts[population])[variable]]
                  for ix, (population, size) in enumerate(zip(populations, sizes))]
