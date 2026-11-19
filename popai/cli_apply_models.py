@@ -37,7 +37,7 @@ def main():
 
     # read empirical data into correct format
     msfs_files = os.listdir(args.empirical)
-    msfs_files = [x for x in msfs_files if x.endswith('_DSFS.obs')]
+    msfs_files = [x for x in msfs_files if x.endswith('_MSFS.obs')]
     msfs_files = sorted(msfs_files, key=lambda x: int(x.split('_')[0][3:]))
     msfs = []
     for file in msfs_files:

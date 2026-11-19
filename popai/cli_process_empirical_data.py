@@ -69,7 +69,7 @@ def main():
         # save to output directory
         for replicate in range(args.reps):
 
-            with open(os.path.join(args.output, f"rep{replicate}_DSFS.obs"), 'w') as f:
+            with open(os.path.join(args.output, f"rep{replicate}_MSFS.obs"), 'w') as f:
                 f.write("1 observations. No. of demes and sample sizes are on next line\n")
                 f.write(str(len(list(downsampling_dict.keys()))))
                 f.write(" ")

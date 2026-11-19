@@ -80,7 +80,7 @@ We are only using a single replicate for this test. This makes sense because our
 
 Notice that this will print to the screen the number of SNPs in your empirical data. Please record this, as we will use it in the next step.
 
-This script will also output in the output directory the joint site frequency spectra between each pair of populations (.jsfs files) and the multidimensional site frequency spectrum (_DSFS.obs) for each replicate, plots of the joint site frequency spectra (.png files), and the empirical alignments as an array (empirical.npy) for the CNN in Steps 4 and 5.
+This script will also output in the output directory the joint site frequency spectra between each pair of populations (.jsfs files) and the multidimensional site frequency spectrum (_MSFS.obs) for each replicate, plots of the joint site frequency spectra (.png files), and the empirical alignments as an array (empirical.npy) for the CNN in Steps 4 and 5.
 
 ==========================================
 Step 3: Simulate data
