@@ -63,6 +63,8 @@ Model files contain up to three sections:
 2. Migration (optional): migration from the present day
 3. Events (optional): splits, migration over a time window, and other changes
 
+Anywhere a range [min,max] is allowed, loguniform[min,max] draws uniformly on a log scale (both ends above 0).
+
 Anything after a ``#`` on a line is a comment.
 
 ------------------
@@ -77,6 +79,7 @@ Notes:
 
 * Name is the name of the population.
 * Min and Max are the bounds of a uniform prior from which the population size is drawn.
+* To use a loguniform prior, use loguniform[min,max].
 * You must also include historical (ancestral) populations.
 * Instead of a range, a size can be a fixed number (``A=20000``), the name of a population listed above it, to give the two the same size in every replicate (``B=A``), or an expression using sizes drawn above it (``AB=0.5*pop_C``).
 
@@ -88,6 +91,24 @@ Example::
     C=[10000,50000]
     AB=[10000,50000]
     ABC=[10000,50000]
+
+------------------
+Parameters (optional)
+------------------
+
+* Parametesrs are drawn first, in file order.
+* Each entry a uniform prior  (``[1e-5,1e-4]``), a loguniform prior (``loguniform[min,max]``), or an expresison of previously drawn parameters.
+* Parameters are not rounded.
+* Parameters can be used in sizes and event values.
+
+Example::
+
+    [Parameters]
+    fold_A = loguniform[2,20]
+
+    [Events]
+    expstop_A = popgrowth{time=[1000,20000], population=A, rate=0}
+    expgrow_A = popgrowth{time=0, population=A, rate=log(fold_A)/expstop_A}
 
 ------------------
 Migration
@@ -105,7 +126,7 @@ The Migration section sets migration rates from the present day. It holds one ta
 Notes:
 
 * The entry in row j, column k is the rate at which lineages move from population j to population k, backwards in time (msprime's M[j, k]). Forward in time, it is the fraction of population j made up of migrants from population k each generation.
-* Each entry is 0 (no migration), a rate (``2e-5``), a uniform prior on the rate (``[1e-5,1e-4]``), or a number of migrants instead of a rate (``1Nm`` or ``[0.5Nm,2Nm]``). Nm is converted to a rate by dividing by the size of the row's population (m = Nm / N_j).
+* Each entry is 0 (no migration), a rate (``2e-5``), a uniform prior on the rate (``[1e-5,1e-4]``), a loguniform prior on the rate (``loguniform[min,max]``), or a number of migrants instead of a rate (``1Nm`` or ``[0.5Nm,2Nm]``). Nm is converted to a rate by dividing by the size of the row's population (m = Nm / N_j).
 * Each entry is drawn separately, so the rates in the two directions can differ.
 * The table only needs to include populations that migrate, and the diagonal must be 0.
 * The table can only include populations that exist at the present. Migration stops when a population splits from its ancestor (backwards in time). For migration involving an ancestral population, use a migration event (below).
@@ -129,7 +150,8 @@ Parameters depend on the event type (see below). Each value can be:
 
 * a number (e.g., ``25000`` or ``1e-5``)
 * a range for a uniform prior (e.g., ``[10000,50000]``), with the smaller value first
-* an expression using other events' times and population sizes. Expressions can use addition (+), subtraction (-), multiplication (*), division (/), parentheses, and the functions min, max, mean, and median (e.g., ``max(div_AB, 45000)`` or ``mean(div_AB, 3*1e4)``). The present-day size of population A is ``pop_A``.
+* a range for a loguniform prior (e.g., ``loguniform[min,max]``)
+* an expression using other events' times and population sizes. Expressions can use addition (+), subtraction (-), multiplication (*), division (/), parentheses, and the functions min, max, mean, median, log, and exp (e.g., ``max(div_AB, 45000)`` or ``mean(div_AB, 3*1e4)``). The present-day size of population A is ``pop_A``.
 
 Events can be listed in any order. popai works out the order to process them in, so that each event comes after the events it refers to. If two events refer to each other in a loop, popai gives an error.
 
@@ -261,6 +283,7 @@ Checks
 popai checks model files as it reads them, and stops with a message naming the model file and the problem. For example, it gives an error for:
 
 * a range with its larger value first, or a value that can't be right: a negative time or migration rate, a size of zero or less, or a proportion outside 0 to 1
+* a loguniform range with a minimum ≤ 0
 * a typo in a value or an expression, or a name that isn't an event or a population size
 * an event type that doesn't exist, or an event missing a value it needs
 * a model file name that doesn't end in ``_x.model``, or two files with the same number

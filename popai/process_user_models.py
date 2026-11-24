@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt # ModelBuilder
 from matplotlib.backends.backend_pdf import PdfPages
 import copy
 import re
+import math
 
 class ModelReader:
 
@@ -24,6 +25,8 @@ class ModelReader:
         'bottleneck': ['time', 'population', 'prop'],
         'pulse': ['time', 'source', 'dest', 'prop'],
     }
+    # a written range: [min,max], or loguniform[min,max] for a draw that is uniform on a log scale
+    RANGE = re.compile(r'^\s*(loguniform)?\s*\[(.*)\]\s*$')
 
     def __init__(self, config_values):
         self.config = config_values
@@ -74,12 +77,16 @@ class ModelReader:
                       for name, text in modelinfo["Events"].items()}
             event_order = self._order_events(events, model)
             self._check_numbers(modelinfo, events, model)
+            parameters = self._read_parameters(modelinfo, events, populations, model)
 
             # iterate over parameterizations
             for _ in range(self.config["replicates"]):
 
                 # dictionary for storing event names and times
                 event_dict = {}
+
+                for name, parameter in parameters.items():
+                    event_dict[name] = self._draw_parameter(name, parameter, event_dict, model)
 
                 # empty demography
                 demography = msprime.Demography()
@@ -181,16 +188,18 @@ class ModelReader:
         can't be negative, sizes must be above 0, proportions must be between 0 and 1).
         Expressions (like 2*div_AB) aren't known until they're drawn, so they're skipped."""
 
-        # (what, event type, key, ends) for every value to check
-        values = [(f"population {name}", None, 'size', text.strip().strip('[]').split(','))
-                  for name, text in modelinfo["Populations"].items()]
+        values = []
+        for name, text in modelinfo["Populations"].items():
+            ends, loguniform, _ = self._parse_range(text)
+            values.append((f"population {name}", None, 'size', ends, loguniform))
         for name, item in events.items():
             for key in ('time', 'start', 'stop', 'size', 'prop', 'rate'):
                 if key in item:
                     ends = item[key] if isinstance(item[key], list) else [item[key]]
-                    values.append((f"event {name}", item.get('event'), key, ends))
+                    values.append((f"event {name}", item.get('event'), key, ends,
+                                   self._is_loguniform(item, key)))
 
-        for what, event_type, key, ends in values:
+        for what, event_type, key, ends, loguniform in values:
             try:
                 numbers = [float(re.sub(r'Nm$', '', end.strip())) for end in ends]   # Nm cut off the end
             except ValueError:
@@ -202,6 +211,8 @@ class ModelReader:
                 raise ValueError(f"{problem}. Both ends of a range must be rates, or both Nm values.")
             if len(numbers) == 2 and numbers[0] > numbers[1]:
                 raise ValueError(f"{problem}. Put the smaller value first.")
+            if loguniform and min(numbers) <= 0:
+                raise ValueError(f"{problem}, but a loguniform range must be above 0.")
             if key == 'size' and min(numbers) <= 0:
                 raise ValueError(f"{problem}, but sizes must be above 0.")
             if key in ('time', 'start', 'stop') and min(numbers) < 0:
@@ -291,10 +302,11 @@ class ModelReader:
                 f"{start_min:g} and {start_max:g}, before the stop (at most {stop_max:g}), and while "
                 f"{' and '.join(populations)} all exist (from {exists_from:g} to {exists_until:g} "
                 f"generations ago in this replicate).")
-        start = self._draw_time(low, high)
+        start = self._draw_time(low, high, self._is_loguniform(item_dict, 'start'))
+
 
         # stop: in its own range, and after the start
-        stop = self._draw_time(max(stop_min, start + 1), stop_max)
+        stop = self._draw_time(max(stop_min, start + 1), stop_max, self._is_loguniform(item_dict, 'stop'))
         return start, stop
 
     def _split_time(self, item, item_dict, splits, event_dict, model):
@@ -316,7 +328,7 @@ class ModelReader:
                 f"{time_min:g} and {time_max:g}, and no younger than the splits that form its "
                 f"descendants (at {', '.join(f'{t:g}' for t in formed) or 'none'} "
                 f"generations ago in this replicate).")
-        return self._draw_time(low, time_max)
+        return self._draw_time(low, time_max, self._is_loguniform(item_dict, 'time'))
 
     def _population_size(self, population, value, event_dict, model):
         """Draw a population's size. The size can be a range ([10000,50000]), a number
@@ -326,16 +338,17 @@ class ModelReader:
         if f"pop_{value}" in event_dict:
             return event_dict[f"pop_{value}"]
         try:
-            if value.startswith('['):
-                ends = [end.strip() for end in value.strip('[]').split(',')]
+        ends, loguniform, is_range = self._parse_range(value)
+        try:
+            if is_range:
                 if len(ends) != 2:
                     raise ValueError
                 low, high = [self._evaluate_var(end, event_dict) for end in ends]
-                return self._draw_time(low, high)
+                return self._draw_time(low, high, loguniform)
             return self._evaluate_var(value, event_dict)
         except (ValueError, SyntaxError, TypeError):
             raise ValueError(f"Error in {model}: can't read the size of population {population}, "
-                             f"'{value}'. Use a range ([10000,50000]), a number (20000), or the "
+                             f"'{value}'. Use a range ([10000,50000]), loguniform[10000,100000], a number (20000), or the "
                              f"name of a population listed above it.") from None
 
     def _migration_rate(self, item, item_dict, event_dict, model):
@@ -359,7 +372,7 @@ class ModelReader:
             ends = [end[:-2] for end in ends]
 
         low, high = [self._evaluate_var(end, event_dict) for end in ends]
-        rate = low if low == high else self.rng.uniform(low=low, high=high, size=1)[0]
+        rate = self._draw(low, high, loguniform=self._is_loguniform(item_dict, 'rate'))
         return rate, is_nm[0]
 
     def _value_range(self, item_dict, event_dict, key):
@@ -372,11 +385,39 @@ class ModelReader:
         value = self._evaluate_var(value, event_dict)
         return value, value
 
-    def _draw_time(self, low, high):
-        """A whole-number time drawn uniformly between low and high (or low, if they're equal)."""
+    def _parse_range(self, text):
+        """Split a written value into its parts. Returns (ends, loguniform, is_range):
+        '[a,b]' -> (['a','b'], False, True), 'loguniform[a,b]' -> (['a','b'], True, True),
+        and anything else (a number or an expression) -> ([text], False, False).
+        Commas inside parentheses (as in max(div_AB, 45000)) don't split the ends."""
+        match = self.RANGE.match(text)
+        if not match:
+            return [text.strip()], False, False
+        ends = [end.strip() for end in self._split_ignore_char(match.group(2), '(', ')')]
+        return ends, bool(match.group(1)), True
+
+    def _draw(self, low, high, loguniform=False, whole=False):
+        """Draw a value between low and high (or low, if they're equal): uniformly, or
+        uniformly on a log scale if loguniform. Rounded to a whole number if whole
+        (times and sizes)."""
         if low == high:
             return low
-        return np.round(self.rng.uniform(low=low, high=high, size=1)[0], 0)
+        if loguniform:
+            if low <= 0:
+                raise ValueError(f"a loguniform range must be above 0, but it is [{low:g},{high:g}]")
+            value = float(np.exp(self.rng.uniform(low=np.log(low), high=np.log(high))))
+        else:
+            value = float(self.rng.uniform(low=low, high=high))
+        return float(np.round(value)) if whole else value
+
+    def _draw_time(self, low, high, loguniform=False):
+        """A whole-number time or size drawn between low and high (or low, if they're equal)."""
+        return self._draw(low, high, loguniform=loguniform, whole=True)
+
+    @staticmethod
+    def _is_loguniform(item_dict, key):
+        """Whether an event's value for key was written as loguniform[min,max]."""
+        return key in item_dict.get('loguniform', ())
 
     def _read_migration_matrix(self, modelinfo, model):
         """Read the [Migration] section of a model file, if there is one.
@@ -388,7 +429,7 @@ class ModelReader:
         lineages move from population j to population k, backwards in time. Each cell is
         drawn separately.
 
-        Returns {(source, dest): (low, high, is_nm)} for the non-zero cells, or None."""
+        Returns {(source, dest): (low, high, is_nm, loguniform)} for the non-zero cells, or None."""
 
         if not modelinfo.has_section("Migration"):
             return None
@@ -400,7 +441,7 @@ class ModelReader:
                              f"(for example 'matrix = ...'), but it has {len(keys)} entries.")
 
         # split each line into cells, keeping [min, max] together even if it contains spaces
-        lines = [re.findall(r"\[[^\]]*\]|\S+(?:\s+Nm\b)?", line)
+        lines = [re.findall(r"(?:loguniform)?\[[^\]]*\]|\S+(?:\s+Nm\b)?", line)
                  for line in modelinfo["Migration"][keys[0]].splitlines() if line.strip()]
         if not lines:
             raise ValueError(f"Error in {model}: the [Migration] table is empty.")
@@ -434,11 +475,11 @@ class ModelReader:
 
     def _parse_matrix_cell(self, value, source, dest, model):
         """One cell of the migration matrix: None for no migration, else (low, high, is_nm)."""
-        ends = [x.strip() for x in value.strip("[]").split(",")]
+        ends, loguniform, _ = self._parse_range(value)
         if len(ends) == 1:
             ends = ends * 2
         problem = (f"Error in {model}: the [Migration] entry for {source} to {dest} is '{value}'. "
-                   "Use 0, a rate (1e-5), a range ([1e-5,1e-4]), or Nm values (Nm1 or [Nm0.5,Nm2]).")
+                   "Use 0, a rate (1e-5), a range ([1e-5,1e-4]), or Nm values (1Nm or [0.5Nm,2Nm]), or a loguniform range.")
         if len(ends) != 2:
             raise ValueError(problem)
         is_nm = [end.endswith("Nm") for end in ends]
@@ -450,9 +491,11 @@ class ModelReader:
             raise ValueError(problem) from None
         if low < 0 or low > high:
             raise ValueError(problem + " Values must be non-negative, minimum first.")
+        if loguniform and low <= 0:
+          raise ValueError(problem + " A loguniform range must be above 0.")
         if high == 0:
             return None
-        return (low, high, is_nm[0])
+        return (low, high, is_nm[0], loguniform)
 
     def _add_matrix_migration(self, demography, cells, splits, event_dict, model):
         """Set migration from the present, as given by the migration matrix. msprime turns
@@ -461,7 +504,7 @@ class ModelReader:
         merged_at_present = {d for time, descendants, _ in splits if time == 0 for d in descendants}
         ancestral = {ancestor for time, _, ancestor in splits if time > 0}
 
-        for (source, dest), (low, high, is_nm) in cells.items():
+        for (source, dest), (low, high, is_nm, loguniform) in cells.items():
             for population in (source, dest):
                 if population in ancestral:
                     raise ValueError(
@@ -477,7 +520,7 @@ class ModelReader:
                         f"{source} and {dest}, but {population} merges with another population "
                         f"at time 0, so it doesn't exist at the present. Use the name of the "
                         f"merged population instead.")
-            rate = low if low == high else self.rng.uniform(low=low, high=high)
+            rate = self._draw(low, high, loguniform=loguniform)
             if is_nm:
                 # M[j, k] is a fraction of population j (forward in time), so m = Nm / N_j
                 rate = rate / event_dict[f"pop_{source}"]
@@ -601,12 +644,16 @@ class ModelReader:
                 raise ValueError(f"{problem}: '{entry}' should be written as name=value.")
             key, value = [part.strip() for part in entry.split('=', 1)]
             if '[' in value:
-                value = [x.strip('[] ') for x in self._split_ignore_char(value, '(', ')')]
+                value, loguniform, _ = self._parse_range(value)
+                if loguniform:
+                    if key not in ('time', 'start', 'stop', 'size', 'rate', 'prop'):
+                        raise ValueError(f"{problem}: {key} can't be loguniform.")
+                    split_results.setdefault('loguniform', set()).add(key)
             split_results[key] = value
 
         # exactly the parameters this type takes
         expected = self.EVENT_PARAMETERS[event_type]
-        unknown = [key for key in split_results if key != 'event' and key not in expected]
+        unknown = [key for key in split_results if key not in ('event', 'loguniform') and key not in expected]
         missing = [key for key in expected if key not in split_results]
         if unknown or missing:
             found = [f"has {', '.join(unknown)}"] if unknown else []
@@ -639,7 +686,7 @@ class ModelReader:
 
     def _evaluate_var(self, var, event_dict):
         """Turn a value from a model file into a number. It can be a number (1e-5) or an
-        expression using earlier events, population sizes, and min, max, mean, or median
+        expression using earlier events, population sizes, and min, max, mean, median, log, or exp
         (for example, 0.5*pop_C or max(div_AB, 45000))."""
         try:
             return float(var)
@@ -649,7 +696,9 @@ class ModelReader:
         # the names an expression can use
         names = {'min': min, 'max': max,
                  'mean': lambda *values: float(np.mean(values)),
-                 'median': lambda *values: float(np.median(values))}
+                 'median': lambda *values: float(np.median(values)),
+                 'log': math.log,
+                 'exp': math.exp}
         names.update(event_dict)
         try:
             return eval(var, {'__builtins__': {}}, names)
@@ -708,9 +757,46 @@ class ModelReader:
         return(result)
 
     def _get_event_value(self, item_dict, event_dict, valuetype):
-        """Draw a time, size, growth rate, or proportion. A fixed value or expression is used
-        as it is; a [min,max] range is drawn uniformly, rounded for times and sizes."""
+        """A range is drawn uniformly, or on a log scale for loguniform[min,max]; times and sizes are rounded."""
         low, high = self._value_range(item_dict, event_dict, valuetype)
-        if valuetype in ('time', 'size'):
-            return self._draw_time(low, high)
-        return low if low == high else self.rng.uniform(low=low, high=high, size=1)[0]
+        return self._draw(low, high, loguniform=self._is_loguniform(item_dict, valuetype),
+                          whole=valuetype in ('time', 'size'))
+
+    def _read_parameters(self, modelinfo, events, populations, model):
+        """Read the optional [Parameters] section: named values for use in expressions that
+        aren't themselves a time, size or rate (e.g. a fold-change). Each is a number, a
+        range ([2,20] or loguniform[2,20]), or an expression using parameters above it.
+        Returns {name: (ends, loguniform, is_range)}, in file order."""
+        parameters = {}
+        if not modelinfo.has_section("Parameters"):
+            return parameters
+        reserved = {'min', 'max', 'mean', 'median', 'log', 'exp'}
+        for name, text in modelinfo["Parameters"].items():
+            if (not re.fullmatch(r'[A-Za-z_]\w*', name) or name in reserved or name.startswith('pop_')
+                    or name in events or name in populations):
+                raise ValueError(f"Error in {model}: the parameter name {name} can't be used. Use letters, "
+                                 f"numbers and _, and not the name of an event, a population, pop_..., "
+                                 f"or {', '.join(sorted(reserved))}.")
+            ends, loguniform, is_range = self._parse_range(text)
+            problem = f"Error in {model}: the parameter {name} is {text.strip()}"
+            if is_range and len(ends) != 2:
+                raise ValueError(f"{problem}. A range needs two values, [min,max].")
+            try:
+                numbers = [float(end) for end in ends]
+            except ValueError:
+                numbers = None   # an expression: checked when it's drawn
+            if numbers and is_range and numbers[0] > numbers[1]:
+                raise ValueError(f"{problem}. Put the smaller value first.")
+            if numbers and loguniform and numbers[0] <= 0:
+                raise ValueError(f"{problem}, but a loguniform range must be above 0.")
+            parameters[name] = (ends, loguniform, is_range)
+        return parameters
+
+    def _draw_parameter(self, name, parameter, event_dict, model):
+        """Draw one parameter for this replicate. Parameters aren't rounded."""
+        ends, loguniform, is_range = parameter
+        try:
+            values = [self._evaluate_var(end, event_dict) for end in ends]
+            return self._draw(values[0], values[1], loguniform=loguniform) if is_range else values[0]
+        except (ValueError, SyntaxError, TypeError) as error:
+            raise ValueError(f"Error in {model}: can't work out parameter {name} ({error}).") from None
