@@ -57,7 +57,7 @@ For example, my directory structure could look as follows:
 Model Files
 ========================================
 
-Model files contain up to three sections:
+Model files contain up to four sections:
 
 1. Populations (required)
 2. Migration (optional): migration from the present day
@@ -92,11 +92,11 @@ Example::
     AB=[10000,50000]
     ABC=[10000,50000]
 
-------------------
+------------------------
 Parameters (optional)
-------------------
+------------------------
 
-* Parametesrs are drawn first, in file order.
+* Parameters are drawn first, in file order.
 * Each entry a uniform prior  (``[1e-5,1e-4]``), a loguniform prior (``loguniform[min,max]``), or an expresison of previously drawn parameters.
 * Parameters are not rounded.
 * Parameters can be used in sizes and event values.
@@ -151,7 +151,7 @@ Parameters depend on the event type (see below). Each value can be:
 * a number (e.g., ``25000`` or ``1e-5``)
 * a range for a uniform prior (e.g., ``[10000,50000]``), with the smaller value first
 * a range for a loguniform prior (e.g., ``loguniform[min,max]``)
-* an expression using other events' times and population sizes. Expressions can use addition (+), subtraction (-), multiplication (*), division (/), parentheses, and the functions min, max, mean, median, log, and exp (e.g., ``max(div_AB, 45000)`` or ``mean(div_AB, 3*1e4)``). The present-day size of population A is ``pop_A``.
+* an expression using other events' times, population sizes, and parameters. Expressions can use addition (+), subtraction (-), multiplication (*), division (/), parentheses, and the functions min, max, mean, median, log, and exp (e.g., ``max(div_AB, 45000)`` or ``mean(div_AB, 3*1e4)``). The present-day size of population A is ``pop_A``.
 
 Events can be listed in any order. popai works out the order to process them in, so that each event comes after the events it refers to. If two events refer to each other in a loop, popai gives an error.
 
@@ -288,6 +288,7 @@ popai checks model files as it reads them, and stops with a message naming the m
 * an event type that doesn't exist, or an event missing a value it needs
 * a model file name that doesn't end in ``_x.model``, or two files with the same number
 * timing that's impossible, such as a split younger than its descendants' splits, or migration that starts after its populations have merged
+* bad or reserved parameter names
 
 Values given as expressions are only known once they are drawn, so they are checked in each replicate.
 

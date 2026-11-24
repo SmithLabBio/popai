@@ -337,7 +337,6 @@ class ModelReader:
         value = value.strip()
         if f"pop_{value}" in event_dict:
             return event_dict[f"pop_{value}"]
-        try:
         ends, loguniform, is_range = self._parse_range(value)
         try:
             if is_range:
@@ -474,7 +473,7 @@ class ModelReader:
         return cells
 
     def _parse_matrix_cell(self, value, source, dest, model):
-        """One cell of the migration matrix: None for no migration, else (low, high, is_nm)."""
+        """One cell of the migration matrix: None for no migration, else (low, high, is_nm, loguniform)."""
         ends, loguniform, _ = self._parse_range(value)
         if len(ends) == 1:
             ends = ends * 2
@@ -705,7 +704,7 @@ class ModelReader:
         except NameError as error:
             raise ValueError(f"Can't work out the value '{var}' ({error}). Expressions can use "
                              f"the names of earlier events, population sizes (as pop_A), and "
-                             f"min, max, mean, and median.") from None
+                             f"min, max, mean, median, log, or exp.") from None
 
     def _split_ignore_char(self, string, char1, char2):
         result = []

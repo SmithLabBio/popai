@@ -535,3 +535,176 @@ def test_example_and_tutorial_models(folder):
     assert labels == ["model_0"] * 3 + ["model_1"] * 3 + ["model_2"] * 3
     for demography in demographies:
         simulate(demography)
+
+# ---------------------------------------------------------------------------
+# Log-uniform ranges
+# ---------------------------------------------------------------------------
+
+def is_log_uniform(values, low, high):
+    """Every value is in [low, high], and about half are below the geometric midpoint, as
+    expected on a log scale (a uniform draw over a range spanning 100x would put ~9% there)."""
+    below = np.mean([v < np.sqrt(low * high) for v in values])
+    return all(low <= v <= high for v in values) and 0.35 < below < 0.65
+
+
+LOG_TABLE = matrix(["", "A", "B"], ["A", "0", "loguniform[1e-6, 1e-4]"], ["B", "0", "0"])
+LOG_EVENTS = ("mig = symmetric_migration{start=loguniform[10,1000], stop=loguniform[2000,9000], "
+              "populations=[A,C], rate=loguniform[0.02Nm,2Nm]}\n"
+              "g = popgrowth{time=loguniform[10,1000], population=C, rate=loguniform[1e-5,1e-3]}\n"
+              "b = bottleneck{time=[500,700], population=B, prop=loguniform[0.001,0.1]}\n")
+LOG_POPULATIONS = POPULATIONS.replace("A=[10000,50000]", "A=loguniform[1000,100000]")
+LOG_SPLITS = SPLITS.replace("[10000,20000]", "loguniform[10000,1000000]").replace("[50000,100000]", "[1000000,2000000]")
+
+
+def test_loguniform_in_every_kind_of_value(tmp_path):
+    demographies = read_one(tmp_path, model(LOG_EVENTS, populations=LOG_POPULATIONS, splits=LOG_SPLITS,
+                                            migration=LOG_TABLE), replicates=400)
+    found = {key: [] for key in ("size", "split", "start", "stop", "nm", "growth time", "growth rate",
+                                 "prop", "matrix")}
+    for demography in demographies:
+        size = sizes(demography)
+        found["size"].append(size["A"])
+        found["split"].append(split_times(demography)["AB"])
+        start, stop, rate = migration_window(demography, "A", "C")
+        found["start"].append(start)
+        found["stop"].append(stop)
+        found["nm"].append(rate * size["A"])   # m = Nm / N_source
+        growth = [e for e in demography.events if getattr(e, "growth_rate", None) is not None][0]
+        found["growth time"].append(growth.time)
+        found["growth rate"].append(growth.growth_rate)
+        found["prop"].append([e for e in demography.events if hasattr(e, "proportion")][0].proportion)
+        found["matrix"].append(present_rate(demography, "A", "B"))
+    limits = {"size": (1000, 100000), "split": (10000, 1000000), "start": (10, 1000), "stop": (2000, 9000),
+              "nm": (0.02, 2), "growth time": (10, 1000), "growth rate": (1e-5, 1e-3), "prop": (0.001, 0.1),
+              "matrix": (1e-6, 1e-4)}
+    for key, (low, high) in limits.items():
+        assert is_log_uniform(found[key], low, high), key
+    # times and sizes are still whole numbers
+    for key in ("size", "split", "start", "stop", "growth time"):
+        assert all(v == round(v) for v in found[key]), key
+
+
+def test_loguniform_rate_is_one_draw_for_both_directions(tmp_path):
+    event = "symmetric_migration{start=0, stop=div_AB, populations=[A,B], rate=loguniform[1e-6,1e-4]}"
+    for rates, _ in windows(tmp_path, event):
+        assert rates[("A", "B")] == rates[("B", "A")] and 1e-6 <= rates[("A", "B")] <= 1e-4
+
+
+def test_loguniform_with_spaces_in_the_migration_table(tmp_path):
+    table = matrix(["", "A", "B"], ["A", "0", "loguniform[1e-6, 1e-4]"], ["B", "loguniform[ 1Nm , 2Nm ]", "0"])
+    for demography in read_one(tmp_path, model(migration=table), replicates=50):
+        assert 1e-6 <= present_rate(demography, "A", "B") <= 1e-4
+        assert 1 <= present_rate(demography, "B", "A") * sizes(demography)["B"] <= 2
+
+
+def test_models_without_loguniform_draw_as_before(tmp_path):
+    # values recorded from popai 4c0d66a (before log-uniform ranges), seed 1
+    table = matrix(["", "A", "B"], ["A", "0", "[1e-5,1e-4]"], ["B", "0", "0"])
+    events = ("mig = symmetric_migration{start=[0,5000], stop=div_AB, populations=[A,C], rate=[0.5Nm,2Nm]}\n"
+              "g = popgrowth{time=[100,500], population=C, rate=[-0.001,0.001]}\n")
+    demography = read_one(tmp_path, model(events, migration=table), replicates=1, seed=1)[0]
+    assert sizes(demography) == {"A": 30473, "B": 48019, "C": 15766, "AB": 47946, "ABC": 22473}
+    assert split_times(demography) == {"AB": 14233, "ABC": 91385}
+    assert migration_window(demography, "C", "A") == (2046, 14233, pytest.approx(8.400295138333053e-05))
+    assert migration_window(demography, "A", "C") == (2046, 14233, pytest.approx(4.3461114150546033e-05))
+    growth = [e for e in demography.events if getattr(e, "growth_rate", None) is not None][0]
+    assert (growth.time, growth.growth_rate) == (111, pytest.approx(0.0005070262173496132))
+    assert present_rate(demography, "A", "B") == pytest.approx(5.8432898189735043e-05)
+
+
+@pytest.mark.parametrize("change, message", [
+    (("populations", "A=[10000,50000]", "A=loguniform[0,50000]"), "a loguniform range must be above 0"),
+    (("events", "b = bottleneck{time=500, population=A, prop=loguniform[0,0.5]}\n"), "a loguniform range must be above 0"),
+    (("events", "m = symmetric_migration{start=loguniform[0,10], stop=div_AB, populations=[A,B], rate=1e-5}\n"),
+     "a loguniform range must be above 0"),
+    (("migration", matrix(["", "A", "B"], ["A", "0", "loguniform[0,1e-4]"], ["B", "0", "0"])),
+     "A loguniform range must be above 0"),
+    (("splits", "div_AB = split{time=[10000,20000], descendants=loguniform[A,B], ancestor=AB}\n"
+                "div_ABC = split{time=[50000,100000], descendants=[AB,C], ancestor=ABC}\n"),
+     "descendants can't be loguniform"),
+])
+def test_impossible_loguniform_values(tmp_path, change, message):
+    kind = change[0]
+    if kind == "populations":
+        text = model(populations=POPULATIONS.replace(change[1], change[2]))
+    elif kind == "events":
+        text = model(change[1])
+    elif kind == "migration":
+        text = model(migration=change[1])
+    else:
+        text = model(splits=change[1])
+    assert message in read_error(tmp_path, text)
+
+
+def test_a_loguniform_range_drawn_from_an_expression_must_be_above_0(tmp_path):
+    events = "b = popsize{time=loguniform[div_AB-div_AB, 100], population=A, size=1000}\n"
+    assert "a loguniform range must be above 0" in read_error(tmp_path, model(events))
+
+
+# ---------------------------------------------------------------------------
+# The [Parameters] section, log and exp
+# ---------------------------------------------------------------------------
+
+EXPANSION = """[Parameters]
+fold = loguniform[2,20]
+lnfold = log(fold)
+
+[Populations]
+A=[10000,50000]
+C=1000*fold
+AB=1000*exp(lnfold)
+
+[Events]
+div_AB = split{time=[50000,100000], descendants=[A,C], ancestor=AB}
+stop_C = popgrowth{time=[1000,20000], population=C, rate=0}
+grow_C = popgrowth{time=0, population=C, rate=log(fold)/stop_C}
+"""
+
+
+def test_parameters_in_sizes_and_event_values(tmp_path):
+    folds = []
+    for demography in read_one(tmp_path, EXPANSION, replicates=400):
+        size = sizes(demography)
+        fold = size["C"] / 1000                     # C = 1000 * fold
+        folds.append(fold)
+        assert size["AB"] == pytest.approx(size["C"])  # exp(log(fold)) = fold
+        stop, grow = sorted((e for e in demography.events if getattr(e, "growth_rate", None) is not None),
+                            key=lambda e: e.time, reverse=True)
+        assert grow.time == 0 and stop.growth_rate == 0
+        assert grow.growth_rate == pytest.approx(np.log(fold) / stop.time)
+        # C grows by the fold-change between stop_C and the present
+        names = [p.name for p in demography.populations]
+        trajectory = demography.debug().population_size_trajectory([0, stop.time])
+        assert trajectory[0, names.index("C")] / trajectory[1, names.index("C")] == pytest.approx(fold)
+    assert is_log_uniform(folds, 2, 20)
+    assert any(f != round(f) for f in folds)        # parameters aren't rounded
+    simulate(read_one(tmp_path, EXPANSION, replicates=1)[0])
+
+
+def test_parameters_can_use_parameters_above_them(tmp_path):
+    text = model(populations="[Parameters]\nx = [1,2]\ny = 2*x\nz = 7\n\n" +
+                 POPULATIONS.replace("C=[10000,50000]", "C=10000*y+z"))
+    for demography in read_one(tmp_path, text, replicates=50):
+        c = sizes(demography)["C"]
+        assert 20007 <= c <= 40007
+
+
+@pytest.mark.parametrize("parameters, message", [
+    ("x = [20,2]", "Put the smaller value first"),
+    ("x = loguniform[0,2]", "a loguniform range must be above 0"),
+    ("x = [1,2,3]", "A range needs two values"),
+    ("2x = 3", "the parameter name 2x can't be used"),
+    ("log = 3", "the parameter name log can't be used"),
+    ("pop_A = 3", "the parameter name pop_A can't be used"),
+    ("div_AB = 3", "the parameter name div_AB can't be used"),
+    ("A = 3", "the parameter name A can't be used"),
+    ("x = y*2", "can't work out parameter x"),
+    ("x = [1,y]", "can't work out parameter x"),
+])
+def test_bad_parameters(tmp_path, parameters, message):
+    assert message in read_error(tmp_path, model(populations=f"[Parameters]\n{parameters}\n\n" + POPULATIONS))
+
+
+def test_a_parameter_can_not_use_a_parameter_below_it(tmp_path):
+    text = model(populations="[Parameters]\nx = 2*y\ny = 3\n\n" + POPULATIONS)
+    assert "can't work out parameter x" in read_error(tmp_path, text)
